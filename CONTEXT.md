@@ -137,8 +137,35 @@ A record absent from today's scrape could mean cancelled, rescheduled, scrolled 
 the ~3-month window, or **the scraper silently broke** — the source never says which.
 So the model records the observation and refuses to infer a status it was never told.
 
-This preserves the UID across a disappearance and reappearance, and gives breakage
-detection (#9) its raw signal.
+This preserves the UID across a disappearance and reappearance, and gives **Source health**
+its raw signal.
+
+### Source health
+
+A source is **unhealthy** when the pipeline has reason to suspect it can no longer be read.
+Four signals, three from the parser (see **Source**, ADR-0006) and one from the core:
+
+| Signal | Meaning |
+|---|---|
+| `fetch` threw, post-retry | Could not acquire the document. |
+| `ok: false` | Anchor absent — not our document (challenge page, redesign, 200-with-an-error). |
+| `failures[]` non-empty | Some rows broke. |
+| **Net drop ≥3 in the future-dated cohort** | The quiet one. See below. |
+
+The **future-dated cohort** is the records from a source whose `end`/`departure` is still
+ahead of `now`. A record has **vanished** when it was in the previous run's cohort, is
+still future-dated now, and is absent now. Appearances offset vanishings — so the measure
+is **net**.
+
+Both qualifiers carry weight. *Future-dated* excludes a conference that merely happened:
+it leaves the cohort by exiting it, not by vanishing from it — which is what makes the
+healthy baseline **net zero or positive** for every source at every size. *Net* absorbs
+SCC's reschedule flaw (see **sourceKey**) by construction: a delete-plus-create is one out,
+one in, net zero, while a dead selector takes rows away and puts nothing back.
+
+**Unhealthy is a suspicion addressed to the operator, never a fact about a record.** There
+is no `status: broken` field. **Seen-tracking** refuses to resolve absence into a status
+the source never stated, and detecting breakage does not reverse that. See ADR-0007.
 
 ### Scraped
 
