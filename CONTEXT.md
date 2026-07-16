@@ -140,6 +140,54 @@ So the model records the observation and refuses to infer a status it was never 
 This preserves the UID across a disappearance and reappearance, and gives breakage
 detection (#9) its raw signal.
 
+### Scraped
+
+What an adapter can honestly return: **observation, not memory.**
+
+```
+Scraped<T> = Omit<T, 'uid' | 'sequence' | 'firstSeenAt' | 'lastSeenAt'>
+```
+
+A parser reads a page. It knows `name`, `start`, `end`, `venue`, `hall`, and computes
+`sourceKey`. It **cannot** know:
+
+| Excluded | Why |
+|---|---|
+| `uid` | Durable state, looked up by `(source, sourceKey)`. Today's HTML has no access to that memory. |
+| `sequence` | A comparison against stored state the parser has never seen. |
+| `firstSeenAt` | A fact about our observation history, not about the page. |
+| `lastSeenAt` | Same. |
+
+**The adapter observes; the core remembers.** If `parse` returned a full **VenueEvent**
+it would have to fabricate those four — including minting a `uid` on *every scrape*,
+which is precisely the recompute that **UID** forbids, and which duplicates a rescheduled
+conference instead of moving it. The type makes that bug unwritable rather than merely
+discouraged.
+
+All **UID** minting, `sequence` diffing and **Seen-tracking** live in the core, once.
+
+Not a third domain type — it is **VenueEvent**/**PortCall** minus what we remember.
+See ADR-0005.
+
+### Source
+
+The seam every scraper implements. `fetch` does all the I/O and returns opaque `Raw`;
+`parse` is pure and fixture-testable. `Raw` is adapter-owned and never inspected by the
+core — so a caller cannot tell that MBCCS drove a headless browser while Suntec did a
+plain GET.
+
+```
+Source<T, Raw> {
+  key
+  fetch(deps): Promise<Raw>                  // http (rate-limited), browser?, now
+  parse(raw, now): ParseResult<Scraped<T>>   // pure
+}
+```
+
+Each source's scraper is **wholly unique** — the three share no code. The interface
+constrains only the edges; the shared pipeline (upsert, **UID**, **Seen-tracking**) is
+what it feeds. See ADR-0005 and ADR-0006.
+
 ### Timing
 
 `start`/`end`/`arrival`/`departure` are **UTC instants**. There is no all-day shape
