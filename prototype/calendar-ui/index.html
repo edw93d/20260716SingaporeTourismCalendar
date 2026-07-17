@@ -1,0 +1,560 @@
+<title>Calendar UI prototype — which view survives the data? (#12)</title>
+<!--
+  THROWAWAY PROTOTYPE for issue #12 — "Prototype the calendar UI".
+  Three radically different views of ONE hand-made, deliberately adversarial dataset,
+  switchable via ?variant= and the floating bar (or ← / → keys).
+
+  The question this must answer (per #12 + #5's input):
+    Which primary view survives contact with this dataset — and can a type FILTER
+    alone carry the load that impact-SCORING carries in comparable products, given
+    the map rules magnitude out of scope?
+
+  The trap to expose: without magnitude, a 40k-delegate congress and a 3-hour craft
+  fair are equal marks; a 4,000-passenger cruise ship and a coffee popup are equal
+  marks. A count-based surface will therefore rank the WRONG day as "busiest".
+
+  Not production. No build step, no framework, no persistence. Delete when the
+  decision is folded into CONTEXT.md / an ADR.
+-->
+<style>
+  :root {
+    --ground:      #f4f6f8;
+    --surface:     #ffffff;
+    --surface-2:   #eef1f4;
+    --ink:         #16212b;
+    --ink-soft:    #47586a;
+    --ink-faint:   #7a8b9a;
+    --border:      #d8dee4;
+    --border-soft: #e6eaee;
+    --accent:      #0e7490;
+    --accent-ink:  #ffffff;
+    --venue:       #b45309;   /* VenueEvent — warm: people gathering */
+    --venue-bg:    #fdf1e3;
+    --venue-line:  #e9b787;
+    --port:        #0369a1;   /* PortCall — ocean */
+    --port-bg:     #e6f1fa;
+    --port-line:   #9cc5e6;
+    --danger:      #b91c1c;
+    --danger-bg:   #fbe9e9;
+    --shadow:      0 1px 2px rgba(16,33,43,.06), 0 8px 24px rgba(16,33,43,.08);
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", "Menlo", "Consolas", monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:      #0f1620;
+      --surface:     #16212d;
+      --surface-2:   #1d2b3a;
+      --ink:         #e7edf3;
+      --ink-soft:    #a9b8c6;
+      --ink-faint:   #6f8296;
+      --border:      #2a3a4b;
+      --border-soft: #223140;
+      --accent:      #38bdf8;
+      --accent-ink:  #05131d;
+      --venue:       #f0a860;
+      --venue-bg:    #33230f;
+      --venue-line:  #6b4a22;
+      --port:        #6bb8ee;
+      --port-bg:     #10283c;
+      --port-line:   #274d69;
+      --danger:      #f87171;
+      --danger-bg:   #341717;
+      --shadow:      0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.45);
+    }
+  }
+  :root[data-theme="light"] {
+    --ground:#f4f6f8; --surface:#ffffff; --surface-2:#eef1f4; --ink:#16212b;
+    --ink-soft:#47586a; --ink-faint:#7a8b9a; --border:#d8dee4; --border-soft:#e6eaee;
+    --accent:#0e7490; --accent-ink:#ffffff; --venue:#b45309; --venue-bg:#fdf1e3;
+    --venue-line:#e9b787; --port:#0369a1; --port-bg:#e6f1fa; --port-line:#9cc5e6;
+    --danger:#b91c1c; --danger-bg:#fbe9e9;
+    --shadow:0 1px 2px rgba(16,33,43,.06),0 8px 24px rgba(16,33,43,.08);
+  }
+  :root[data-theme="dark"] {
+    --ground:#0f1620; --surface:#16212d; --surface-2:#1d2b3a; --ink:#e7edf3;
+    --ink-soft:#a9b8c6; --ink-faint:#6f8296; --border:#2a3a4b; --border-soft:#223140;
+    --accent:#38bdf8; --accent-ink:#05131d; --venue:#f0a860; --venue-bg:#33230f;
+    --venue-line:#6b4a22; --port:#6bb8ee; --port-bg:#10283c; --port-line:#274d69;
+    --danger:#f87171; --danger-bg:#341717;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.45);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+    background: var(--ground);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.45;
+  }
+  .app { max-width: 1180px; margin: 0 auto; padding: 22px 22px 120px; }
+
+  /* ---------- top bar ---------- */
+  header.top { display: flex; flex-wrap: wrap; gap: 16px 22px; align-items: flex-end;
+               justify-content: space-between; margin-bottom: 20px; }
+  .brand h1 { font-size: 19px; margin: 0; letter-spacing: -.01em; font-weight: 650; }
+  .brand p  { margin: 3px 0 0; color: var(--ink-soft); font-size: 13px; max-width: 52ch; }
+  .brand .rng { font-family: var(--mono); font-size: 12px; color: var(--ink-faint);
+                margin-top: 6px; letter-spacing: .02em; }
+
+  .filter { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border);
+            border-radius: 10px; padding: 3px; gap: 2px; }
+  .filter button { font: inherit; font-size: 12.5px; font-weight: 550; cursor: pointer;
+                   border: 0; background: transparent; color: var(--ink-soft);
+                   padding: 7px 13px; border-radius: 7px; display: inline-flex; align-items: center; gap: 7px; }
+  .filter button .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .filter button[data-k="venue"] .dot { background: var(--venue); }
+  .filter button[data-k="port"]  .dot { background: var(--port); }
+  .filter button[data-k="all"]   .dot { background: linear-gradient(90deg,var(--venue) 50%,var(--port) 50%); }
+  .filter button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+  .filter button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- shared bits ---------- */
+  .legend { display: flex; gap: 18px; align-items: center; color: var(--ink-faint);
+            font-size: 12px; margin: 0 0 14px; flex-wrap: wrap; }
+  .legend .k { display: inline-flex; gap: 7px; align-items: center; }
+  .legend .sw { width: 12px; height: 12px; border-radius: 3px; }
+  .sw.venue { background: var(--venue-bg); border: 1.5px solid var(--venue); }
+  .sw.port  { background: var(--port-bg);  border: 1.5px solid var(--port); }
+  .badge { font-family: var(--mono); font-size: 10px; letter-spacing: .04em; text-transform: uppercase;
+           padding: 2px 6px; border-radius: 5px; font-weight: 600; white-space: nowrap; }
+  .badge.venue { color: var(--venue); background: var(--venue-bg); border: 1px solid var(--venue-line); }
+  .badge.port  { color: var(--port);  background: var(--port-bg);  border: 1px solid var(--port-line); }
+  .src { color: var(--ink-faint); font-size: 11px; font-family: var(--mono); }
+  .muted { color: var(--ink-faint); }
+  .tnum { font-variant-numeric: tabular-nums; font-family: var(--mono); }
+
+  .note { border: 1px solid var(--border); border-left: 3px solid var(--danger);
+          background: var(--danger-bg); border-radius: 8px; padding: 11px 14px; margin: 0 0 18px;
+          font-size: 12.5px; color: var(--ink); }
+  .note b { color: var(--danger); }
+
+  /* ================= VARIANT A — month grid ================= */
+  .grid-cap { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
+  .mgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
+           background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .mgrid .dow { background: var(--surface-2); color: var(--ink-faint); font-size: 11px;
+                text-transform: uppercase; letter-spacing: .06em; padding: 7px 8px; font-weight: 600; text-align: right; }
+  .mgrid .cell { background: var(--surface); min-height: 108px; padding: 6px 7px; display: flex; flex-direction: column; gap: 3px; }
+  .mgrid .cell.out { background: var(--surface-2); }
+  .mgrid .cell .dnum { font-size: 12px; text-align: right; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .mgrid .cell.today .dnum { color: var(--accent-ink); background: var(--accent); border-radius: 50%;
+                             width: 21px; height: 21px; line-height: 21px; margin-left: auto; text-align: center; font-weight: 700; }
+  .chip { font-size: 11px; padding: 2px 6px; border-radius: 5px; white-space: nowrap; overflow: hidden;
+          text-overflow: ellipsis; border-left: 3px solid; cursor: default; }
+  .chip.venue { background: var(--venue-bg); border-color: var(--venue); color: var(--venue); }
+  .chip.port  { background: var(--port-bg);  border-color: var(--port);  color: var(--port); }
+  .chip.span  { border-radius: 5px; font-weight: 600; }
+  .more { font-size: 10.5px; color: var(--ink-faint); padding: 1px 6px; cursor: default; }
+
+  /* ================= VARIANT B — date-spine timeline ================= */
+  .spine { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border);
+           border-radius: 10px; overflow: hidden; background: var(--surface); }
+  .srow { display: grid; grid-template-columns: 92px 1fr; border-top: 1px solid var(--border-soft); }
+  .srow:first-child { border-top: 0; }
+  .srow.weekend .datecol { background: var(--surface-2); }
+  .srow.today .datecol { box-shadow: inset 3px 0 0 var(--accent); }
+  .datecol { padding: 9px 12px; border-right: 1px solid var(--border-soft); }
+  .datecol .wd { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-faint); }
+  .datecol .dd { font-size: 21px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .datecol .mo { font-size: 11px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+  .track { position: relative; padding: 8px 0; min-height: 26px; }
+  .track .hourgrid { position: absolute; inset: 0; pointer-events: none; }
+  .track .hourgrid i { position: absolute; top: 0; bottom: 0; border-left: 1px dashed var(--border-soft); }
+  .track .hourgrid span { position: absolute; top: 2px; font-size: 9px; color: var(--ink-faint); font-family: var(--mono); transform: translateX(3px); }
+  .bar { position: relative; height: 22px; margin: 3px 8px 3px 0; border-radius: 5px; border-left: 3px solid;
+         font-size: 11px; line-height: 22px; padding: 0 8px; white-space: nowrap; overflow: hidden;
+         text-overflow: ellipsis; box-sizing: border-box; }
+  .bar.venue { background: var(--venue-bg); border-color: var(--venue); color: var(--venue); }
+  .bar.port  { background: var(--port-bg);  border-color: var(--port);  color: var(--port); }
+  .bar.multi { font-weight: 650; height: 24px; line-height: 24px; box-shadow: var(--shadow); }
+  .bar.cont::before { content: "‹ "; opacity: .5; }
+  .bar.contr::after { content: " ›"; opacity: .5; }
+  .lane { position: relative; height: 28px; }
+
+  /* ================= VARIANT C — agenda ================= */
+  .agenda { display: flex; flex-direction: column; gap: 0; }
+  .aday { border-top: 1px solid var(--border); }
+  .aday:first-child { border-top: 0; }
+  .aday .ah { position: sticky; top: 0; background: var(--ground); display: flex; align-items: baseline;
+              justify-content: space-between; padding: 12px 2px 8px; z-index: 2; }
+  .aday .ah .d { font-size: 14px; font-weight: 650; }
+  .aday .ah .d .wd { color: var(--ink-faint); font-weight: 500; margin-left: 8px; font-size: 12.5px; text-transform: uppercase; letter-spacing: .04em; }
+  .aday .ah .cnt { font-size: 11.5px; color: var(--ink-faint); font-family: var(--mono); }
+  .arow { display: grid; grid-template-columns: 128px 1fr auto; gap: 14px; align-items: center;
+          background: var(--surface); border: 1px solid var(--border-soft); border-radius: 8px;
+          padding: 9px 13px; margin-bottom: 6px; }
+  .arow .when { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .arow .when .dur { display: block; color: var(--ink-faint); font-size: 10.5px; margin-top: 2px; }
+  .arow .what .ttl { font-size: 13.5px; font-weight: 550; }
+  .arow .what .loc { font-size: 11.5px; color: var(--ink-faint); margin-top: 1px; }
+  .arow .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .arow .durbar { grid-column: 1 / -1; height: 3px; border-radius: 2px; margin-top: 2px; opacity: .8; }
+  .arow .durbar.venue { background: var(--venue); }
+  .arow .durbar.port  { background: var(--port); }
+
+  .empty { color: var(--ink-faint); font-size: 12px; padding: 14px; text-align: center; }
+
+  /* ---------- floating switcher ---------- */
+  .switcher {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+    display: flex; align-items: stretch; gap: 0; background: var(--ink); color: var(--ground);
+    border-radius: 999px; box-shadow: 0 8px 30px rgba(0,0,0,.35); z-index: 50; font-family: var(--sans);
+    border: 1px solid rgba(255,255,255,.12);
+  }
+  :root[data-theme="dark"] .switcher, .switcher { }
+  .switcher button { font: inherit; background: transparent; color: inherit; border: 0; cursor: pointer;
+                     padding: 0 16px; font-size: 18px; display: flex; align-items: center; border-radius: 999px; }
+  .switcher button:hover { background: rgba(255,255,255,.12); }
+  .switcher .lbl { padding: 10px 6px; display: flex; flex-direction: column; align-items: center; min-width: 190px; }
+  .switcher .lbl .v { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; opacity: .6; }
+  .switcher .lbl .n { font-size: 13px; font-weight: 600; }
+  .switcher .dots { display: flex; gap: 5px; padding: 0 14px 0 4px; align-items: center; }
+  .switcher .dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.3); }
+  .switcher .dots i.on { background: var(--ground); }
+  .switcher button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  @media (max-width: 640px) {
+    .arow { grid-template-columns: 100px 1fr; }
+    .arow .meta { grid-column: 2; flex-direction: row; }
+    .mgrid .cell { min-height: 84px; }
+    .datecol { padding: 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>SG Demand Calendar <span class="muted" style="font-weight:400">— UI prototype</span></h1>
+      <p>Which primary view survives real-shaped data? Same dataset in every variant — including a
+         deliberately adversarial week. Flip variants below (or use ← / →).</p>
+      <div class="rng" id="range"></div>
+    </div>
+    <div class="filter" id="filter" role="group" aria-label="Type filter">
+      <button data-k="all"   class="on"><span class="dot"></span>All</button>
+      <button data-k="venue"><span class="dot"></span>Venue events</button>
+      <button data-k="port"><span class="dot"></span>Port calls</button>
+    </div>
+  </header>
+
+  <div class="note" id="probe">
+    <b>The test:</b> the model carries no magnitude. Watch <b>Fri 24 Jul</b> (5 small entries) against
+    <b>Mon–Fri 20–24 Jul</b> (one 40,000-delegate congress) and the <span class="tnum">Fri</span> cruise
+    call <i>Spectrum of the Seas</i> (~4,000 passengers, rendered identically to a coffee popup).
+    <b>Does this view make the wrong day look busiest?</b>
+  </div>
+
+  <div class="legend">
+    <span class="k"><span class="sw venue"></span> VenueEvent <span class="muted">· Suntec</span></span>
+    <span class="k"><span class="sw port"></span> PortCall <span class="muted">· MBCCS / Singapore Cruise Centre</span></span>
+    <span class="k muted" id="count"></span>
+  </div>
+
+  <main id="stage"></main>
+</div>
+
+<div class="switcher" role="group" aria-label="Prototype variant switcher">
+  <button id="prev" aria-label="Previous variant">‹</button>
+  <div class="lbl">
+    <span class="v" id="vkey"></span>
+    <span class="n" id="vname"></span>
+  </div>
+  <button id="next" aria-label="Next variant">›</button>
+  <div class="dots" id="dots"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- adversarial hand-made dataset (real-shaped, from the seed sources) ----
+  // t: "venue" | "port". Times are local SGT; prototype only cares about shape.
+  // A VenueEvent has a name; a PortCall has only a vessel (no name, no magnitude).
+  const SUNTEC = "Suntec Convention Centre";
+  const MBCCS  = "Marina Bay Cruise Centre";
+  const SCC    = "Singapore Cruise Centre";
+  function d(y,m,day,h,mi){ return new Date(y,m-1,day,h,mi||0); }
+
+  const DATA = [
+    // ---- warm-up week ----
+    { t:"venue", name:"Cellar Fiesta Wine Expo", src:"suntec", loc:"Suntec · Hall 406", venue:SUNTEC, s:d(2026,7,18,13,0), e:d(2026,7,18,20,0) },
+    { t:"port",  vessel:"Ovation of the Seas / Royal Caribbean", src:"mbccs", loc:MBCCS, s:d(2026,7,18,8,0), e:d(2026,7,18,19,0) },
+    { t:"port",  vessel:"ODYSSEY / VILLA VIE RESIDENCES", src:"scc", loc:SCC, s:d(2026,7,19,9,0), e:d(2026,7,19,20,0) },
+
+    // ---- THE ADVERSARIAL WEEK (20–26 Jul) ----
+    // one enormous 5-day congress spanning Mon–Fri
+    { t:"venue", name:"Singapore FinTech & Investment Congress 2026", tag:"40,000 delegates", src:"suntec",
+      loc:"Suntec · Halls 401–403", venue:SUNTEC, s:d(2026,7,20,9,0), e:d(2026,7,24,18,0) },
+    { t:"venue", name:"BNI Vision 2026 (chapter meeting)", src:"suntec", loc:"Suntec · Room 208", venue:SUNTEC, s:d(2026,7,20,9,0), e:d(2026,7,20,12,30) },
+    { t:"port",  vessel:"Star Voyager / StarCruises", src:"mbccs", loc:MBCCS, s:d(2026,7,21,7,0), e:d(2026,7,21,23,0) },
+    { t:"venue", name:"Singapore Coffee Festival", src:"suntec", loc:"Suntec · Hall 404", venue:SUNTEC, s:d(2026,7,22,11,0), e:d(2026,7,22,19,0) },
+    { t:"port",  vessel:"Genting Dream / Resorts World Cruises", src:"mbccs", loc:MBCCS, s:d(2026,7,23,8,0), e:d(2026,7,23,18,0) },
+
+    // Friday 24 Jul — the pile of five trivial-looking marks
+    { t:"venue", name:"Vinyl & Vintage Record Fair", src:"suntec", loc:"Suntec · L3 Concourse", venue:SUNTEC, s:d(2026,7,24,11,0), e:d(2026,7,24,14,0) },
+    { t:"venue", name:"Artisan Coffee Popup", src:"suntec", loc:"Suntec · Galleria", venue:SUNTEC, s:d(2026,7,24,10,0), e:d(2026,7,24,14,0) },
+    { t:"venue", name:"Indie Craft Market", src:"suntec", loc:"Suntec · L4 Atrium", venue:SUNTEC, s:d(2026,7,24,12,0), e:d(2026,7,24,18,0) },
+    { t:"port",  vessel:"Spectrum of the Seas / Royal Caribbean", tag:"~4,000 pax", src:"mbccs", loc:MBCCS, s:d(2026,7,24,7,0), e:d(2026,7,24,18,0) },
+    { t:"port",  vessel:"Resorts World One / Resorts World Cruises", src:"mbccs", loc:MBCCS, s:d(2026,7,24,8,0), e:d(2026,7,24,17,0) },
+
+    // weekend consumer 2-day
+    { t:"venue", name:"Singapore Comic Con 2026", src:"suntec", loc:"Suntec · Halls 401–403", venue:SUNTEC, s:d(2026,7,25,10,0), e:d(2026,7,25,20,0) },
+    { t:"venue", name:"Singapore Comic Con 2026", src:"suntec", loc:"Suntec · Halls 401–403", venue:SUNTEC, s:d(2026,7,26,10,0), e:d(2026,7,26,19,0) },
+    { t:"port",  vessel:"Silver Muse / Silversea", src:"scc", loc:SCC, s:d(2026,7,26,9,0), e:d(2026,7,26,18,0) },
+
+    // ---- following, lighter weeks ----
+    { t:"venue", name:"Tech in Asia Conference 2026", src:"suntec", loc:"Suntec · Hall 405", venue:SUNTEC, s:d(2026,7,30,9,0), e:d(2026,7,31,18,0) },
+    { t:"port",  vessel:"Queen Anne / Cunard", src:"mbccs", loc:MBCCS, s:d(2026,7,29,8,0), e:d(2026,7,29,19,0) },
+    { t:"port",  vessel:"Westerdam / Holland America", src:"scc", loc:SCC, s:d(2026,8,3,9,0), e:d(2026,8,3,18,0) },
+    { t:"venue", name:"SG Wellness & Yoga Expo", src:"suntec", loc:"Suntec · Hall 406", venue:SUNTEC, s:d(2026,8,5,10,0), e:d(2026,8,6,18,0) },
+    { t:"port",  vessel:"Diamond Princess / Princess Cruises", src:"mbccs", loc:MBCCS, s:d(2026,8,7,7,0), e:d(2026,8,7,18,0) },
+  ];
+
+  const NOW = d(2026,7,17,9,0);
+  const VARIANTS = [
+    { key:"A", name:"Month grid (the reflex)" },
+    { key:"B", name:"Date-spine timeline" },
+    { key:"C", name:"Agenda list" },
+  ];
+
+  // ---- state (in-memory source of truth; URL sync is best-effort) ----
+  let state = { variant:"A", filter:"all" };
+  try {
+    const p = new URLSearchParams(location.search);
+    if (["A","B","C"].includes(p.get("variant"))) state.variant = p.get("variant");
+    if (["all","venue","port"].includes(p.get("filter"))) state.filter = p.get("filter");
+  } catch (e) {}
+  function syncURL() {
+    try {
+      const p = new URLSearchParams(location.search);
+      p.set("variant", state.variant); p.set("filter", state.filter);
+      history.replaceState(null, "", location.pathname + "?" + p.toString());
+    } catch (e) {}
+  }
+
+  // ---- helpers ----
+  const WD = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const pad = n => String(n).padStart(2,"0");
+  const hm  = dt => pad(dt.getHours()) + ":" + pad(dt.getMinutes());
+  const dayKey = dt => dt.getFullYear()+"-"+pad(dt.getMonth()+1)+"-"+pad(dt.getDate());
+  const startOfDay = dt => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+  const addDays = (dt,n) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()+n);
+  const sameDay = (a,b) => dayKey(a)===dayKey(b);
+  function durLabel(s,e){
+    const mins = Math.round((e-s)/60000);
+    if (mins < 60) return mins+" min";
+    const days = Math.floor(mins/1440), h = Math.round((mins%1440)/60);
+    if (days>=1) return days+"d" + (h? " "+h+"h":"");
+    return (mins/60).toFixed(mins%60?1:0).replace(".0","")+"h";
+  }
+  const esc = s => (s+"").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+  const title = ev => ev.t==="venue" ? ev.name : "Cruise: "+ev.vessel;
+
+  function filtered() {
+    return DATA.filter(ev => state.filter==="all" || ev.t===state.filter);
+  }
+  // expand a (possibly multi-day) event into per-day segments for grids/timelines
+  function segments(list) {
+    const segs = [];
+    list.forEach((ev, i) => {
+      let cur = startOfDay(ev.s);
+      const last = startOfDay(ev.e);
+      let idx = 0;
+      const total = Math.round((last - startOfDay(ev.s))/86400000) + 1;
+      while (cur <= last) {
+        segs.push({ ev, day: new Date(cur), first: idx===0, lastSeg: sameDay(cur,last),
+                    multi: total>1, i });
+        cur = addDays(cur,1); idx++;
+      }
+    });
+    return segs;
+  }
+
+  // =================== VARIANT A — month grid ===================
+  function renderGrid() {
+    const list = filtered();
+    const segsByDay = {};
+    segments(list).forEach(s => { (segsByDay[dayKey(s.day)] ||= []).push(s); });
+
+    const first = d(2026,7,1); const startPad = first.getDay();
+    const daysIn = 31;
+    let cells = "";
+    const dows = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    dows.forEach(w => cells += `<div class="dow">${w}</div>`);
+    for (let i=0;i<startPad;i++) cells += `<div class="cell out"></div>`;
+    for (let day=1; day<=daysIn; day++) {
+      const dt = d(2026,7,day);
+      const k = dayKey(dt);
+      const segs = (segsByDay[k]||[]).sort((a,b)=> a.ev.s-b.ev.s);
+      const today = sameDay(dt, NOW);
+      let chips = "";
+      const shown = segs.slice(0,3);
+      shown.forEach(s => {
+        const cls = s.ev.t;
+        const label = s.ev.t==="venue" ? s.ev.name : s.ev.vessel.split(" / ")[0];
+        chips += `<div class="chip ${cls} ${s.multi?"span":""}" title="${esc(title(s.ev))}">${s.multi&&!s.first?"→ ":""}${esc(label)}</div>`;
+      });
+      if (segs.length>3) chips += `<div class="more">+${segs.length-3} more</div>`;
+      cells += `<div class="cell ${today?"today":""}"><div class="dnum">${day}</div>${chips}</div>`;
+    }
+    return `
+      <div class="grid-cap">July 2026</div>
+      <div class="mgrid">${cells}</div>
+      <p class="muted" style="font-size:12px;margin-top:12px">
+        Every mark is one row, equal weight. Overflow collapses into <span class="tnum">+N&nbsp;more</span>.
+      </p>`;
+  }
+
+  // =================== VARIANT B — date-spine timeline ===================
+  function renderTimeline() {
+    const list = filtered();
+    const segsByDay = {};
+    segments(list).forEach(s => { (segsByDay[dayKey(s.day)] ||= []).push(s); });
+
+    // window: 17 Jul – 8 Aug
+    const startDay = d(2026,7,17), endDay = d(2026,8,8);
+    const H0 = 6, H1 = 24; // visible hour window
+    const pct = dt => Math.max(0, Math.min(100, ((dt.getHours()+dt.getMinutes()/60) - H0)/(H1-H0)*100));
+
+    let rows = "";
+    for (let cur=new Date(startDay); cur<=endDay; cur=addDays(cur,1)) {
+      const k = dayKey(cur);
+      const segs = (segsByDay[k]||[]).sort((a,b)=> a.ev.s-b.ev.s);
+      const wknd = cur.getDay()===0 || cur.getDay()===6;
+      const today = sameDay(cur, NOW);
+
+      // hour ticks
+      let ticks = "";
+      for (let h=H0; h<=H1; h+=6) {
+        const left = (h-H0)/(H1-H0)*100;
+        ticks += `<i style="left:${left}%"></i><span style="left:${left}%">${pad(h)}:00</span>`;
+      }
+
+      // multi-day spanning bars first (full width), then intraday bars
+      let bars = "";
+      segs.filter(s=>s.multi).forEach(s => {
+        const contL = !s.first, contR = !s.lastSeg;
+        bars += `<div class="bar ${s.ev.t} multi ${contL?"cont":""} ${contR?"contr":""}" title="${esc(title(s.ev))}">${esc(title(s.ev))}${s.ev.tag?` · <b>${esc(s.ev.tag)}</b>`:""}</div>`;
+      });
+      const intra = segs.filter(s=>!s.multi);
+      if (intra.length) {
+        let lanes = "";
+        intra.forEach(s => {
+          const l = pct(s.ev.s), r = pct(s.ev.e);
+          const w = Math.max(9, r-l);
+          const label = title(s.ev) + (s.ev.tag?` · ${s.ev.tag}`:"");
+          lanes += `<div class="lane"><div class="bar ${s.ev.t}" style="position:absolute;left:${l}%;width:${w}%" title="${esc(label)} (${hm(s.ev.s)}–${hm(s.ev.e)})">${esc(label)}</div></div>`;
+        });
+        bars += lanes;
+      }
+      if (!segs.length) bars = `<div style="padding:4px 8px" class="muted"><span style="font-size:11px">—</span></div>`;
+
+      rows += `
+        <div class="srow ${wknd?"weekend":""} ${today?"today":""}">
+          <div class="datecol">
+            <div class="wd">${WD[cur.getDay()]}</div>
+            <div class="dd">${cur.getDate()}</div>
+            <div class="mo">${MO[cur.getMonth()]}</div>
+          </div>
+          <div class="track"><div class="hourgrid">${ticks}</div>${bars}</div>
+        </div>`;
+    }
+    return `<div class="spine">${rows}</div>
+      <p class="muted" style="font-size:12px;margin-top:12px">
+        Bar length = duration. A multi-day congress becomes a physically dominant band; a 3-hour fair is a sliver —
+        <i>span</i> stands in for magnitude the data doesn't carry.
+      </p>`;
+  }
+
+  // =================== VARIANT C — agenda list ===================
+  function renderAgenda() {
+    const list = filtered().slice().sort((a,b)=> a.s-b.s);
+    // group by START day (multi-day shown once, on its start)
+    const byDay = {};
+    list.forEach(ev => { (byDay[dayKey(ev.s)] ||= []).push(ev); });
+    const keys = Object.keys(byDay).sort();
+    if (!keys.length) return `<div class="empty">No entries for this filter.</div>`;
+
+    let out = "";
+    keys.forEach(k => {
+      const evs = byDay[k];
+      const dt = evs[0].s;
+      let rows = "";
+      evs.forEach(ev => {
+        const multi = !sameDay(ev.s, ev.e);
+        const when = multi
+          ? `${WD[ev.s.getDay()]} ${pad(ev.s.getDate())} → ${WD[ev.e.getDay()]} ${pad(ev.e.getDate())}`
+          : `${hm(ev.s)}–${hm(ev.e)}`;
+        rows += `
+          <div class="arow">
+            <div class="when">${when}<span class="dur">${durLabel(ev.s,ev.e)}</span></div>
+            <div class="what">
+              <div class="ttl">${esc(title(ev))} ${ev.tag?`<span class="badge ${ev.t}" style="margin-left:4px">${esc(ev.tag)}</span>`:""}</div>
+              <div class="loc">${esc(ev.loc)}</div>
+            </div>
+            <div class="meta">
+              <span class="badge ${ev.t}">${ev.t==="venue"?"Venue":"Port call"}</span>
+              <span class="src">${ev.src}</span>
+            </div>
+            <div class="durbar ${ev.t}" style="width:${Math.min(100, Math.max(4, (ev.e-ev.s)/(5*86400000)*100))}%"></div>
+          </div>`;
+      });
+      out += `
+        <section class="aday">
+          <div class="ah">
+            <div class="d">${pad(dt.getDate())} ${MO[dt.getMonth()]}<span class="wd">${WD[dt.getDay()]}</span></div>
+            <div class="cnt">${evs.length} ${evs.length===1?"entry":"entries"}</div>
+          </div>
+          ${rows}
+        </section>`;
+    });
+    return `<div class="agenda">${out}</div>
+      <p class="muted" style="font-size:12px;margin-top:12px">
+        No spatial "busy": density is just list length. The reader scans names and durations, not a heat map.
+      </p>`;
+  }
+
+  // ---- render ----
+  const stage = document.getElementById("stage");
+  function render() {
+    document.getElementById("range").textContent = "17 Jul – 8 Aug 2026  ·  Asia/Singapore (+08:00)";
+    const n = filtered().length;
+    document.getElementById("count").textContent = `${n} ${n===1?"entry":"entries"} shown`;
+    if (state.variant==="A") stage.innerHTML = renderGrid();
+    else if (state.variant==="B") stage.innerHTML = renderTimeline();
+    else stage.innerHTML = renderAgenda();
+
+    // switcher chrome
+    const idx = VARIANTS.findIndex(v=>v.key===state.variant);
+    document.getElementById("vkey").textContent = "Variant " + state.variant;
+    document.getElementById("vname").textContent = VARIANTS[idx].name;
+    document.getElementById("dots").innerHTML = VARIANTS.map((v,i)=>`<i class="${i===idx?"on":""}"></i>`).join("");
+    document.querySelectorAll("#filter button").forEach(b =>
+      b.classList.toggle("on", b.dataset.k===state.filter));
+    syncURL();
+  }
+
+  function cycle(dir) {
+    const idx = VARIANTS.findIndex(v=>v.key===state.variant);
+    state.variant = VARIANTS[(idx+dir+VARIANTS.length)%VARIANTS.length].key;
+    render();
+  }
+
+  document.getElementById("prev").addEventListener("click", ()=>cycle(-1));
+  document.getElementById("next").addEventListener("click", ()=>cycle(1));
+  document.querySelectorAll("#filter button").forEach(b =>
+    b.addEventListener("click", ()=>{ state.filter = b.dataset.k; render(); }));
+  document.addEventListener("keydown", e => {
+    const tag = (e.target.tagName||"").toLowerCase();
+    if (tag==="input"||tag==="textarea"||e.target.isContentEditable) return;
+    if (e.key==="ArrowLeft") cycle(-1);
+    else if (e.key==="ArrowRight") cycle(1);
+  });
+
+  render();
+})();
+</script>
