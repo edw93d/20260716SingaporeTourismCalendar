@@ -195,6 +195,10 @@
   .arow .durbar { grid-column: 1 / -1; height: 3px; border-radius: 2px; margin-top: 2px; opacity: .8; }
   .arow .durbar.venue { background: var(--venue); }
   .arow .durbar.port  { background: var(--port); }
+  .arow.cont { background: var(--surface-2); }
+  .arow.cont .ttl { font-weight: 500; }
+  .run { font-family: var(--mono); font-size: 10px; letter-spacing: .03em; margin-left: 6px;
+         padding: 1px 5px; border-radius: 4px; color: var(--ink-faint); border: 1px solid var(--border); }
 
   .empty { color: var(--ink-faint); font-size: 12px; padding: 14px; text-align: center; }
 
@@ -473,28 +477,41 @@
 
   // =================== VARIANT C — agenda list ===================
   function renderAgenda() {
-    const list = filtered().slice().sort((a,b)=> a.s-b.s);
-    // group by START day (multi-day shown once, on its start)
+    const list = filtered();
+    // expand multi-day events into one row PER DAY they span — a 5-day congress
+    // is demand on every one of its days, so it must appear under each.
     const byDay = {};
-    list.forEach(ev => { (byDay[dayKey(ev.s)] ||= []).push(ev); });
+    list.forEach(ev => {
+      let cur = startOfDay(ev.s);
+      const last = startOfDay(ev.e);
+      const total = Math.round((last - startOfDay(ev.s)) / 86400000) + 1;
+      let idx = 0;
+      while (cur <= last) {
+        (byDay[dayKey(cur)] ||= []).push({ ev, dayIdx: idx, total, first: idx === 0, lastSeg: sameDay(cur, last) });
+        cur = addDays(cur, 1); idx++;
+      }
+    });
     const keys = Object.keys(byDay).sort();
     if (!keys.length) return `<div class="empty">No entries for this filter.</div>`;
 
     let out = "";
     keys.forEach(k => {
-      const evs = byDay[k];
-      const dt = evs[0].s;
+      const items = byDay[k].slice().sort((a,b)=> a.ev.s - b.ev.s);
+      const [Y,M,D] = k.split("-").map(Number);
+      const dt = new Date(Y, M-1, D);
       let rows = "";
-      evs.forEach(ev => {
-        const multi = !sameDay(ev.s, ev.e);
-        const when = multi
-          ? `${WD[ev.s.getDay()]} ${pad(ev.s.getDate())} → ${WD[ev.e.getDay()]} ${pad(ev.e.getDate())}`
-          : `${hm(ev.s)}–${hm(ev.e)}`;
+      items.forEach(it => {
+        const ev = it.ev, multi = it.total > 1;
+        let when, sub;
+        if (!multi) { when = `${hm(ev.s)}–${hm(ev.e)}`; sub = durLabel(ev.s, ev.e); }
+        else if (it.first)   { when = `from ${hm(ev.s)}`;  sub = `Day 1 of ${it.total}`; }
+        else if (it.lastSeg) { when = `until ${hm(ev.e)}`; sub = `Day ${it.total} of ${it.total}`; }
+        else                 { when = `all day`;           sub = `Day ${it.dayIdx+1} of ${it.total}`; }
         rows += `
-          <div class="arow">
-            <div class="when">${when}<span class="dur">${durLabel(ev.s,ev.e)}</span></div>
+          <div class="arow${multi&&!it.first?" cont":""}">
+            <div class="when">${when}<span class="dur">${sub}</span></div>
             <div class="what">
-              <div class="ttl">${esc(title(ev))} ${ev.tag?`<span class="badge ${ev.t}" style="margin-left:4px">${esc(ev.tag)}</span>`:""}</div>
+              <div class="ttl">${esc(title(ev))} ${ev.tag?`<span class="badge ${ev.t}" style="margin-left:4px">${esc(ev.tag)}</span>`:""}${multi?`<span class="run ${ev.t}">${it.total}-day</span>`:""}</div>
               <div class="loc">${esc(ev.loc)}</div>
             </div>
             <div class="meta">
@@ -508,7 +525,7 @@
         <section class="aday">
           <div class="ah">
             <div class="d">${pad(dt.getDate())} ${MO[dt.getMonth()]}<span class="wd">${WD[dt.getDay()]}</span></div>
-            <div class="cnt">${evs.length} ${evs.length===1?"entry":"entries"}</div>
+            <div class="cnt">${items.length} ${items.length===1?"entry":"entries"}</div>
           </div>
           ${rows}
         </section>`;
