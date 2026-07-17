@@ -74,12 +74,34 @@ Projection rules:
 | `description` | **generated** | **generated** (includes berth) |
 
 `summary` carries the category as **prose** because `CATEGORIES` survives on only
-1 of 3 iCal clients (see ADR-0001, issue #6). This holds however the feed shape
-question (#11) resolves — separate feeds still render into one calendar grid.
+1 of 3 iCal clients (see ADR-0001, issue #6). The feed is split by type into two
+subscriptions (see **Feeds**, ADR-0008), but every entry still renders into one
+calendar grid — the split is a subscription boundary, not a schema difference.
 
 **CalendarEntry is a convenience, not a bottleneck.** It flattens away `vessel`,
 `hall` and `berth`. A serializer needing those (a future Excel export) reads the
 domain types directly.
+
+### Feeds
+
+The iCal subscription surface is **two feeds, split by type** — never a single
+firehose, never split by source:
+
+| Feed | `X-WR-CALNAME` | URL | Contents |
+|---|---|---|---|
+| Port calls | SG Cruise Arrivals | `/feeds/port-calls.ics` | every `PortCall` |
+| Venue events | SG Venue Events | `/feeds/venue-events.ics` | every `VenueEvent` |
+
+Split by **type**, because the audience thinks in demand shapes, not scrapers — and
+`source` already rides inside every entry, so per-source feeds would only fragment
+attribution that is not lost. **No `all` feed:** the unfiltered, duplicate-heavy
+stream is not a subscription anyone should hold; the *everything* view is the web
+calendar, which filters client-side for free.
+
+Consequence: **the feed set grows with types, not sources.** A new source (e.g.
+ticketed events, #13) folds into `venue-events` and adds no feed. `CATEGORIES` cannot
+carry the split in-feed (ADR-0001, #6), which is why the split is baked into distinct
+URLs at generation time. See ADR-0008.
 
 ### Facts-only extraction
 
