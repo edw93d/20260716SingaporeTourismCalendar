@@ -175,6 +175,47 @@
   .bar.contr::after { content: " ›"; opacity: .5; }
   .lane { position: relative; height: 28px; }
 
+  /* ================= VARIANT D — week view (X = days, Y = time) ================= */
+  .wk { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); }
+  .wk .wknav { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .wk .wknav button { font: inherit; font-size: 13px; cursor: pointer; background: var(--surface-2);
+                      border: 1px solid var(--border); color: var(--ink); border-radius: 7px; padding: 5px 11px; }
+  .wk .wknav button:hover { background: var(--border-soft); }
+  .wk .wknav .wklabel { font-size: 14px; font-weight: 600; }
+  .wk .wknav .today-btn { margin-left: auto; }
+  .wk .wkhead { display: grid; grid-template-columns: 54px repeat(7, minmax(0,1fr)); border-bottom: 1px solid var(--border); }
+  .wk .wkhead .corner { border-right: 1px solid var(--border-soft); }
+  .wk .wkhead .dh { text-align: center; padding: 7px 4px; border-left: 1px solid var(--border-soft); }
+  .wk .wkhead .dh .wd { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-faint); }
+  .wk .wkhead .dh .dn { font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.15; }
+  .wk .wkhead .dh.today .dn { color: var(--accent); }
+  .wk .wkhead .dh.wknd { background: var(--surface-2); }
+  /* all-day / multi-day band */
+  .wk .allday { display: grid; grid-template-columns: 54px repeat(7, minmax(0,1fr));
+                border-bottom: 1px solid var(--border); position: relative; min-height: 26px; }
+  .wk .allday .lbl { font-size: 9.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-faint);
+                     border-right: 1px solid var(--border-soft); padding: 4px 6px; display: flex; align-items: center; }
+  .wk .allday .adcols { grid-column: 2 / -1; position: relative; }
+  .wk .allday .adcols .colsep { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--border-soft); }
+  .wk .adband { position: absolute; height: 20px; border-radius: 5px; border-left: 3px solid; font-size: 11px;
+                line-height: 20px; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                font-weight: 600; box-shadow: var(--shadow); box-sizing: border-box; }
+  .wk .adband.venue { background: var(--venue-bg); border-color: var(--venue); color: var(--venue); }
+  .wk .adband.port  { background: var(--port-bg);  border-color: var(--port);  color: var(--port); }
+  /* timed grid */
+  .wk .wkbody { display: grid; grid-template-columns: 54px repeat(7, minmax(0,1fr)); position: relative;
+                max-height: 620px; overflow-y: auto; }
+  .wk .gutter { position: relative; border-right: 1px solid var(--border-soft); }
+  .wk .gutter .hr { position: absolute; right: 6px; font-size: 10px; color: var(--ink-faint);
+                    font-family: var(--mono); transform: translateY(-6px); }
+  .wk .daycol { position: relative; border-left: 1px solid var(--border-soft); }
+  .wk .daycol.wknd { background: var(--surface-2); }
+  .wk .ev { position: absolute; border-radius: 5px; border-left: 3px solid; font-size: 10.5px; line-height: 1.2;
+            padding: 2px 5px; overflow: hidden; box-sizing: border-box; cursor: default; }
+  .wk .ev .et { font-family: var(--mono); font-size: 9px; opacity: .8; display: block; }
+  .wk .ev.venue { background: var(--venue-bg); border-color: var(--venue); color: var(--venue); }
+  .wk .ev.port  { background: var(--port-bg);  border-color: var(--port);  color: var(--port); }
+
   /* ================= VARIANT C — agenda ================= */
   .agenda { display: flex; flex-direction: column; gap: 0; }
   .aday { border-top: 1px solid var(--border); }
@@ -323,13 +364,20 @@
     { key:"A", name:"Month grid (the reflex)" },
     { key:"B", name:"Date-spine timeline" },
     { key:"C", name:"Agenda list" },
+    { key:"D", name:"Week view (macOS-style)" },
   ];
 
+  // Monday of the week containing a date (self-contained: runs at state-init time,
+  // before the const helpers below exist)
+  function mondayOf(dt){ const g = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    const w = g.getDay(); g.setDate(g.getDate() + (w===0?-6:1-w)); return g; }
+
   // ---- state (in-memory source of truth; URL sync is best-effort) ----
-  let state = { variant:"A", filter:"all" };
+  // weekStart drives variant D; defaults to the adversarial congress week (Mon 20 Jul).
+  let state = { variant:"A", filter:"all", weekStart: mondayOf(d(2026,7,20)) };
   try {
     const p = new URLSearchParams(location.search);
-    if (["A","B","C"].includes(p.get("variant"))) state.variant = p.get("variant");
+    if (["A","B","C","D"].includes(p.get("variant"))) state.variant = p.get("variant");
     if (["all","venue","port"].includes(p.get("filter"))) state.filter = p.get("filter");
   } catch (e) {}
   function syncURL() {
@@ -475,6 +523,117 @@
       </p>`;
   }
 
+  // =================== VARIANT D — week view (macOS-style) ===================
+  // Days along X, time down Y. Timed events are positioned blocks (overlaps split the
+  // column); multi-day events ride an all-day band across the columns they span.
+  function renderWeek() {
+    const list = filtered();
+    const H0 = 6, H1 = 24, PX = 34;              // 06:00–24:00 at 34px/hour
+    const bodyH = (H1 - H0) * PX;
+    const ws = state.weekStart;                   // Monday
+    const days = [];
+    for (let i=0;i<7;i++) days.push(addDays(ws, i));
+    const weekEnd = addDays(ws, 7);               // exclusive
+
+    // headers
+    let head = `<div class="corner"></div>`;
+    days.forEach(dt => {
+      const wknd = dt.getDay()===0 || dt.getDay()===6;
+      const today = sameDay(dt, NOW);
+      head += `<div class="dh ${wknd?"wknd":""} ${today?"today":""}">
+        <div class="wd">${WD[dt.getDay()]}</div><div class="dn">${dt.getDate()}</div></div>`;
+    });
+
+    // split events: multi-day (all-day band) vs timed (single-day)
+    const inWeek = list.filter(ev => ev.e > ws && ev.s < weekEnd);
+    const multi = inWeek.filter(ev => !sameDay(ev.s, ev.e));
+    const timed = inWeek.filter(ev => sameDay(ev.s, ev.e));
+
+    // all-day band: pack multi-day events into stacked rows, each spanning its columns
+    const colW = 100/7;
+    const bandRows = [];  // each row = array of {ev, startCol, endCol}
+    multi.slice().sort((a,b)=> a.s-b.s).forEach(ev => {
+      const startCol = Math.max(0, Math.round((startOfDay(ev.s) - ws)/86400000));
+      const endCol   = Math.min(6, Math.round((startOfDay(ev.e) - ws)/86400000));
+      let placed=false;
+      for (const row of bandRows){ if (row.every(b => endCol < b.startCol || startCol > b.endCol)){ row.push({ev,startCol,endCol}); placed=true; break; } }
+      if (!placed) bandRows.push([{ev,startCol,endCol}]);
+    });
+    let bands = "";
+    bandRows.forEach((row, ri) => row.forEach(b => {
+      const left = b.startCol*colW, width = (b.endCol-b.startCol+1)*colW;
+      const contL = b.ev.s < ws, contR = b.ev.e >= weekEnd;
+      bands += `<div class="adband ${b.ev.t}" style="left:${left}%;width:calc(${width}% - 4px);top:${4+ri*24}px" title="${esc(title(b.ev))}">${contL?"‹ ":""}${esc(title(b.ev))}${b.ev.tag?` · ${esc(b.ev.tag)}`:""}${contR?" ›":""}</div>`;
+    }));
+    const bandH = Math.max(26, bandRows.length*24 + 8);
+    let colseps = "";
+    for (let i=1;i<7;i++) colseps += `<i class="colsep" style="left:${i*colW}%"></i>`;
+
+    // timed events per day, with overlap lane packing inside each day column
+    function layout(evs){
+      evs = evs.slice().sort((a,b)=> a.s-b.s || a.e-b.e);
+      const out = []; let i=0;
+      while (i<evs.length){
+        let end=evs[i].e, j=i+1;
+        while (j<evs.length && evs[j].s < end){ if (evs[j].e>end) end=evs[j].e; j++; }
+        const cluster = evs.slice(i,j), lanes=[];
+        cluster.forEach(ev => {
+          let L=0; for (; L<lanes.length; L++){ if (lanes[L] <= ev.s) break; }
+          lanes[L]=ev.e; out.push({ev, lane:L, _c:i});
+        });
+        const n=lanes.length; for (let k=out.length-cluster.length;k<out.length;k++) out[k].lanes=n;
+        i=j;
+      }
+      return out;
+    }
+    const yOf = dt => (Math.max(H0, dt.getHours()+dt.getMinutes()/60) - H0) * PX;
+
+    let cols = "";
+    // gutter
+    let hrs = "";
+    for (let h=H0; h<=H1; h+=3) hrs += `<div class="hr" style="top:${(h-H0)*PX}px">${pad(h)}:00</div>`;
+    cols += `<div class="gutter" style="height:${bodyH}px">${hrs}</div>`;
+    days.forEach(dt => {
+      const dayEvs = timed.filter(ev => sameDay(ev.s, dt));
+      const laid = layout(dayEvs);
+      let boxes = "";
+      laid.forEach(it => {
+        const ev = it.ev;
+        const top = yOf(ev.s);
+        const bottom = (Math.min(H1, ev.e.getHours()+ev.e.getMinutes()/60) - H0) * PX;
+        const h = Math.max(16, bottom - top);
+        const w = 100/it.lanes, left = it.lane*w;
+        boxes += `<div class="ev ${ev.t}" style="top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 2px)" title="${esc(title(ev))} (${hm(ev.s)}–${hm(ev.e)})">
+          <span class="et">${hm(ev.s)}</span>${esc(title(ev))}${ev.tag?` · ${esc(ev.tag)}`:""}</div>`;
+      });
+      const wknd = dt.getDay()===0 || dt.getDay()===6;
+      // hour gridlines via gradient
+      const grid = `repeating-linear-gradient(to bottom, transparent 0, transparent ${PX-1}px, var(--border-soft) ${PX-1}px, var(--border-soft) ${PX}px)`;
+      cols += `<div class="daycol ${wknd?"wknd":""}" style="height:${bodyH}px;background-image:${grid}">${boxes}</div>`;
+    });
+
+    const label = `${days[0].getDate()} ${MO[days[0].getMonth()]} – ${days[6].getDate()} ${MO[days[6].getMonth()]} ${days[6].getFullYear()}`;
+    return `
+      <div class="wk">
+        <div class="wknav">
+          <button data-wk="-1">‹ Prev week</button>
+          <span class="wklabel">${label}</span>
+          <button data-wk="1">Next week ›</button>
+          <button class="today-btn" data-wk="0">Congress week</button>
+        </div>
+        <div class="wkhead">${head}</div>
+        <div class="allday" style="min-height:${bandH}px">
+          <div class="lbl">all-day</div>
+          <div class="adcols">${colseps}${bands || ""}</div>
+        </div>
+        <div class="wkbody">${cols}</div>
+      </div>
+      <p class="muted" style="font-size:12px;margin-top:12px">
+        One week at a time, days across the top. Overlapping events split a day's width; multi-day events ride the
+        all-day band. Denser than the vertical spine, but only ever shows seven days — paging is the cost.
+      </p>`;
+  }
+
   // =================== VARIANT C — agenda list ===================
   function renderAgenda() {
     const list = filtered();
@@ -544,7 +703,17 @@
     document.getElementById("count").textContent = `${n} ${n===1?"entry":"entries"} shown`;
     if (state.variant==="A") stage.innerHTML = renderGrid();
     else if (state.variant==="B") stage.innerHTML = renderTimeline();
+    else if (state.variant==="D") stage.innerHTML = renderWeek();
     else stage.innerHTML = renderAgenda();
+
+    // week-view nav (only present in variant D)
+    if (state.variant==="D") {
+      stage.querySelectorAll(".wknav button").forEach(b => b.addEventListener("click", () => {
+        const w = Number(b.dataset.wk);
+        state.weekStart = w===0 ? mondayOf(d(2026,7,20)) : addDays(state.weekStart, w*7);
+        render();
+      }));
+    }
 
     // switcher chrome
     const idx = VARIANTS.findIndex(v=>v.key===state.variant);
