@@ -103,6 +103,40 @@ ticketed events, #13) folds into `venue-events` and adds no feed. `CATEGORIES` c
 carry the split in-feed (ADR-0001, #6), which is why the split is baked into distinct
 URLs at generation time. See ADR-0008.
 
+### Web calendar
+
+The *everything* view #11 made load-bearing (there is no `all` feed). It carries the
+full dataset — both types, all sources, duplicates labelled — in a **static** page,
+filtered client-side. It offers **four switchable views**; no single one is *the*
+view, and reading demand from multiple perspectives is the point:
+
+| Order | View | Question it answers | Role |
+|---|---|---|---|
+| 1 | **Month** | which days have demand? | **default landing / navigator** |
+| 2 | **Week** | this week, hour by hour? | reading surface |
+| 3 | **Agenda** | what exactly, and where? | reading surface |
+| 4 | **Date-spine** | how long / how much? | reading surface |
+
+- **Default landing is Month, as a navigator** (orientation — "which days are live"),
+  **not** a magnitude-reading surface. This keeps #5 intact: #5 disqualified the grid
+  as the place to *read* magnitude, not as an entry point to *drill from*.
+- **Type filter** (All / VenueEvent / PortCall) across every view — the interactive
+  counterpart to the two baked feeds (see **Feeds**).
+- **Multi-day events appear on every day they span** — a multi-day event is demand on
+  each of its days.
+- **No magnitude.** The density-inversion (a count/spatial view ranks five trivial
+  marks above one 40k congress) is mitigated **structurally** — Date-spine makes
+  duration literal, Agenda names entries — not by impact-scoring. **Accepted hole:** a
+  **PortCall** has neither span nor name, so a ~4,000-passenger ship renders like a
+  coffee popup in every view; the audience infers size from `vessel`. **Reopen
+  trigger:** if real use shows this misleads, magnitude re-enters scope as a
+  *destination redraw*, not a quiet patch.
+
+Everything is **static-renderable** (ADR-0009, #10): the views, filter, week paging,
+and Today control are client JS over data already on the page — no server. The UI
+library that implements this (if any) is gated by licensing (#14), not settled here.
+See ADR-0009.
+
 ### Facts-only extraction
 
 Extract event **facts** (name, date, venue, vessel) and never copyrightable
