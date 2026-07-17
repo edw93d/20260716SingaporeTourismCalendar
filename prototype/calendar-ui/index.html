@@ -133,11 +133,12 @@
 
   /* ================= VARIANT A — month grid ================= */
   .grid-cap { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
-  .mgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
+  .mgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px;
            background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
   .mgrid .dow { background: var(--surface-2); color: var(--ink-faint); font-size: 11px;
                 text-transform: uppercase; letter-spacing: .06em; padding: 7px 8px; font-weight: 600; text-align: right; }
-  .mgrid .cell { background: var(--surface); min-height: 108px; padding: 6px 7px; display: flex; flex-direction: column; gap: 3px; }
+  .mgrid .cell { background: var(--surface); min-height: 108px; padding: 6px 7px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .mgrid .cell > * { min-width: 0; max-width: 100%; }
   .mgrid .cell.out { background: var(--surface-2); }
   .mgrid .cell .dnum { font-size: 12px; text-align: right; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
   .mgrid .cell.today .dnum { color: var(--accent-ink); background: var(--accent); border-radius: 50%;
