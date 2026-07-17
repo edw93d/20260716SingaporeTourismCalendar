@@ -360,11 +360,12 @@
   ];
 
   const NOW = d(2026,7,17,9,0);
+  // Product order (settled on #12): Month (default) → Week → Agenda → Date-spine.
   const VARIANTS = [
-    { key:"A", name:"Month grid (the reflex)" },
-    { key:"B", name:"Date-spine timeline" },
-    { key:"C", name:"Agenda list" },
-    { key:"D", name:"Week view (macOS-style)" },
+    { key:"A", name:"Month · default" },
+    { key:"D", name:"Week" },
+    { key:"C", name:"Agenda" },
+    { key:"B", name:"Date-spine" },
   ];
 
   // Monday of the week containing a date (self-contained: runs at state-init time,
