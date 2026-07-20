@@ -115,16 +115,19 @@ export const createHttpClient = ({
 
         try {
           const response = await fetchOnce(url);
-          lastRequestAt.set(host, Date.now());
 
           if (response.ok) return await response.text();
 
           lastError = new HttpError(response.status, url);
           if (!RETRYABLE.has(response.status)) throw lastError;
         } catch (error) {
-          lastRequestAt.set(host, Date.now());
           if (error instanceof HttpError && !RETRYABLE.has(error.status)) throw error;
           lastError = error;
+        } finally {
+          // Stamped however the attempt ended. A request that failed still
+          // reached the host, so it still owes the next one a full interval —
+          // charging only successes would let a failing host be retried fastest.
+          lastRequestAt.set(host, Date.now());
         }
       }
 

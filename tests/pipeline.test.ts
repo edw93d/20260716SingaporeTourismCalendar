@@ -12,7 +12,7 @@ import type {
 } from "../src/domain/types.js";
 import { runPipeline } from "../src/pipeline/run.js";
 import { openStore } from "../src/store/store.js";
-import type { ParseResult, Source } from "../src/sources/types.js";
+import type { HttpClient, ParseResult, Source } from "../src/sources/types.js";
 
 /**
  * **Seam 1 — the whole pipeline run.** Records go in through a fixture adapter,
@@ -93,8 +93,25 @@ const venueFeed = () => readFileSync(join(feedsDir(), "venue-events.ics"), "utf8
 
 const clockAt = (value: string) => () => new Date(value);
 
+/**
+ * Refuses rather than fetches. Every source in this file is a fake that serves
+ * its own bytes, so any call here means a test reached for the network by
+ * accident — and saying so loudly is the reason `http` is a required option.
+ */
+const noHttp: HttpClient = {
+  get: async (url) => {
+    throw new Error(`the pipeline tests must not make requests, but something GET ${url}`);
+  },
+};
+
 const run = (sources: (Source<VenueEvent> | Source<PortCall>)[], at: string) =>
-  runPipeline({ sources, db: dbPath(), feedsDir: feedsDir(), now: clockAt(at) });
+  runPipeline({
+    sources,
+    db: dbPath(),
+    feedsDir: feedsDir(),
+    now: clockAt(at),
+    http: noHttp,
+  });
 
 /** Reads the database back the way a later run — or the operator — would. */
 const storedVenueEvents = () => {

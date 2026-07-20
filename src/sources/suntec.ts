@@ -56,10 +56,27 @@ const VENUE = "Suntec Convention Centre";
 const ANCHOR = /<div[^>]*\bclass="(?:[^"]*\s)?eventlist(?:\s[^"]*)?"/;
 
 /** Rows are split on the opening tag: `</article>` may not be reliably balanced. */
-const ROW_BOUNDARY = /(?=<article[^>]*\bclass="[^"]*\beventlist-event\b)/;
 const IS_ROW = /<article[^>]*\bclass="[^"]*\beventlist-event\b/;
+/** Derived, not rewritten: one selector fix must not have to land in two places. */
+const ROW_BOUNDARY = new RegExp(`(?=${IS_ROW.source})`);
 
-/** `dates=20260717T040000Z/20260718T140000Z` inside the gcal export href. */
+/**
+ * The gcal export **anchor**, matched as a tag so the timing parameters below can
+ * be read from its `href` and nothing else.
+ *
+ * Scoping matters here more than it looks. The same row already carries a second
+ * export link (`?format=ical`), and a `dates=` or `location=` search run across
+ * the whole fragment would take whichever link happened to come first — silently,
+ * with no failure to report. The parameters are the one mechanism this adapter
+ * exists for, so they are read from the one link that is known to carry them.
+ *
+ * Matched in two steps rather than one, so attribute order is not load-bearing:
+ * Squarespace emits `href` before `class` today, and nothing promises it always will.
+ */
+const GCAL_LINK = /<a\b[^>]*\bclass="[^"]*\beventlist-meta-export-google\b[^"]*"[^>]*>/;
+const HREF = /\bhref="([^"]*)"/;
+
+/** `dates=20260717T040000Z/20260718T140000Z`, read from the gcal href alone. */
 const GCAL_DATES = /[?&]dates=(\d{8}T\d{6}Z)\/(\d{8}T\d{6}Z)/;
 const GCAL_LOCATION = /[?&]location=([^"&]*)/;
 
@@ -90,8 +107,8 @@ const TITLE = /<a[^>]*class="[^"]*\beventlist-title-link\b[^"]*"[^>]*>([\s\S]*?)
  * Only the middle is the hall — the address is the venue, already a constant,
  * and repeating it in `hall` would print it twice in every `LOCATION` line.
  */
-const ADDRESS_PREFIX = "1 Raffles Boulevard Suntec City";
-const COUNTRY_SUFFIX = "Singapore";
+const ADDRESS_PREFIX = /raffles\s+boulevard/i;
+const COUNTRY_SUFFIX = /^singapore$/i;
 
 const ENTITIES: Record<string, string> = {
   amp: "&",
@@ -156,6 +173,13 @@ const instantFromCompactUtc = (compact: string) =>
  * Nullable rather than defaulted: 90 of the 178 rows publish no hall at all, and
  * inventing one would be a fabrication in the field a planner reads to find the
  * room.
+ *
+ * The address and country parts are recognised by **pattern, not by string
+ * equality**. An exact match against the published literal fails open in the
+ * worst direction: one copy edit or one doubled space and the street address
+ * stops being recognised, survives as a "hall", and prints inside every
+ * `LOCATION` line in the feed. Matching the stable part of the string — the
+ * street name — degrades quietly instead.
  */
 const hallFrom = (location: string): string | null => {
   const parts = location
@@ -164,7 +188,7 @@ const hallFrom = (location: string): string | null => {
     .filter((part) => part.length > 0);
 
   const inner = parts.filter(
-    (part) => part !== ADDRESS_PREFIX && part !== COUNTRY_SUFFIX,
+    (part) => !ADDRESS_PREFIX.test(part) && !COUNTRY_SUFFIX.test(part),
   );
 
   return inner.length > 0 ? inner.join(", ") : null;
@@ -190,7 +214,13 @@ const parseRow = (
     return failed("a detail link matching /visit-events/<slug>, to key the record");
   }
 
-  const dates = GCAL_DATES.exec(row);
+  const link = GCAL_LINK.exec(row)?.[0];
+  const href = link ? HREF.exec(link)?.[1] : undefined;
+  if (!href) {
+    return failed("an a.eventlist-meta-export-google link, which carries the timing");
+  }
+
+  const dates = GCAL_DATES.exec(href);
   if (!dates) {
     return failed(
       "a Google Calendar export link carrying dates=<start>/<end> as UTC instants",
@@ -201,7 +231,7 @@ const parseRow = (
   const name = title ? textOf(title[1]!) : "";
   if (!name) return failed("a non-empty eventlist-title-link, for the name");
 
-  const rawLocation = GCAL_LOCATION.exec(row)?.[1];
+  const rawLocation = GCAL_LOCATION.exec(href)?.[1];
   const location = rawLocation === undefined ? null : decodeParam(rawLocation);
   if (location === null) {
     return failed("a decodable location parameter on the Google Calendar link");
@@ -235,13 +265,21 @@ export const suntec: Source<VenueEvent, string> = {
   fetch: async ({ http }: FetchDeps) => http.get(LISTING_URL),
 
   /**
-   * Pure. `now` is accepted because the seam injects it, and is deliberately
-   * unused: Suntec publishes absolute UTC instants, so no field here is relative
-   * to the moment of reading, and the fixtures cannot drift as they age past the
-   * publishing window. Naming it `_now` would suggest an oversight; this note is
-   * the honest version.
+   * Pure. `now` is **declared and deliberately unused**: Suntec publishes
+   * absolute UTC instants, so no field below is relative to the moment of
+   * reading, and the fixtures cannot drift as they age past the publishing
+   * window.
+   *
+   * It is written out rather than omitted so the purity test — which calls this
+   * with two very different clocks and asserts equal output — is actually
+   * exercising the parameter. Omitted, the signature still satisfies
+   * `Source<T, Raw>` by arity-widening, and that test can never fail.
+   * Naming it `_now` would suggest an oversight; this note is the honest version.
    */
-  parse: (raw: string): ParseResult<Scraped<VenueEvent>> => {
+  parse: (raw: string, now: Date): ParseResult<Scraped<VenueEvent>> => {
+    void now;
+
+
     if (!ANCHOR.test(raw)) {
       return {
         ok: false,

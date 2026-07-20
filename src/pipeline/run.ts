@@ -6,7 +6,6 @@ import type { PortCall, Scraped, SourceId, VenueEvent } from "../domain/types.js
 import { serializeCalendar } from "../feeds/ical.js";
 import type { FetchDeps, HttpClient, ParseFailure, Source } from "../sources/types.js";
 import { openStore, type Store } from "../store/store.js";
-import { createHttpClient } from "./http.js";
 
 /**
  * One pipeline run: every source is read, what it observed is folded into the
@@ -27,12 +26,21 @@ export type PipelineOptions = {
   feedsDir: string;
   now: () => Date;
   /**
-   * The rate-limited client every adapter reads through. Defaulted rather than
-   * required, so no caller has to know the policy in order to run the pipeline —
-   * and overridable, so a test can drive real adapters over saved bytes without
-   * ever leaving the machine.
+   * The rate-limited client every adapter reads through.
+   *
+   * **Required, and deliberately not defaulted.** A default of
+   * `createHttpClient()` would invert what the `NO_HTTP_CLIENT_YET` placeholder
+   * was for: that placeholder existed so unfinished wiring would refuse rather
+   * than improvise. Defaulting means a caller who simply forgets to inject —
+   * a new test as easily as a new entry point — silently reaches the live
+   * internet, which is the one failure mode a scrape with a politeness posture
+   * cannot afford to have happen quietly.
+   *
+   * Reaching the network is therefore something a caller has to say out loud.
+   * Tests pass a stub and never leave the machine; the entry point passes
+   * `createHttpClient()`.
    */
-  http?: HttpClient;
+  http: HttpClient;
 };
 
 /**
@@ -64,7 +72,7 @@ export const runPipeline = async ({
   db,
   feedsDir,
   now,
-  http = createHttpClient(),
+  http,
 }: PipelineOptions): Promise<PipelineRun> => {
   const ranAt = instantFromDate(now());
 

@@ -49,9 +49,16 @@ broke.
 
 | Source | Anchor |
 |---|---|
-| Suntec | the `article.eventlist-event` container |
+| Suntec | the `div.eventlist` listing container |
 | SCC | the schedule `<table>` |
 | MBCCS | the rendered grid |
+
+**The anchor is the listing container, never a row.** This table first named Suntec's
+anchor as `article.eventlist-event` — a row element — and that was an error, corrected on
+2026-07-20 during #34. A row selector cannot satisfy the two bullets immediately below,
+because *empty listing* and *not our document* both yield zero rows and would be
+indistinguishable. Only a container that the CMS renders whether or not it has contents
+can carry the distinction, which is the whole point of the anchor.
 
 - **Anchor present, no rows** → `ok: true, records: []`. The source is genuinely empty.
   A fact. (MBCCS renders *"There are no scheduled cruises"* as a valid state; SCC's 16-row

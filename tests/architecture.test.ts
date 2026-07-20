@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { sources } from "../src/sources/registry.js";
+import { identifiersOnly } from "./support/identifiers-only.js";
 
 /**
  * Guards for decisions that are enforced by convention everywhere else, and so
@@ -18,86 +19,6 @@ const sourceFiles = (dir: string): string[] =>
     if (entry.isDirectory()) return sourceFiles(path);
     return entry.name.endsWith(".ts") ? [path] : [];
   });
-
-/**
- * Strips comments, string literals and regex literals, leaving only identifiers.
- *
- * All three exclusions are load-bearing. Comments legitimately *discuss* the
- * banned term — this file does, and so does the domain model. String and regex
- * literals hold **markup and URLs we do not control**: Suntec's structural
- * anchor is `article.eventlist-event`, so a guard that read their contents would
- * forbid the very selector the adapter is required to match on.
- *
- * Done as a **single left-to-right scan**, not a chain of independent replaces.
- * A chain has to decide what a delimiter means without knowing what it is inside
- * of, and every ordering of it is wrong somewhere real:
- *
- * - strip comments first, and `"https://host/visit-events"` loses its tail to
- *   the line-comment rule, leaving an unterminated quote that swallows the rest
- *   of the file;
- * - strip strings first, and a comment containing an apostrophe pairs with the
- *   next one, doing the same;
- * - strip either before regexes, and `/class="[^"]*eventlist"/` has its own
- *   quotes paired across the pattern, leaving its middle behind as code.
- *
- * Each of those was reached by real source in this repo, so the scanner is the
- * cheap version, not the thorough one.
- */
-const identifiersOnly = (code: string): string => {
-  /** A `/` opens a regex only in value position; after a value it is division. */
-  const REGEX_MAY_FOLLOW = /(?:[=(,:;[!&|?{}+\-*%~^]|\b(?:return|typeof|case|in|of|do|else))\s*$/;
-
-  let out = "";
-  let i = 0;
-
-  while (i < code.length) {
-    const rest = code.slice(i);
-
-    if (rest.startsWith("//")) {
-      i = code.indexOf("\n", i);
-      if (i === -1) break;
-      continue;
-    }
-    if (rest.startsWith("/*")) {
-      const close = code.indexOf("*/", i + 2);
-      i = close === -1 ? code.length : close + 2;
-      continue;
-    }
-
-    const char = code[i]!;
-
-    if (char === '"' || char === "'" || char === "`") {
-      i += 1;
-      while (i < code.length && code[i] !== char) i += code[i] === "\\" ? 2 : 1;
-      i += 1;
-      out += char + char;
-      continue;
-    }
-
-    if (char === "/" && REGEX_MAY_FOLLOW.test(out)) {
-      i += 1;
-      let inClass = false;
-      while (i < code.length) {
-        const c = code[i]!;
-        if (c === "\\") i += 2;
-        else if (c === "[") (inClass = true), (i += 1);
-        else if (c === "]") (inClass = false), (i += 1);
-        else if (c === "/" && !inClass) break;
-        else if (c === "\n") break;
-        else i += 1;
-      }
-      i += 1;
-      while (i < code.length && /[gimsuy]/.test(code[i]!)) i += 1;
-      out += "/(?:)/";
-      continue;
-    }
-
-    out += char;
-    i += 1;
-  }
-
-  return out;
-};
 
 const files = sourceFiles(SRC).map((path) => ({
   path: path.slice(SRC.length + 1),
@@ -124,10 +45,14 @@ describe("the source tree", () => {
   });
 
   it("tolerates the banned term inside a selector string", () => {
-    // Suntec's structural anchor (ADR-0006) is `article.eventlist-event`. The
-    // guard above must not forbid it, or it blocks the adapter that needs it.
-    const suntecAnchor = 'const ANCHOR = "article.eventlist-event";';
+    // Suntec's structural anchor (ADR-0006) is `div.eventlist`, and its rows are
+    // `article.eventlist-event`. Both selector strings carry the banned term, and
+    // the guard above must forbid neither, or it blocks the adapter that needs them.
+    const suntecAnchor = 'const ANCHOR = "div.eventlist";';
     expect(/\bevents?\b/i.test(identifiersOnly(suntecAnchor))).toBe(false);
+
+    const suntecRow = 'const IS_ROW = "article.eventlist-event";';
+    expect(/\bevents?\b/i.test(identifiersOnly(suntecRow))).toBe(false);
   });
 
   it("tolerates the banned term inside a selector regex, quotes and all", () => {

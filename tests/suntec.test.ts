@@ -151,6 +151,43 @@ describe("parsing the real listing", () => {
     expect(byKey(parsed("listing.html"), "cws-thanksgiving-18-july-2026").hall).toBeNull();
   });
 
+  it("still recognises the street address after a copy edit, and keeps it out of the hall", () => {
+    // The address is filtered by pattern, not by equality against the exact
+    // published literal. Under equality this drift — a doubled space, a lowercase
+    // street, a renamed complex — leaks `1  raffles Boulevard Suntec Towers` into
+    // `hall`, and from there into every LOCATION line in the feed.
+    const drifted = fixture("listing.html").replace(
+      /1%20Raffles%20Boulevard%20Suntec%20City/g,
+      "1%20%20raffles%20Boulevard%20Suntec%20Towers",
+    );
+
+    expect(byKey(suntec.parse(drifted, NOW), "cellar-fiesta-2026").hall).toBe("Level 4, Hall 404");
+    expect(byKey(suntec.parse(drifted, NOW), "cws-thanksgiving-18-july-2026").hall).toBeNull();
+  });
+
+  it("reads timing from the gcal link only, not from another link in the same row", () => {
+    // The row already carries a second export link. Today it sits *after* the
+    // gcal link and carries no parameters, so a whole-row search happens to be
+    // right — by luck of ordering, not by construction. This stages the two
+    // template changes that would end that luck at once: the ical link gains
+    // dates=/location= and is emitted first. A whole-row search reads 1999.
+    const decoy =
+      '<a href="/visit-events/cellar-fiesta-2026?format=ical' +
+      "&dates=19990101T000000Z/19990101T010000Z" +
+      '&location=Decoy%20Hall%2C%20Singapore" class="eventlist-meta-export-ical"></a>';
+
+    const gcalLink = fixture("listing.html").match(
+      /<a[^>]*text=Cellar[^>]*class="eventlist-meta-export-google">/,
+    )?.[0];
+    if (!gcalLink) throw new Error("fixture no longer has the gcal link this test stages against");
+
+    const decoyed = fixture("listing.html").replace(gcalLink, decoy + gcalLink);
+
+    const record = byKey(suntec.parse(decoyed, NOW), "cellar-fiesta-2026");
+    expect(record.start).toBe("2026-07-17T04:00:00Z");
+    expect(record.hall).toBe("Level 4, Hall 404");
+  });
+
   it("labels every record with its own source", () => {
     expect(recordsOf(parsed("listing.html")).every((r) => r.source === "suntec")).toBe(true);
   });
