@@ -1,0 +1,125 @@
+# The daily run. Unattended by design: nobody is present when this fires, so
+# every property it needs has to be structural rather than operational.
+#
+# Zero credentials end to end. `GITHUB_TOKEN` is minted by Actions for this run
+# and expires with it; there is no secret, PAT or connection string anywhere in
+# this file, and `tests/workflow.test.ts` holds that.
+name: Daily pipeline
+
+on:
+  # 19:37 UTC = 03:37 SGT — overnight in Singapore, and **off the top of the
+  # hour on purpose**: GitHub documents that scheduled runs may be dropped when
+  # the platform is under load, and load concentrates on the minute everybody
+  # picked. A dropped run costs a day of freshness and nothing else (the store
+  # is upserted, so the next run heals it), but it is still the failure worth
+  # not courting.
+  schedule:
+    - cron: "37 19 * * *"
+  # The only way to run this on demand. Kept because the first thing anyone will
+  # want after merging is to watch it run once.
+  workflow_dispatch:
+
+# **Two runs must never overlap.** The store is a single SQLite blob committed
+# to the repository; two runs would each build on the same parent and the second
+# push would either be rejected or clobber the first. A blob cannot merge.
+#
+# Queued rather than cancelled: a cancelled run may already have upserted, and
+# killing it between the transaction and the commit is the one way to lose a
+# scrape that was actually made.
+concurrency:
+  group: daily-pipeline
+  cancel-in-progress: false
+
+permissions:
+  # Commit the refreshed store and feeds back.
+  contents: write
+  # Publish the site.
+  pages: write
+  id-token: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      # Full history, not the default shallow clone. The push retry below rebases
+      # onto the remote ref, and rebasing a depth-1 checkout is not something git
+      # can be relied on to do — the one recovery path this run has would fail in
+      # exactly the situation it exists for.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      # Scrapes every source, folds what it saw into the store, and re-emits the
+      # feeds from the store. A source that cannot be read is reported and does
+      # not fail the run — see the note in `src/main.ts`.
+      - name: Run the pipeline
+        run: npm run pipeline
+
+      - name: Commit the refreshed store and feeds
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/calendar.sqlite site/feeds
+
+          # **Unreachable today, and kept anyway.** DTSTAMP is the run instant
+          # (ADR-0011), so the feed differs on every run even when no source
+          # could be read and nothing was upserted — there is currently no such
+          # thing as a no-op run. This guard is what stops an empty commit if
+          # that ever stops being true; the alternative, inventing a commit with
+          # `--allow-empty`, is the keepalive #19 bans.
+          if git diff --cached --quiet; then
+            echo "Nothing changed."
+            exit 0
+          fi
+
+          git commit -m "Daily run: refresh the store and the feeds"
+
+          # One retry, and only one. The concurrency group above means this
+          # workflow is the sole writer of these paths, so a rejected push can
+          # only mean a human commit landed during the run — which our commit
+          # rebases onto cleanly, because it touches nothing a human edits.
+          git push || {
+            git fetch origin "${{ github.ref_name }}"
+            git rebase "origin/${{ github.ref_name }}"
+            git push
+          }
+
+      # **Publishing runs after the commit-back, and is blocked by its failure.**
+      # That coupling is deliberate rather than incidental. A uid is minted once
+      # and then persisted (CONTEXT.md § UID); a feed published from a store that
+      # was never pushed carries uids the next run will mint again, landing a
+      # duplicate in every subscriber's calendar. Not publishing costs a day of
+      # freshness — the cheaper of the two failures by a wide margin.
+      #
+      # A failed deploy leaves the previous site up rather than blanking it, so
+      # the reader sees stale, never empty.
+
+      # `enablement` turns Pages on for the repository on first run, using the
+      # same `GITHUB_TOKEN`. Kept here rather than done by hand in Settings so
+      # that the deployment has no manual prerequisite — a setting clicked once
+      # by somebody is exactly the kind of state this repo has none of.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      # **Uploaded as an artifact, not committed to a gh-pages branch.** The
+      # feeds are already committed above, on the branch they are generated on,
+      # which is what keeps them diffable; publishing them a second time into a
+      # branch would add a commit per run whose entire diff is a DTSTAMP.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -134,6 +134,7 @@ const storedPortCalls = () => {
 
 const RUN_ONE = "2026-07-01T02:00:00Z";
 const RUN_TWO = "2026-07-02T02:00:00Z";
+const RUN_THREE = "2026-07-03T02:00:00Z";
 
 /** The VEVENT bodies, one array of property lines each, unfolded. */
 const vevents = (ics: string): string[][] => {
@@ -535,6 +536,35 @@ describe("idempotence", () => {
     expect(venueFeed()).toBe(firstBytes);
     expect(storedVenueEvents()).toEqual(firstVenueEvents);
     expect(storedPortCalls()).toEqual(firstPortCalls);
+  });
+
+  it("self-heals a dropped run, costing freshness and nothing else", async () => {
+    // GitHub drops scheduled runs under load, so a day on which the pipeline
+    // simply never fires is expected rather than exceptional. The next run has
+    // to absorb that: re-minting a uid would land a duplicate in every
+    // subscriber's calendar, which is a far worse outcome than a stale one.
+    //
+    // Distinct from the re-run above: that repeats a run at the *same* instant,
+    // this skips one entirely and resumes at a later one, which is the only
+    // shape in which `lastSeenAt` has a gap to be wrong about.
+    const fixtures = () => [venueSourceOf("suntec", [bniVision()])];
+
+    await run(fixtures(), RUN_ONE);
+    const before = storedVenueEvents();
+
+    // Nothing runs at RUN_TWO. The scheduled run was dropped.
+    await run(fixtures(), RUN_THREE);
+    const after = storedVenueEvents();
+
+    expect(after).toHaveLength(before.length);
+    expect(after.map((record) => record.uid)).toEqual(before.map((record) => record.uid));
+    // Content did not change while we were not looking, so nothing is an update.
+    expect(after.map((record) => record.sequence)).toEqual(before.map((record) => record.sequence));
+    expect(after.map((record) => record.firstSeenAt)).toEqual(
+      before.map((record) => record.firstSeenAt),
+    );
+    // The one thing that does move — and it moves to now, not to the run we lost.
+    expect(after.map((record) => record.lastSeenAt)).toEqual([instant(RUN_THREE)]);
   });
 
   it("orders entries deterministically regardless of the order sources are read", async () => {
