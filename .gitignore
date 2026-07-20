@@ -1,3 +1,7 @@
 # Local Claude Code state. Holds git worktrees for research branches — checkouts,
 # not content. The research itself lives in the research/* branches on origin.
 .claude/
+
+node_modules/
+.DS_Store
+*.tsbuildinfo
