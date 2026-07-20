@@ -1,0 +1,19 @@
+<!-- The load-bearing fixture for this adapter.
+
+     Singapore Cruise Centre sits behind Imperva/Incapsula (`x-cdn: Imperva` on
+     every live response). It is passive today and returned HTTP 200 with full
+     content on every request we have made — but it is a switch the operator can
+     flip, and this is what the page becomes when they do.
+
+     Two properties make it dangerous, and they are why this file exists:
+
+     - **It is served with HTTP 200.** A fetch layer checking status codes sees
+       nothing wrong, so the parser is the only thing standing here.
+     - **It is byte-plausible as a quiet week.** No schedule table, no rows, no
+       error text a heuristic could match on. A parser that counts rows reports
+       `ok: true, records: []` — an assertion that no ship calls at Singapore
+       for three months, made by a scraper that never saw the schedule.
+
+     The structural anchor (ADR-0006) is the only thing that separates this
+     document from `empty-table.html`. -->
+<html style="height:100%"><head><META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW"><meta name="format-detection" content="telephone=no"><meta name="viewport" content="initial-scale=1.0"><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"><script src="/_Incapsula_Resource?SWJIYLWA=719d34d31c8e3a6e6fffd425f7e032f3"></script></head><body style="margin:0px;height:100%"><iframe id="main-iframe" src="/_Incapsula_Resource?CWUDNSAI=25&xinfo=52-216248457-0%20NNNN%20RT%281784524504044%2010%29%20q%280%200%200%20-1%29%20r%280%206%29%20U12&incident_id=3134597-216248462&edet=15&cinfo=0e0f0000&rpinfo=0" frameborder=0 width="100%" height="100%" marginheight="0px" marginwidth="0px">Request unsuccessful. Incapsula incident ID: 3134597-216248462</iframe></body></html>

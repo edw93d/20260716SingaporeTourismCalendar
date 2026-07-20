@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
@@ -90,6 +90,7 @@ let workspace: string;
 const dbPath = () => join(workspace, "calendar.sqlite");
 const feedsDir = () => join(workspace, "feeds");
 const venueFeed = () => readFileSync(join(feedsDir(), "venue-events.ics"), "utf8");
+const portCallFeed = () => readFileSync(join(feedsDir(), "port-calls.ics"), "utf8");
 
 const clockAt = (value: string) => () => new Date(value);
 
@@ -466,6 +467,70 @@ describe("venue-events.ics", () => {
 
   it("terminates every line with CRLF", () => {
     expect(venueFeed().endsWith("END:VCALENDAR\r\n")).toBe(true);
+  });
+});
+
+describe("port-calls.ics", () => {
+  beforeEach(async () => {
+    await run(
+      [venueSourceOf("suntec", [bniVision()]), portCallSourceOf("scc", [odyssey()])],
+      RUN_ONE,
+    );
+  });
+
+  it("announces itself as SG Cruise Arrivals", () => {
+    // Plain audience language, read beside a hotelier's own work calendars.
+    expect(portCallFeed()).toContain("X-WR-CALNAME:SG Cruise Arrivals");
+  });
+
+  it("carries every PortCall and no VenueEvent", () => {
+    const blocks = vevents(portCallFeed());
+    expect(blocks).toHaveLength(1);
+    expect(valueOf(blocks[0]!, "SUMMARY")).toBe(
+      "Cruise: ODYSSEY / VILLA VIE RESIDENCES at Singapore Cruise Centre",
+    );
+    expect(portCallFeed()).not.toContain("BNI Vision");
+  });
+
+  it("is one of exactly two feeds, with no all firehose among them", () => {
+    // Split by **type**, never by source, and there is no `all` (ADR-0008). The
+    // unfiltered duplicate-heavy stream is not a subscription anyone should
+    // hold; the everything-view is the web calendar. Asserted as the whole
+    // directory listing, so a third feed cannot appear unnoticed.
+    expect(readdirSync(feedsDir()).sort()).toEqual(["port-calls.ics", "venue-events.ics"]);
+  });
+
+  it("projects location as the terminal, never the berth", () => {
+    // A pier number is a fact about a ship, not about where demand lands.
+    expect(valueOf(vevents(portCallFeed())[0]!, "LOCATION")).toBe("Singapore Cruise Centre");
+    expect(valueOf(vevents(portCallFeed())[0]!, "LOCATION")).not.toContain("Pier");
+  });
+
+  it("carries the berth in the generated description instead", () => {
+    // Demoted, not dropped — and it travels in prose we generate, never scraped.
+    const description = valueOf(vevents(portCallFeed())[0]!, "DESCRIPTION") ?? "";
+    expect(description).toContain("Pier 2");
+    expect(description).toMatch(/cruise/i);
+    expect(description).toContain("scc");
+  });
+
+  it("carries the same seven properties as the other feed", () => {
+    // The split is a subscription boundary, not a schema difference.
+    expect(vevents(portCallFeed())[0]!.map(propertyName).sort()).toEqual([
+      "DESCRIPTION",
+      "DTEND",
+      "DTSTAMP",
+      "DTSTART",
+      "LOCATION",
+      "SUMMARY",
+      "UID",
+    ]);
+  });
+
+  it("serializes arrival and departure as the entry's start and end", () => {
+    const block = vevents(portCallFeed())[0]!;
+    expect(valueOf(block, "DTSTART")).toBe("20260718T000000Z");
+    expect(valueOf(block, "DTEND")).toBe("20260718T100000Z");
   });
 });
 

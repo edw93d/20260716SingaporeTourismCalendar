@@ -117,7 +117,7 @@ describe("the source registry", () => {
   it("lists exactly the sources that feed this calendar", () => {
     // One file answers "what feeds this?". Adding a source touches two files —
     // the module and this array — and that is the point, not overhead.
-    expect(sources.map((source) => source.key)).toEqual(["suntec"]);
+    expect(sources.map((source) => source.key)).toEqual(["suntec", "scc"]);
   });
 
   it("is an array, not a discovered map", () => {

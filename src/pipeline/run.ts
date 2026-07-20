@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { instantFromDate, type Instant } from "../domain/instant.js";
-import { projectVenueEvent } from "../domain/project.js";
+import { projectPortCall, projectVenueEvent } from "../domain/project.js";
 import type { PortCall, Scraped, SourceId, VenueEvent } from "../domain/types.js";
 import { serializeCalendar } from "../feeds/ical.js";
 import type { FetchDeps, HttpClient, ParseFailure, Source } from "../sources/types.js";
@@ -94,12 +94,26 @@ export const runPipeline = async ({
       outcomes.push(outcome);
     }
 
+    // Two feeds, split by **type** — never a single firehose, never split by
+    // source, and there is no `all` (ADR-0008). The audience thinks in demand
+    // shapes, `source` already rides inside every entry, and the unfiltered
+    // duplicate-heavy stream is not a subscription anyone should hold. The
+    // everything-view is the web calendar. Consequently the feed set grows with
+    // types, not sources: a fourth source folds into one of these two.
     mkdirSync(feedsDir, { recursive: true });
     writeFileSync(
       join(feedsDir, "venue-events.ics"),
       serializeCalendar({
         name: "SG Venue Events",
         entries: store.readVenueEvents().map(projectVenueEvent),
+        dtstamp: ranAt,
+      }),
+    );
+    writeFileSync(
+      join(feedsDir, "port-calls.ics"),
+      serializeCalendar({
+        name: "SG Cruise Arrivals",
+        entries: store.readPortCalls().map(projectPortCall),
         dtstamp: ranAt,
       }),
     );
