@@ -90,6 +90,18 @@ describe("the source tree", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("constructs a network client in exactly one place", () => {
+    // ADR-0010: reaching the live internet is something a caller says out loud,
+    // and the entry point is where it gets said. A second construction site is
+    // how the default this ADR removed grows back — some module deciding for
+    // its callers that they meant to be online.
+    const constructors = files
+      .filter(({ path, code }) => path !== "pipeline/http.ts" && /createHttpClient\s*\(/.test(code))
+      .map(({ path }) => path);
+
+    expect(constructors).toEqual(["main.ts"]);
+  });
+
   it("loads no configuration file", () => {
     // Selectors and URLs are constants in their adapter module. A config system
     // is foreclosed by the standing constraint that extraction is code.

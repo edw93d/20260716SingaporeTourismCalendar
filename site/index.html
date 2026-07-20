@@ -1,0 +1,68 @@
+<!doctype html>
+<!--
+  The static shell of the published site.
+
+  Deliberately minimal: the web calendar — four switchable views, type filter,
+  client-side (ADR-0009) — is #38, and this page is what stands in the meantime.
+  Deploying before coverage is complete is the point of #35: a partly-covered
+  page costs nothing while nobody has the URL, and it starts the clock on the
+  60-day auto-disable question (#19) that only observation can answer.
+
+  Everything below is hand-written and committed. Only `feeds/` is generated.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      Not indexed while coverage is one venue. #35 deploys early on the grounds
+      that a partly-covered page costs nothing *while nobody has the URL*; a
+      search result is how somebody gets the URL. Lift this when the site is
+      worth finding.
+    -->
+    <meta name="robots" content="noindex" />
+    <title>Singapore tourism &amp; MICE demand calendar</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0 auto;
+        padding: 2rem 1.25rem 4rem;
+        max-width: 42rem;
+        font: 1rem/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      h1 { font-size: 1.5rem; line-height: 1.3; }
+      code { font-size: 0.9em; }
+      .note { opacity: 0.75; font-size: 0.9rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Singapore tourism &amp; MICE demand calendar</h1>
+
+    <p>
+      Public listings of what is happening in Singapore — conferences, exhibitions,
+      concerts, consumer festivals — aggregated into <strong>existence and timing</strong>
+      records and refreshed daily, for people who plan around demand landing.
+    </p>
+
+    <h2>Subscribe</h2>
+    <ul>
+      <li><a href="feeds/venue-events.ics">SG Venue Events</a> — <code>feeds/venue-events.ics</code></li>
+    </ul>
+    <p class="note">
+      Add the link to your calendar as a <em>subscription</em>, not an import, so it
+      keeps refreshing. Cruise arrivals get their own feed once those sources land.
+    </p>
+
+    <h2>What is here so far</h2>
+    <p class="note">
+      One source: Suntec Singapore Convention &amp; Exhibition Centre. Coverage is
+      incomplete on purpose — the pipeline was deployed early so that it could be
+      watched running. Nothing here is a complete picture of Singapore demand yet.
+    </p>
+
+    <p class="note">
+      Facts only — names, dates, venues, as published. Free software under AGPLv3:
+      <a href="https://github.com/edw93d/20260716SingaporeTourismCalendar">source</a>.
+    </p>
+  </body>
+</html>
