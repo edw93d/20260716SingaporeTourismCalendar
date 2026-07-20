@@ -1,4 +1,4 @@
-import type { CalendarEntry, PortCall, VenueEvent } from "./types.js";
+import type { CalendarEntry, VenueEvent } from "./types.js";
 
 /**
  * The projection both record types serialize through, per `CONTEXT.md`
@@ -7,6 +7,10 @@ import type { CalendarEntry, PortCall, VenueEvent } from "./types.js";
  * It is **a convenience, not a bottleneck** — it flattens away `vessel`, `hall`
  * and `berth`, and a serializer needing those (a future Excel export) reads the
  * domain types directly rather than widening this.
+ *
+ * Only the `VenueEvent` half exists here. The `PortCall` projection arrives with
+ * the feed that renders it (`port-calls.ics`) rather than sitting unreachable
+ * until then.
  */
 
 /**
@@ -22,8 +26,8 @@ import type { CalendarEntry, PortCall, VenueEvent } from "./types.js";
  * friendlier `X-` namespace to escape into, so the marker travels as prose or
  * not at all.
  */
-const describe = (category: string, source: string, detail?: string): string =>
-  [detail ? `${category} — ${detail}.` : `${category}.`, `Source: ${source}.`].join("\n");
+const descriptionFor = (category: string, source: string): string =>
+  `${category}.\nSource: ${source}.`;
 
 export const projectVenueEvent = (record: VenueEvent): CalendarEntry => ({
   uid: record.uid,
@@ -32,23 +36,6 @@ export const projectVenueEvent = (record: VenueEvent): CalendarEntry => ({
   end: record.end,
   // Venue plus hall: a hotelier heading there needs the room, not just the building.
   location: [record.venue, record.hall].filter((part) => part !== null).join(", "),
-  description: describe("Venue event", record.source),
-  source: record.source,
-});
-
-export const projectPortCall = (record: PortCall): CalendarEntry => ({
-  uid: record.uid,
-  // A port call has no name — this label is ours, and says so by construction.
-  summary: `Cruise: ${record.vessel} at ${record.terminal}`,
-  start: record.arrival,
-  end: record.departure,
-  // The terminal, **never the berth**. A pier number is not reader-facing;
-  // it is demoted into the description below.
-  location: record.terminal,
-  description: describe(
-    "Cruise port call",
-    record.source,
-    record.berth === null ? undefined : `berth ${record.berth}`,
-  ),
+  description: descriptionFor("Venue event", record.source),
   source: record.source,
 });

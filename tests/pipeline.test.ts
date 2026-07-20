@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { instant } from "../src/domain/instant.js";
 import type {
@@ -92,10 +93,7 @@ const venueFeed = () => readFileSync(join(feedsDir(), "venue-events.ics"), "utf8
 
 const clockAt = (value: string) => () => new Date(value);
 
-const run = (
-  sources: (Source<VenueEvent> | Source<PortCall>)[],
-  at: string,
-): Promise<unknown> =>
+const run = (sources: (Source<VenueEvent> | Source<PortCall>)[], at: string) =>
   runPipeline({ sources, db: dbPath(), feedsDir: feedsDir(), now: clockAt(at) });
 
 /** Reads the database back the way a later run — or the operator — would. */
@@ -191,12 +189,14 @@ describe("the store", () => {
     // stated. A column would be the first place that refusal leaks.
     await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
 
-    const store = openStore(dbPath());
+    const db = new Database(dbPath(), { readonly: true });
     try {
-      expect(store.columnNames().filter((c) => /status|state|deleted|cancelled|active/i.test(c)))
-        .toEqual([]);
+      const columns = ["venue_event", "port_call"].flatMap((table) =>
+        (db.pragma(`table_info(${table})`) as { name: string }[]).map(({ name }) => name),
+      );
+      expect(columns.filter((c) => /status|state|deleted|cancelled|active/i.test(c))).toEqual([]);
     } finally {
-      store.close();
+      db.close();
     }
   });
 });
@@ -337,6 +337,49 @@ describe("parse outcomes", () => {
     expect(storedVenueEvents()).toHaveLength(1);
     expect(vevents(venueFeed())).toHaveLength(1);
   });
+
+  it("reports what each source did, so a bad reading is not swallowed", async () => {
+    const { outcomes } = await run(
+      [
+        sourceReturning<VenueEvent>("suntec", {
+          ok: true,
+          records: [bniVision()],
+          failures: [{ fragment: "<article/>", expected: "a start instant" }],
+        }),
+        sourceReturning<VenueEvent>("expo", { ok: false, reason: "listing anchor absent" }),
+      ],
+      RUN_ONE,
+    );
+
+    expect(outcomes).toEqual([
+      {
+        source: "suntec",
+        ok: true,
+        records: 1,
+        failures: [{ fragment: "<article/>", expected: "a start instant" }],
+      },
+      { source: "expo", ok: false, reason: "listing anchor absent" },
+    ]);
+  });
+
+  it("does not let one unreachable source cost every other source its reading", async () => {
+    const unreachable: Source<VenueEvent> = {
+      key: "scc",
+      fetch: async () => {
+        throw new Error("connect ETIMEDOUT");
+      },
+      parse: () => ({ ok: true, records: [], failures: [] }),
+    };
+
+    const { outcomes } = await run(
+      [unreachable, venueSourceOf("suntec", [bniVision()])],
+      RUN_ONE,
+    );
+
+    expect(outcomes[0]).toMatchObject({ source: "scc", ok: false });
+    expect(outcomes[0]).toHaveProperty("reason", expect.stringContaining("ETIMEDOUT"));
+    expect(storedVenueEvents()).toHaveLength(1);
+  });
 });
 
 describe("venue-events.ics", () => {
@@ -460,14 +503,21 @@ describe("idempotence", () => {
   it("produces byte-identical output and identical state on a re-run", async () => {
     // A dropped run must cost freshness and nothing else, so the scrape has to
     // be safe to repeat.
-    await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
-    const firstBytes = venueFeed();
-    const firstState = storedVenueEvents();
+    const fixtures = () => [
+      venueSourceOf("suntec", [bniVision()]),
+      portCallSourceOf("scc", [odyssey()]),
+    ];
 
-    await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
+    await run(fixtures(), RUN_ONE);
+    const firstBytes = venueFeed();
+    const firstVenueEvents = storedVenueEvents();
+    const firstPortCalls = storedPortCalls();
+
+    await run(fixtures(), RUN_ONE);
 
     expect(venueFeed()).toBe(firstBytes);
-    expect(storedVenueEvents()).toEqual(firstState);
+    expect(storedVenueEvents()).toEqual(firstVenueEvents);
+    expect(storedPortCalls()).toEqual(firstPortCalls);
   });
 
   it("orders entries deterministically regardless of the order sources are read", async () => {

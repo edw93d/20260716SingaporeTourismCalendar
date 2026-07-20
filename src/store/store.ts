@@ -145,8 +145,6 @@ export type Store = {
   readPortCalls(): PortCall[];
   upsertVenueEvent(scraped: Scraped<VenueEvent>, seenAt: Instant): void;
   upsertPortCall(scraped: Scraped<PortCall>, seenAt: Instant): void;
-  /** Every column across both tables — the seam the no-status guard asserts on. */
-  columnNames(): string[];
   /** Runs `work` as one transaction, so a run either lands or does not. */
   transact(work: () => void): void;
   close(): void;
@@ -243,11 +241,6 @@ export const openStore = (path: string): Store => {
 
     upsertVenueEvent: (scraped, seenAt) => upsert(VENUE_EVENT, scraped, seenAt),
     upsertPortCall: (scraped, seenAt) => upsert(PORT_CALL, scraped, seenAt),
-
-    columnNames: () =>
-      [VENUE_EVENT.table, PORT_CALL.table].flatMap((table) =>
-        (db.pragma(`table_info(${table})`) as { name: string }[]).map((column) => column.name),
-      ),
 
     transact: (work) => {
       db.transaction(work)();

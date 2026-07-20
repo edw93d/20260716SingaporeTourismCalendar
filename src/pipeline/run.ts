@@ -5,7 +5,7 @@ import { projectVenueEvent } from "../domain/project.js";
 import type { PortCall, Scraped, SourceId, VenueEvent } from "../domain/types.js";
 import { serializeCalendar } from "../feeds/ical.js";
 import type { FetchDeps, HttpClient, ParseFailure, Source } from "../sources/types.js";
-import { openStore } from "../store/store.js";
+import { openStore, type Store } from "../store/store.js";
 
 /**
  * One pipeline run: every source is read, what it observed is folded into the
@@ -25,14 +25,6 @@ export type PipelineOptions = {
   /** Where the `.ics` files land. */
   feedsDir: string;
   now: () => Date;
-  /**
-   * The rate-limited client the core injects into every adapter.
-   *
-   * Optional only because no adapter exists yet to use one; the default refuses
-   * rather than improvises, so the first real adapter fails loudly at the wiring
-   * instead of quietly acquiring an unpoliced route to the network.
-   */
-  http?: HttpClient;
 };
 
 /**
@@ -50,10 +42,19 @@ export type PipelineRun = {
   outcomes: SourceOutcome[];
 };
 
-const REFUSING_HTTP: HttpClient = {
+/**
+ * The core owns policy — user agent, per-host rate limit, timeout, retry — so
+ * that politeness is structural rather than disciplinary, and an adapter has no
+ * other route to the network.
+ *
+ * No such client exists yet, because no adapter yet exists to use one. This
+ * placeholder **refuses rather than improvises**, so the first real adapter
+ * fails loudly at the wiring instead of quietly acquiring an unpoliced route.
+ */
+const NO_HTTP_CLIENT_YET: HttpClient = {
   get: async (url) => {
     throw new Error(
-      `No HTTP client is wired into this pipeline run, so ${url} was not fetched. Pass one via \`http\`.`,
+      `No HTTP client is wired into this pipeline yet, so ${url} was not fetched.`,
     );
   },
 };
@@ -72,10 +73,9 @@ export const runPipeline = async ({
   db,
   feedsDir,
   now,
-  http = REFUSING_HTTP,
 }: PipelineOptions): Promise<PipelineRun> => {
   const ranAt = instantFromDate(now());
-  const deps: FetchDeps = { http, now };
+  const deps: FetchDeps = { http: NO_HTTP_CLIENT_YET, now };
 
   const store = openStore(db);
 
@@ -110,7 +110,7 @@ const readSource = async (
   source: Source<VenueEvent> | Source<PortCall>,
   deps: FetchDeps,
   seenAt: Instant,
-  store: ReturnType<typeof openStore>,
+  store: Store,
 ): Promise<SourceOutcome> => {
   let result;
   try {
