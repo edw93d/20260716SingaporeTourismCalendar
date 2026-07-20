@@ -162,12 +162,20 @@ adapter's business and not the core's:
 |---|---|---|
 | MBCCS | `raw.id` | Stable — a real source ID. |
 | Suntec | slug from detail URL (`bni-vision1472026`) | **Assumed** stable. Unverified. |
-| SCC | `{vessel}\|{arrivalDate}` | **Duplicates on reschedule.** Unavoidable. |
+| SCC | `{vessel}\|{arrivalDate}` | **Duplicates on reschedule; collides on a same-day repeat call.** Unavoidable. |
 
 **Known limitations, accepted for v1:**
 
 - **SCC duplicates on reschedule.** The table exposes nothing stable, so a shifted
   arrival is a delete-plus-create, not a move.
+- **SCC collapses a vessel calling twice on one local date.** The same missing
+  identifier, read the other way: two calls yield one key, and the second upsert
+  overwrites the first. Not observed in the published window (17 sailings, 17
+  distinct keys), and **invisible to every signal in § Source health** — the lost
+  call was never in a prior cohort, so ADR-0007's net-drop detection cannot see it
+  go. Unlike the reschedule case, nothing downstream reveals it. Making it audible
+  is [#48](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/48);
+  the key itself has no honest fix without upstream data that does not exist.
 - **Suntec's slug embeds a date** (`1472026` = 14/7/2026). A Squarespace slug is
   frozen at creation rather than re-derived, so it *should* survive a reschedule —
   but this has not been observed and is an assumption. If wrong, Suntec inherits

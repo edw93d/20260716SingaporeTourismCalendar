@@ -1,5 +1,6 @@
 import { instant } from "../domain/instant.js";
 import type { PortCall, Scraped, SourceKey, Terminal } from "../domain/types.js";
+import { textOf } from "./html.js";
 import type { FetchDeps, ParseFailure, ParseResult, Source } from "./types.js";
 
 /**
@@ -66,53 +67,16 @@ const ROW = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
  *
  * The header row carries `<th>` and no `<td>`, so it yields no cells and is
  * skipped without needing to be recognised.
+ *
+ * `textOf` strips tags rather than reading text nodes, and that is what keeps the
+ * cruise line's logo out of the vessel: several rows lead with an
+ * `<img src="…wp-content…">`, and a naive read welds that URL to the front of the
+ * vessel string — and from there into `sourceKey`, permanently.
  */
 const cell = (row: string, label: string): string | null => {
   const match = new RegExp(`<td[^>]*\\bdata-label="${label}"[^>]*>([\\s\\S]*?)</td>`).exec(row);
   return match ? textOf(match[1]!) : null;
 };
-
-const ENTITIES: Record<string, string> = {
-  amp: "&",
-  lt: "<",
-  gt: ">",
-  quot: '"',
-  // Escaped, not literal: a bare apostrophe inside a double-quoted string
-  // desynchronises the quote-pairing the architecture guard does when it strips
-  // literals, and everything after it in this file reads as code to that guard.
-  apos: "'",
-  nbsp: " ",
-  rsquo: "’",
-  lsquo: "‘",
-  ldquo: "“",
-  rdquo: "”",
-  ndash: "–",
-  mdash: "—",
-};
-
-const decodeEntities = (value: string): string =>
-  value.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (whole, body: string) => {
-    if (body.startsWith("#")) {
-      const code = body.startsWith("#x") || body.startsWith("#X")
-        ? Number.parseInt(body.slice(2), 16)
-        : Number.parseInt(body.slice(1), 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : whole;
-    }
-    return ENTITIES[body.toLowerCase()] ?? whole;
-  });
-
-/**
- * Tags out, entities decoded, runs of whitespace collapsed.
- *
- * Stripping tags rather than reading text nodes is what keeps the cruise line's
- * logo out of the vessel: several rows lead with an `<img src="…wp-content…">`,
- * and a naive read welds that URL to the front of the vessel string — and from
- * there into `sourceKey`, permanently.
- */
-const textOf = (html: string): string =>
-  decodeEntities(html.replace(/<[^>]*>/g, " "))
-    .replace(/\s+/g, " ")
-    .trim();
 
 const MONTHS: Record<string, string> = {
   jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",

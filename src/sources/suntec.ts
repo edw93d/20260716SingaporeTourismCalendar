@@ -1,5 +1,6 @@
 import { instant } from "../domain/instant.js";
 import type { Scraped, SourceKey, VenueEvent } from "../domain/types.js";
+import { decodeEntities, textOf } from "./html.js";
 import type { FetchDeps, ParseFailure, ParseResult, Source } from "./types.js";
 
 /**
@@ -109,42 +110,6 @@ const TITLE = /<a[^>]*class="[^"]*\beventlist-title-link\b[^"]*"[^>]*>([\s\S]*?)
  */
 const ADDRESS_PREFIX = /raffles\s+boulevard/i;
 const COUNTRY_SUFFIX = /^singapore$/i;
-
-const ENTITIES: Record<string, string> = {
-  amp: "&",
-  lt: "<",
-  gt: ">",
-  quot: '"',
-  // Escaped, not literal: a bare apostrophe inside a double-quoted string
-  // desynchronises the quote-pairing the architecture guard does when it strips
-  // literals, and everything after it in this file reads as code to that guard.
-  apos: "\u0027",
-  nbsp: " ",
-  rsquo: "’",
-  lsquo: "‘",
-  ldquo: "“",
-  rdquo: "”",
-  ndash: "–",
-  mdash: "—",
-  hellip: "…",
-};
-
-const decodeEntities = (value: string): string =>
-  value.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (whole, body: string) => {
-    if (body.startsWith("#")) {
-      const code = body.startsWith("#x") || body.startsWith("#X")
-        ? Number.parseInt(body.slice(2), 16)
-        : Number.parseInt(body.slice(1), 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : whole;
-    }
-    return ENTITIES[body.toLowerCase()] ?? whole;
-  });
-
-/** Tags out, entities decoded, runs of whitespace — including `&nbsp;` — collapsed. */
-const textOf = (html: string): string =>
-  decodeEntities(html.replace(/<[^>]*>/g, " "))
-    .replace(/\s+/g, " ")
-    .trim();
 
 /**
  * `%20` decoding can throw on a malformed sequence, which would take the whole

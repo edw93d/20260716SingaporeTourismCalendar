@@ -72,8 +72,10 @@ with the MBCCS leaked credentials permanently banned.
 
 ## Consequences
 
-- **Each source gets a wholly unique scraper.** The three implementations share no code;
-  the interface constrains only the edges. This is what the seam *buys*, not what it costs.
+- **Each source gets a wholly unique scraper.** The three implementations share no
+  *source knowledge* — selectors, URLs, parse rules, `sourceKey` computation; the
+  interface constrains only the edges. This is what the seam *buys*, not what it costs.
+  See **Amendment 1** for the boundary between source knowledge and HTML primitives.
 - **#9 (breakage detection) gets a usable seam.** A pure `parse` over stored bytes means
   yesterday's fixture can be replayed against today's parser — so breakage can be
   attributed to *which side moved*. Unified fetch+parse would make those inseparable.
@@ -85,6 +87,12 @@ with the MBCCS leaked credentials permanently banned.
   `deps`. Enforced by the type, not by a note in a doc.
 - **Fixture tests are the primary test asset.** All real logic (gcal extraction, SGT
   parsing, UTC conversion, `sourceKey`) sits in `parse` and needs no network.
+  **Fixtures are real bytes the source served, trimmed to the region under test and
+  otherwise verbatim** — each carrying a header comment with its URL and fetch date.
+  A hand-written fixture asserts the page behaves as its author imagined and keeps
+  passing while the real page moves on, which is the same objection that rejects
+  unified `scrape()` below. Trimming is allowed because it removes bytes; editing
+  them is what manufactures the fiction.
 - **`now` is injected** so fixture tests don't drift as fixtures age past the ~3-month window.
 - Adding a source touches two files (module + registry). That is the point, not overhead.
 
@@ -118,3 +126,33 @@ with the MBCCS leaked credentials permanently banned.
   being a one-line revertable diff and becomes an `enabled: false` flag, reintroducing the
   config system through the side door.
 - **A config file for selectors** — foreclosed by the standing constraint; extraction is code.
+
+## Amendments
+
+### Amendment 1: "share no code" means share no *source knowledge*
+
+- **Date:** 2026-07-20
+- **Ticket:** [#36](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/36)
+
+The original consequence read "the three implementations share no code," which the SCC
+adapter took literally: `ENTITIES`, `decodeEntities` and `textOf` were copied from Suntec
+verbatim, comment included. With two copies they had **already diverged** — Suntec's
+entity table carries `hellip`, SCC's did not, and the same `apos` value was spelled two
+different ways. MBCCS would have made three.
+
+The line this ADR was actually drawing is around **source knowledge**: what is true about
+one page — its URLs, its selectors, its parse rules, how it computes `sourceKey`. Sharing
+those is what produces the coupling this ADR rejects, where a Suntec redesign edits a file
+SCC depends on. An HTML entity table is not knowledge about SCC; `&amp;` decodes the same
+in every document on the web. Copying it buys no decoupling and costs silent drift, which
+is the opposite of the trade this ADR made.
+
+**Decided:** generic HTML primitives that hold no opinion about any source may live in one
+shared module (`src/sources/html.ts`). Anything naming a source, a URL, a selector, or a
+field stays in its adapter. The test is whether the code would read identically if written
+for a page nobody has seen — entity decoding would; `cell(row, "CRUISE SHIP")` would not.
+
+Rationale a reader will want and the diff will not give: `textOf`'s *docstrings* stayed in
+the adapters, because why SCC strips tags (a cruise line's `<img>` logo would otherwise weld
+itself into `vessel`, and from there into `sourceKey`) is source knowledge, even though the
+function that does it is not.
