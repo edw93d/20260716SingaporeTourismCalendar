@@ -20,21 +20,84 @@ const sourceFiles = (dir: string): string[] =>
   });
 
 /**
- * Strips comments and string literals, leaving only identifiers.
+ * Strips comments, string literals and regex literals, leaving only identifiers.
  *
- * Both exclusions are load-bearing. Comments legitimately *discuss* the banned
- * term — this file does, and so does the domain model. String literals hold
- * selectors we do not control: Suntec's structural anchor is
- * `article.eventlist-event`, so a guard that read string contents would forbid
- * the very selector the Suntec adapter is required to match on.
+ * All three exclusions are load-bearing. Comments legitimately *discuss* the
+ * banned term — this file does, and so does the domain model. String and regex
+ * literals hold **markup and URLs we do not control**: Suntec's structural
+ * anchor is `article.eventlist-event`, so a guard that read their contents would
+ * forbid the very selector the adapter is required to match on.
+ *
+ * Done as a **single left-to-right scan**, not a chain of independent replaces.
+ * A chain has to decide what a delimiter means without knowing what it is inside
+ * of, and every ordering of it is wrong somewhere real:
+ *
+ * - strip comments first, and `"https://host/visit-events"` loses its tail to
+ *   the line-comment rule, leaving an unterminated quote that swallows the rest
+ *   of the file;
+ * - strip strings first, and a comment containing an apostrophe pairs with the
+ *   next one, doing the same;
+ * - strip either before regexes, and `/class="[^"]*eventlist"/` has its own
+ *   quotes paired across the pattern, leaving its middle behind as code.
+ *
+ * Each of those was reached by real source in this repo, so the scanner is the
+ * cheap version, not the thorough one.
  */
-const identifiersOnly = (code: string): string =>
-  code
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/.*$/gm, "")
-    .replace(/'(?:[^'\\]|\\.)*'/g, "''")
-    .replace(/"(?:[^"\\]|\\.)*"/g, '""')
-    .replace(/`(?:[^`\\]|\\.)*`/g, "``");
+const identifiersOnly = (code: string): string => {
+  /** A `/` opens a regex only in value position; after a value it is division. */
+  const REGEX_MAY_FOLLOW = /(?:[=(,:;[!&|?{}+\-*%~^]|\b(?:return|typeof|case|in|of|do|else))\s*$/;
+
+  let out = "";
+  let i = 0;
+
+  while (i < code.length) {
+    const rest = code.slice(i);
+
+    if (rest.startsWith("//")) {
+      i = code.indexOf("\n", i);
+      if (i === -1) break;
+      continue;
+    }
+    if (rest.startsWith("/*")) {
+      const close = code.indexOf("*/", i + 2);
+      i = close === -1 ? code.length : close + 2;
+      continue;
+    }
+
+    const char = code[i]!;
+
+    if (char === '"' || char === "'" || char === "`") {
+      i += 1;
+      while (i < code.length && code[i] !== char) i += code[i] === "\\" ? 2 : 1;
+      i += 1;
+      out += char + char;
+      continue;
+    }
+
+    if (char === "/" && REGEX_MAY_FOLLOW.test(out)) {
+      i += 1;
+      let inClass = false;
+      while (i < code.length) {
+        const c = code[i]!;
+        if (c === "\\") i += 2;
+        else if (c === "[") (inClass = true), (i += 1);
+        else if (c === "]") (inClass = false), (i += 1);
+        else if (c === "/" && !inClass) break;
+        else if (c === "\n") break;
+        else i += 1;
+      }
+      i += 1;
+      while (i < code.length && /[gimsuy]/.test(code[i]!)) i += 1;
+      out += "/(?:)/";
+      continue;
+    }
+
+    out += char;
+    i += 1;
+  }
+
+  return out;
+};
 
 const files = sourceFiles(SRC).map((path) => ({
   path: path.slice(SRC.length + 1),
@@ -67,6 +130,30 @@ describe("the source tree", () => {
     expect(/\bevents?\b/i.test(identifiersOnly(suntecAnchor))).toBe(false);
   });
 
+  it("tolerates the banned term inside a selector regex, quotes and all", () => {
+    // The shape the Suntec adapter actually uses. A guard that stripped strings
+    // before regexes would pair the pattern's own quotes and leave its middle
+    // behind, failing the one adapter it was written to permit.
+    const rowPattern = 'const ROW = /<article[^>]*class="[^"]*eventlist-event"/;';
+    expect(/\bevents?\b/i.test(identifiersOnly(rowPattern))).toBe(false);
+  });
+
+  it("tolerates a URL whose path carries the banned term", () => {
+    // The Suntec listing lives at `/visit-events`. Read as a line comment — the
+    // obvious ordering — the `//` in `https://` truncates the literal and the
+    // unterminated quote swallows the rest of the file.
+    const url = 'const LISTING = "https://www.suntecsingapore.com/visit-events";';
+    expect(/\bevents?\b/i.test(identifiersOnly(url))).toBe(false);
+    // Everything after it must still be visible to the guard.
+    expect(identifiersOnly(`${url}\nconst after = 1;`)).toContain("after");
+  });
+
+  it("still catches the banned term in an identifier beside a literal", () => {
+    // Guards the guard: an over-broad stripper would silently permit everything.
+    expect(identifiersOnly('const events = /class="eventlist"/;')).toMatch(/\bevents\b/);
+    expect(identifiersOnly('const url = "/visit-events"; let event = 1;')).toMatch(/\bevent\b/);
+  });
+
   it("reads no environment variables", () => {
     // v1 has zero credentials end to end — everything authenticates with
     // GITHUB_TOKEN inside the workflow and nothing else. A process.env read is
@@ -90,12 +177,23 @@ describe("the source tree", () => {
 });
 
 describe("the source registry", () => {
-  it("is explicit and currently empty", () => {
-    expect(sources).toEqual([]);
+  it("lists exactly the sources that feed this calendar", () => {
+    // One file answers "what feeds this?". Adding a source touches two files —
+    // the module and this array — and that is the point, not overhead.
+    expect(sources.map((source) => source.key)).toEqual(["suntec"]);
   });
 
   it("is an array, not a discovered map", () => {
     expect(Array.isArray(sources)).toBe(true);
+  });
+
+  it("carries no enabled flag on any source", () => {
+    // Disabling a source is a one-line revertable diff. A flag would reintroduce
+    // the config system through the side door — see ADR-0005.
+    for (const source of sources) {
+      expect(source).not.toHaveProperty("enabled");
+      expect(Object.keys(source).sort()).toEqual(["fetch", "key", "parse"]);
+    }
   });
 });
 

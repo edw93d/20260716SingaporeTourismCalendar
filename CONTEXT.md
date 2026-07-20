@@ -276,7 +276,8 @@ what it feeds. See ADR-0005 and ADR-0006.
 `start`/`end`/`arrival`/`departure` are **UTC instants**. There is no all-day shape
 and no `RRULE` in v1.
 
-All three sources publish true end times (Suntec 154/154 as a UTC interval; MBCCS
+All three sources publish true end times (Suntec 154/154 as a UTC interval on
+2026-07-16 and 178/178 on 2026-07-20, when the adapter was built; MBCCS
 `unberthingDateTime`; SCC a departure column). The only date-only source was
 Ticketmaster, dropped on the legal audit (#3) — which retired the earlier
 inclusive-end-date rule along with it. See ADR-0003.

@@ -6,6 +6,7 @@ import type { PortCall, Scraped, SourceId, VenueEvent } from "../domain/types.js
 import { serializeCalendar } from "../feeds/ical.js";
 import type { FetchDeps, HttpClient, ParseFailure, Source } from "../sources/types.js";
 import { openStore, type Store } from "../store/store.js";
+import { createHttpClient } from "./http.js";
 
 /**
  * One pipeline run: every source is read, what it observed is folded into the
@@ -25,6 +26,13 @@ export type PipelineOptions = {
   /** Where the `.ics` files land. */
   feedsDir: string;
   now: () => Date;
+  /**
+   * The rate-limited client every adapter reads through. Defaulted rather than
+   * required, so no caller has to know the policy in order to run the pipeline —
+   * and overridable, so a test can drive real adapters over saved bytes without
+   * ever leaving the machine.
+   */
+  http?: HttpClient;
 };
 
 /**
@@ -43,23 +51,6 @@ export type PipelineRun = {
 };
 
 /**
- * The core owns policy — user agent, per-host rate limit, timeout, retry — so
- * that politeness is structural rather than disciplinary, and an adapter has no
- * other route to the network.
- *
- * No such client exists yet, because no adapter yet exists to use one. This
- * placeholder **refuses rather than improvises**, so the first real adapter
- * fails loudly at the wiring instead of quietly acquiring an unpoliced route.
- */
-const NO_HTTP_CLIENT_YET: HttpClient = {
-  get: async (url) => {
-    throw new Error(
-      `No HTTP client is wired into this pipeline yet, so ${url} was not fetched.`,
-    );
-  },
-};
-
-/**
  * The two record types are told apart structurally, on the one field only a
  * `PortCall` has. There is no discriminator on the wire and there should not be:
  * `Raw` is adapter-owned and the domain types are honest, separate shapes.
@@ -73,9 +64,14 @@ export const runPipeline = async ({
   db,
   feedsDir,
   now,
+  http = createHttpClient(),
 }: PipelineOptions): Promise<PipelineRun> => {
   const ranAt = instantFromDate(now());
-  const deps: FetchDeps = { http: NO_HTTP_CLIENT_YET, now };
+
+  // No `browser` key: it is optional on `FetchDeps`, and leaving it off is what
+  // scopes headless to the one adapter that will declare a need for it. Suntec
+  // cannot acquire one, enforced by the type rather than by a note in a doc.
+  const deps: FetchDeps = { http, now };
 
   const store = openStore(db);
 
