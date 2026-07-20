@@ -109,6 +109,20 @@ describe("the daily workflow", () => {
     expect(body).toMatch(/git\s+push/);
   });
 
+  it("does not ask configure-pages to enable Pages", () => {
+    // `enablement: true` asks the action to *create* the Pages site, which
+    // `GITHUB_TOKEN` cannot do — `pages: write` deploys to an existing site, but
+    // creating one is administrative. Setting it does not degrade to a no-op: it
+    // fails the step, and with it the publish (#46). Pages-enabled is repository
+    // state set once by hand, recorded in ADR-0011.
+    //
+    // Read from the parsed step rather than the text, so the comment above the
+    // step is free to name the flag it forbids.
+    const configure = steps.find((step) => step.uses?.startsWith("actions/configure-pages"));
+    expect(configure).toBeDefined();
+    expect(configure?.with?.enablement).toBeUndefined();
+  });
+
   it("publishes the site directory to Pages", () => {
     const upload = steps.find((step) => step.uses?.startsWith("actions/upload-pages-artifact"));
     expect(upload?.with?.path).toBe(SITE_DIR);
