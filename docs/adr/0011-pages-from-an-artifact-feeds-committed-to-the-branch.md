@@ -58,6 +58,14 @@ to Pages as an artifact.**
   running anything, which is what the opaque blob otherwise takes away.
 - Pages serves whatever the last successful run uploaded. A failed run leaves the previous
   site up rather than blanking it.
+- **Publishing has exactly one manual prerequisite: Pages must be enabled on the
+  repository.** This decision is otherwise structural — no secret, no branch, no setting —
+  and the first attempt tried to keep it that way with `configure-pages`' `enablement: true`,
+  which failed: `GITHUB_TOKEN` deploys to an existing Pages site but cannot create one
+  (#46). Enabling it is `POST /repos/:owner/:repo/pages` with `build_type=workflow`, done
+  once with an admin credential. It is written down here because it is the only state a
+  reader of this repository cannot see by reading it — restoring publishing to a fresh fork
+  means doing this first, and the workflow will fail at the deploy step until it is done.
 
 ## Alternatives rejected
 

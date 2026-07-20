@@ -105,13 +105,19 @@ jobs:
       # A failed deploy leaves the previous site up rather than blanking it, so
       # the reader sees stale, never empty.
 
-      # `enablement` turns Pages on for the repository on first run, using the
-      # same `GITHUB_TOKEN`. Kept here rather than done by hand in Settings so
-      # that the deployment has no manual prerequisite — a setting clicked once
-      # by somebody is exactly the kind of state this repo has none of.
+      # **Pages must already be enabled on the repository; this step will not do
+      # it.** `configure-pages` accepts an `enablement: true` that creates the
+      # Pages site, and it was set here on the theory that the run should have no
+      # manual prerequisite. It does not work: `GITHUB_TOKEN` is granted
+      # `pages: write`, which deploys to an existing site, but *creating* one is
+      # administrative and the run token is not an admin. The first real run
+      # failed here with `Resource not accessible by integration` (#46).
+      #
+      # So Pages-enabled is this repository's one piece of clicked-once state,
+      # set by `POST /repos/:owner/:repo/pages` with `build_type=workflow`. It is
+      # recorded in ADR-0011 rather than left to be rediscovered from a failure,
+      # because nothing in the working tree reveals it.
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       # **Uploaded as an artifact, not committed to a gh-pages branch.** The
       # feeds are already committed above, on the branch they are generated on,
