@@ -1,4 +1,5 @@
 import type { PortCall, VenueEvent } from "../domain/types.js";
+import { suntec } from "./suntec.js";
 import type { Source } from "./types.js";
 
 /**
@@ -17,4 +18,4 @@ import type { Source } from "./types.js";
  * Adding a source touches two files — the module and this array. That is the
  * point, not overhead.
  */
-export const sources: (Source<VenueEvent> | Source<PortCall>)[] = [];
+export const sources: (Source<VenueEvent> | Source<PortCall>)[] = [suntec];

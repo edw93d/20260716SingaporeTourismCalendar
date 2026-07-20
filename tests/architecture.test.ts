@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { sources } from "../src/sources/registry.js";
+import { identifiersOnly } from "./support/identifiers-only.js";
 
 /**
  * Guards for decisions that are enforced by convention everywhere else, and so
@@ -18,23 +19,6 @@ const sourceFiles = (dir: string): string[] =>
     if (entry.isDirectory()) return sourceFiles(path);
     return entry.name.endsWith(".ts") ? [path] : [];
   });
-
-/**
- * Strips comments and string literals, leaving only identifiers.
- *
- * Both exclusions are load-bearing. Comments legitimately *discuss* the banned
- * term — this file does, and so does the domain model. String literals hold
- * selectors we do not control: Suntec's structural anchor is
- * `article.eventlist-event`, so a guard that read string contents would forbid
- * the very selector the Suntec adapter is required to match on.
- */
-const identifiersOnly = (code: string): string =>
-  code
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/.*$/gm, "")
-    .replace(/'(?:[^'\\]|\\.)*'/g, "''")
-    .replace(/"(?:[^"\\]|\\.)*"/g, '""')
-    .replace(/`(?:[^`\\]|\\.)*`/g, "``");
 
 const files = sourceFiles(SRC).map((path) => ({
   path: path.slice(SRC.length + 1),
@@ -61,10 +45,38 @@ describe("the source tree", () => {
   });
 
   it("tolerates the banned term inside a selector string", () => {
-    // Suntec's structural anchor (ADR-0006) is `article.eventlist-event`. The
-    // guard above must not forbid it, or it blocks the adapter that needs it.
-    const suntecAnchor = 'const ANCHOR = "article.eventlist-event";';
+    // Suntec's structural anchor (ADR-0006) is `div.eventlist`, and its rows are
+    // `article.eventlist-event`. Both selector strings carry the banned term, and
+    // the guard above must forbid neither, or it blocks the adapter that needs them.
+    const suntecAnchor = 'const ANCHOR = "div.eventlist";';
     expect(/\bevents?\b/i.test(identifiersOnly(suntecAnchor))).toBe(false);
+
+    const suntecRow = 'const IS_ROW = "article.eventlist-event";';
+    expect(/\bevents?\b/i.test(identifiersOnly(suntecRow))).toBe(false);
+  });
+
+  it("tolerates the banned term inside a selector regex, quotes and all", () => {
+    // The shape the Suntec adapter actually uses. A guard that stripped strings
+    // before regexes would pair the pattern's own quotes and leave its middle
+    // behind, failing the one adapter it was written to permit.
+    const rowPattern = 'const ROW = /<article[^>]*class="[^"]*eventlist-event"/;';
+    expect(/\bevents?\b/i.test(identifiersOnly(rowPattern))).toBe(false);
+  });
+
+  it("tolerates a URL whose path carries the banned term", () => {
+    // The Suntec listing lives at `/visit-events`. Read as a line comment — the
+    // obvious ordering — the `//` in `https://` truncates the literal and the
+    // unterminated quote swallows the rest of the file.
+    const url = 'const LISTING = "https://www.suntecsingapore.com/visit-events";';
+    expect(/\bevents?\b/i.test(identifiersOnly(url))).toBe(false);
+    // Everything after it must still be visible to the guard.
+    expect(identifiersOnly(`${url}\nconst after = 1;`)).toContain("after");
+  });
+
+  it("still catches the banned term in an identifier beside a literal", () => {
+    // Guards the guard: an over-broad stripper would silently permit everything.
+    expect(identifiersOnly('const events = /class="eventlist"/;')).toMatch(/\bevents\b/);
+    expect(identifiersOnly('const url = "/visit-events"; let event = 1;')).toMatch(/\bevent\b/);
   });
 
   it("reads no environment variables", () => {
@@ -90,12 +102,23 @@ describe("the source tree", () => {
 });
 
 describe("the source registry", () => {
-  it("is explicit and currently empty", () => {
-    expect(sources).toEqual([]);
+  it("lists exactly the sources that feed this calendar", () => {
+    // One file answers "what feeds this?". Adding a source touches two files —
+    // the module and this array — and that is the point, not overhead.
+    expect(sources.map((source) => source.key)).toEqual(["suntec"]);
   });
 
   it("is an array, not a discovered map", () => {
     expect(Array.isArray(sources)).toBe(true);
+  });
+
+  it("carries no enabled flag on any source", () => {
+    // Disabling a source is a one-line revertable diff. A flag would reintroduce
+    // the config system through the side door — see ADR-0005.
+    for (const source of sources) {
+      expect(source).not.toHaveProperty("enabled");
+      expect(Object.keys(source).sort()).toEqual(["fetch", "key", "parse"]);
+    }
   });
 });
 
