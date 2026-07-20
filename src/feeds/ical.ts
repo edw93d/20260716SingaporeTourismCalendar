@@ -12,6 +12,13 @@ import type { CalendarEntry } from "../domain/types.js";
  * survival**, which is why attribution and category travel as prose inside
  * `SUMMARY` / `DESCRIPTION` instead (ADR-0001, #6).
  *
+ * **`SEQUENCE` is absent on purpose** — it is not an oversight to fix. The
+ * domain model stores and bumps it, but these feeds carry no `METHOD`, and
+ * `SEQUENCE` is what a client consults on an iTIP *invitation*, not on a
+ * subscribed calendar it refetches and reconciles by `UID`. A reschedule
+ * propagates as a changed `DTSTART` under an unchanged `UID` either way. See
+ * ADR-0008 §5, which also records the reopen trigger.
+ *
  * Nothing here says anything about staleness (#17). Every in-feed mechanism is
  * ugly — mutating individually-accurate records' text and churning `SEQUENCE`
  * daily, or injecting a phantom marker entry. Freshness is disclosed on the web

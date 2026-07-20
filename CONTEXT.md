@@ -26,7 +26,7 @@ The honest common property is that something is scheduled at a venue.
 | Field | Notes |
 |---|---|
 | `uid` | Durable. Minted once, never recomputed. See **UID**. |
-| `sequence` | RFC 5545 `SEQUENCE`; bumped when content changes under a stable key. |
+| `sequence` | Bumped when content changes under a stable key. Named for RFC 5545 `SEQUENCE` but **not serialized into the feeds** — see ADR-0008 §5. |
 | `source` | Which adapter produced it. Duplicates are accepted and labelled by source. |
 | `sourceKey` | See **sourceKey**. |
 | `name` | The event's name, as published. |

@@ -163,7 +163,9 @@ export const openStore = (path: string): Store => {
    *
    * - **First sight** mints a `uid` and fixes `firstSeenAt`.
    * - **Same key, changed content** keeps the `uid` and bumps `sequence`, so a
-   *   reschedule reaches a subscriber as a move rather than a duplicate.
+   *   reschedule reaches a subscriber as a move rather than a duplicate. The
+   *   move is carried by the stable `uid`, not by `sequence`, which is recorded
+   *   here but deliberately not serialized (ADR-0008 §5).
    * - **Every sighting** advances `lastSeenAt`. A record that stops appearing is
    *   simply not passed here, so its `lastSeenAt` stops advancing — which is the
    *   whole of what absence means.
