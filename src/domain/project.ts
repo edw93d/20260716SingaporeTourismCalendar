@@ -1,4 +1,4 @@
-import type { CalendarEntry, VenueEvent } from "./types.js";
+import type { CalendarEntry, PortCall, VenueEvent } from "./types.js";
 
 /**
  * The projection both record types serialize through, per `CONTEXT.md`
@@ -8,9 +8,10 @@ import type { CalendarEntry, VenueEvent } from "./types.js";
  * and `berth`, and a serializer needing those (a future Excel export) reads the
  * domain types directly rather than widening this.
  *
- * Only the `VenueEvent` half exists here. The `PortCall` projection arrives with
- * the feed that renders it (`port-calls.ics`) rather than sitting unreachable
- * until then.
+ * The two halves flatten different things and are written separately, because
+ * the types are honest, separate shapes: a `PortCall` has no name to be a
+ * summary and no venue to be a location, and a unified projection would have had
+ * to fabricate both (ADR-0001).
  */
 
 /**
@@ -37,5 +38,30 @@ export const projectVenueEvent = (record: VenueEvent): CalendarEntry => ({
   // Venue plus hall: a hotelier heading there needs the room, not just the building.
   location: [record.venue, record.hall].filter((part) => part !== null).join(", "),
   description: descriptionFor("Venue event", record.source),
+  source: record.source,
+});
+
+export const projectPortCall = (record: PortCall): CalendarEntry => ({
+  uid: record.uid,
+  /**
+   * A `PortCall` has no name, so the summary is composed rather than copied.
+   * `Cruise:` is the category the client discarded from `CATEGORIES`, restated
+   * as the prose it has to travel as; `vessel` is the only thing the audience
+   * has to infer the size of the landing from, so it leads.
+   */
+  summary: `Cruise: ${record.vessel} at ${record.terminal}`,
+  start: record.arrival,
+  end: record.departure,
+  /**
+   * The **terminal, never the berth.** A hotelier plans around which side of the
+   * island thousands of passengers land on; a pier number is a fact about a ship,
+   * not about where demand goes, and it would crowd out the one word that is.
+   */
+  location: record.terminal,
+  description: descriptionFor(
+    // The berth is not dropped, only demoted — it rides in prose we generate.
+    record.berth === null ? "Cruise arrival" : `Cruise arrival, berth ${record.berth}`,
+    record.source,
+  ),
   source: record.source,
 });

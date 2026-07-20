@@ -1,0 +1,40 @@
+<!-- One real row beside one carrying an arrival the parser cannot read.
+     The clock has been replaced with a placeholder -- the shape a source reaches
+     for when a time is not yet fixed. ADR-0006 forbids dropping it silently: a
+     dropped row stops appearing, `lastSeenAt` stops advancing, and a scraper
+     defect becomes indistinguishable from a genuine absence. -->
+<!doctype html>
+<html lang="en-US"><head><meta charset="UTF-8"><title>Cruise Schedule | Singapore Cruise Centre</title></head>
+<body>
+<table class="schedule-table schedule-table_cruise">
+<thead>
+<tr>
+                           <th class="sc-arrive" scope="col">ARRIVAL</th>
+                           <th class="sc-depature" scope="col">DEPARTURE</th>
+                           <th class="sc-cruise" scope="col">CRUISE SHIP / CRUISE LINE</th>
+                           <th class="sc-from" scope="col">FROM</th>
+                           <th class="sc-from" scope="col">NEXT</th>
+                        </tr>
+</thead>
+<tbody>
+<tr>
+                           <td data-label="ARRIVAL">Thu, 30 Jul 2026 <span> --:--</span></td>
+                           <td data-label="DEPARTURE">Sat, 1 Aug 2026 <span> 1900</span></td>
+                                                      <td data-label="CRUISE SHIP">
+                           ODYSSEY <span> VILLA VIE RESIDENCES</span>                           </td>
+
+                           <td data-label="FROM PORT">Thailand </td>
+                           <td data-label="NEXT PORT">Vung Tau </td>
+                        </tr>
+<tr>
+                           <td data-label="ARRIVAL">Sat, 8 Aug 2026 <span> 1200</span></td>
+                           <td data-label="DEPARTURE">Sat, 8 Aug 2026 <span> 1800</span></td>
+                                                      <td data-label="CRUISE SHIP">
+                           ISLAND SKY <span> NOBLE CALEDONIA</span>                           </td>
+
+                           <td data-label="FROM PORT">Andorra </td>
+                           <td data-label="NEXT PORT">Kuching, Sarawak </td>
+                        </tr>
+</tbody>
+</table>
+</body></html>
