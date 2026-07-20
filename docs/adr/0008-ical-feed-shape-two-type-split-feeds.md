@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-17
 - **Ticket:** [#11](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/11)
+- **Amended:** 2026-07-20 ([#33](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/33)) — §5 records that `SEQUENCE` is stored but not serialized
 
 ## Context
 
@@ -67,6 +68,40 @@ whole-picture view load-bearing rather than decorative (see Consequences).
   work calendars, so it must announce *whose* data and *which* market at a glance,
   in language a hotelier reads without having seen the glossary. Revisit when the
   product has a real name.
+
+### 5. `SEQUENCE` is stored but not serialized
+
+The domain model carries `sequence` and bumps it whenever content changes under a
+stable key (`CONTEXT.md` § UID). **It does not reach the feed.** Implementing #33
+surfaced this as an unrecorded gap rather than a decision, so it is decided here.
+
+`SEQUENCE` is consulted by clients for **iTIP scheduling messages** — a
+`METHOD:REQUEST` invitation, where it determines whether an update supersedes a
+prior one. These feeds carry no `METHOD`. A subscribed calendar is refetched
+whole and reconciled by `UID`, so a rescheduled conference propagates as a
+changed `DTSTART` under an unchanged `UID` with or without the property.
+
+Emitting it would therefore buy **conformance with no observable subscriber
+effect** — which is the exact trade #6 already declined when it found that
+`CATEGORIES` and `URL` are impeccably standard and still do not survive.
+*Standards conformance does not imply survival*, and the corollary holds: a
+property that changes nothing a subscriber sees earns no place in a feed this
+decision defines as a deliberately reduced projection.
+
+Nothing is foreclosed. `CalendarEntry` has no `sequence` field and must not grow
+one, but ADR-0001 already blesses the route — *"a serializer needing those reads
+the domain types directly"* — so emitting it later is a change to one serializer
+and no schema.
+
+**Unverified, and knowingly so.** #6 tested `CATEGORIES` and `URL` against three
+real clients. Nobody has tested `SEQUENCE`; the reasoning above is from RFC 5545
+§3.8.7.4 and general client behaviour, not from observation. **Reopen trigger:** a
+subscriber reports a reschedule that does not propagate, or anyone runs the #6
+sweep for `SEQUENCE` and finds a client that consults it in a `METHOD`-less feed.
+
+`sequence` is nonetheless still stored and still bumped. It records that content
+changed under a stable key, which is a fact about our observation history and
+true whether or not it reaches the wire.
 
 ## Consequences
 
