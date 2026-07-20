@@ -271,6 +271,10 @@ Each source's scraper is **wholly unique** — the three share no code. The inte
 constrains only the edges; the shared pipeline (upsert, **UID**, **Seen-tracking**) is
 what it feeds. See ADR-0005 and ADR-0006.
 
+The rate-limited client in `deps` is **required, never defaulted** — reaching the network
+is something a caller says out loud, so no code touches the live internet by forgetting to
+pass a stub. See ADR-0010.
+
 ### Timing
 
 `start`/`end`/`arrival`/`departure` are **UTC instants**. There is no all-day shape
