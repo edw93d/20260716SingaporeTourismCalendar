@@ -2,6 +2,11 @@
 # not content. The research itself lives in the research/* branches on origin.
 .claude/
 
+# Session handoffs and working notes — the bridge between context windows.
+# Ephemeral by construction: what survives a handoff belongs in an issue, an
+# ADR, or CONTEXT.md, not here.
+.scratch/
+
 node_modules/
 .DS_Store
 *.tsbuildinfo
