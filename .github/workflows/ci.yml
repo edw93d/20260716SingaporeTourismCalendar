@@ -1,0 +1,60 @@
+# The merge gate. Every guard this repo relies on — the banned bare "event"
+# term, the zero-`process.env` rule, ADR-0010's single client construction site,
+# the AGPLv3 licence, and the structural properties `tests/workflow.test.ts`
+# holds about the daily pipeline — is enforced *by a test*, and a test enforces
+# nothing on a change nobody ran it against. Until this file existed, nothing
+# ran on a pull request at all (#45): the suite was only ever as good as whoever
+# remembered to run it locally.
+#
+# Zero credentials, like `daily.yml`. This job reads the code and reports a
+# status; `tests/workflow.test.ts` scans every workflow — this one included — for
+# secret references and keepalives, and this file is meant to pass that, not be
+# exempted from it.
+name: CI
+
+on:
+  # The gate proper: every pull request, whatever its target.
+  pull_request:
+  # And on the trunk itself, so a merge is checked even when it lands without a
+  # PR (a direct push, an admin override). The check that guards `main` should
+  # also run *on* `main`.
+  push:
+    branches: [main]
+
+# **Cancel-in-progress is correct here, unlike the daily pipeline.** A check run
+# writes nothing — no store, no push, no side effect to tear — so a superseded
+# run has nothing worth finishing. Pushing twice to a branch should abandon the
+# stale check and grade the tip, not queue behind a result nobody will read.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  # Read the code, report a status. Nothing here writes.
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22, matching `daily.yml`. A version skew is how a suite goes green
+      # in CI and breaks in production for a reason that has nothing to do with
+      # the change.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      # No `playwright install` here, deliberately. The suite drives the MBCCS
+      # source through a fake browser (`tests/mbccs.test.ts`), so it
+      # needs no real Chromium — only the daily pipeline, which launches a live
+      # session, does.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
