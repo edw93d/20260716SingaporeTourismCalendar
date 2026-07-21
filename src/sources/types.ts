@@ -25,10 +25,33 @@ export type HttpClient = {
  * Injected **only** into adapters that declare a need — which is MBCCS and
  * nothing else. Suntec and Singapore Cruise Centre are server-rendered and
  * undefended, and headless must not become the default execution model.
+ *
+ * The primitives are the minimal honest set for "operate a UI until it yields
+ * rows" (ADR-0005, Amendment 2). ADR-0005 originally sketched `{ goto, content }`;
+ * `content()` was dropped because the one thing the adapter needs — the schedule's
+ * stable UUID — lives only in the page's React state, never in the rendered HTML,
+ * so a bytes snapshot structurally cannot carry it. `evaluate` is what reads that
+ * state; `click` and `waitForFunction` are what drive the date filter and pager
+ * and block on the async refetch each action triggers.
  */
 export type BrowserSession = {
+  /** Load a URL and wait for the document to load. */
   goto(url: string): Promise<void>;
-  content(): Promise<string>;
+  /**
+   * Run an expression in the page and return its (JSON-serialisable) value. The
+   * one primitive that reads what the rendered DOM does not carry — the records
+   * array in React state, which month the picker shows, whether the pager can
+   * advance.
+   */
+  evaluate<T>(expression: string): Promise<T>;
+  /** Click the first element matching a selector — the date-picker and the pager. */
+  click(selector: string): Promise<void>;
+  /**
+   * Block until an expression evaluates truthy in the page: hydration, and the
+   * refetch each filter or pager action fires. This is the async settle a static
+   * snapshot cannot express, which is why the session is more than `goto`.
+   */
+  waitForFunction(expression: string): Promise<void>;
 };
 
 /**

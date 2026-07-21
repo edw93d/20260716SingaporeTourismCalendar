@@ -89,3 +89,35 @@ can carry the distinction, which is the whole point of the anchor.
 - **Let #9 infer breakage from row counts** — cannot distinguish "source published nothing"
   from "the selector died." That distinction is only cheaply available *inside* the parser,
   which is the only code that knows what the document should look like.
+
+## Amendments
+
+### Amendment 1: MBCCS's anchor is a well-formed schedule payload, not the rendered grid
+
+- **Date:** 2026-07-21
+- **Ticket:** [#37](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/37)
+
+The anchor table above names MBCCS's anchor as "the rendered grid," and #37 repeats it. That
+was written before the page was built against. The MBCCS grid is Tailwind utility-class
+`<div>`s with no id and no stable class; its stable data lives only in React state, so `fetch`
+harvests that state and hands `parse` a JSON payload rather than markup (ADR-0005, Amendment 2).
+The anchor moves with the raw material.
+
+**MBCCS's anchor is a well-formed schedule payload** — `fetch` returning an *array* of schedule
+records (each an object shaped like the schedule, whatever its length). It plays the exact role
+this ADR demands of an anchor, only in JSON:
+
+- **Payload present, no records** → `ok: true, records: []`. MBCCS renders *"There are no
+  scheduled cruises"* as a genuine empty state, and `fetch` harvests that as an empty array. A
+  quiet window is a fact about the source.
+- **Payload absent** (`fetch` could not locate the schedule state — the app did not hydrate, a
+  redesign moved it, or the page served is not ours) → `ok: false`. This is the JSON equivalent
+  of SCC's missing `<table>`: proof we are not looking at the document we think we are, kept
+  distinct from a genuinely empty week. The contract with `fetch` is precise for this reason —
+  it returns an empty array for the empty state and a null/absent payload *only* when the
+  schedule state cannot be found at all.
+
+The principle is unchanged from the Decision above: the anchor is the container the source
+renders whether or not it has contents, checked before any record is examined, because *empty*
+and *not our document* both yield zero records and only the anchor tells them apart. The
+container is a JSON array here instead of a `<table>`; the reasoning is identical.

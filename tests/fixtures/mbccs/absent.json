@@ -1,0 +1,4 @@
+{
+  "_note": "fetch could not locate the schedule state — the app did not hydrate, a redesign moved it, or the page is not ours. The JSON equivalent of SCC's missing <table>: the anchor is absent, so parse returns ok:false rather than reading it as a quiet week.",
+  "schedule": null
+}

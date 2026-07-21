@@ -20,10 +20,17 @@ const sourceFiles = (dir: string): string[] =>
     return entry.name.endsWith(".ts") ? [path] : [];
   });
 
-const files = sourceFiles(SRC).map((path) => ({
-  path: path.slice(SRC.length + 1),
-  code: identifiersOnly(readFileSync(path, "utf8")),
-}));
+const files = sourceFiles(SRC).map((path) => {
+  const raw = readFileSync(path, "utf8");
+  return {
+    path: path.slice(SRC.length + 1),
+    code: identifiersOnly(raw),
+    // The verbatim bytes, for the few guards that must read a string literal —
+    // `identifiersOnly` strips those, so an `import … from "playwright"` is
+    // invisible to `code` and has to be matched against `raw` instead.
+    raw,
+  };
+});
 
 describe("the source tree", () => {
   it("has files to check", () => {
@@ -102,6 +109,34 @@ describe("the source tree", () => {
     expect(constructors).toEqual(["main.ts"]);
   });
 
+  it("constructs a browser session in exactly one place", () => {
+    // Symmetric with the network-client guard above (ADR-0005, Amendment 2).
+    // Headless is scoped to MBCCS by construction — `browser` is optional on
+    // `FetchDeps` — but the *launch* is the other half: a second construction
+    // site is how a browser becomes the default execution model by drift. The
+    // provider owns the launch; only the entry point calls it.
+    const constructors = files
+      .filter(
+        ({ path, code }) =>
+          path !== "pipeline/browser.ts" && /createBrowserSession\s*\(/.test(code),
+      )
+      .map(({ path }) => path);
+
+    expect(constructors).toEqual(["main.ts"]);
+  });
+
+  it("imports Playwright in exactly one place", () => {
+    // The provider is the only module that names the browser library. An adapter
+    // reaching for `playwright` directly would be constructing its own I/O — the
+    // exact coupling the injected-session seam exists to prevent. Matched against
+    // `raw`, because the import path is a string literal `code` has stripped.
+    const importers = files
+      .filter(({ raw }) => /from\s+["']playwright["']/.test(raw))
+      .map(({ path }) => path);
+
+    expect(importers).toEqual(["pipeline/browser.ts"]);
+  });
+
   it("loads no configuration file", () => {
     // Selectors and URLs are constants in their adapter module. A config system
     // is foreclosed by the standing constraint that extraction is code.
@@ -117,7 +152,7 @@ describe("the source registry", () => {
   it("lists exactly the sources that feed this calendar", () => {
     // One file answers "what feeds this?". Adding a source touches two files —
     // the module and this array — and that is the point, not overhead.
-    expect(sources.map((source) => source.key)).toEqual(["suntec", "scc"]);
+    expect(sources.map((source) => source.key)).toEqual(["suntec", "scc", "mbccs"]);
   });
 
   it("is an array, not a discovered map", () => {

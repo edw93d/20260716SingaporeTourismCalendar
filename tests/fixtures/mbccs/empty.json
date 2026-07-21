@@ -1,0 +1,4 @@
+{
+  "_note": "The genuine 'There are no scheduled cruises' state. fetch harvests it as an empty array (ADR-0006 Amendment 1) — a fact about the source, not a failure to read it. Distinct from absent.json, whose null means fetch never located the schedule state at all.",
+  "schedule": []
+}

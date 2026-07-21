@@ -1,3 +1,4 @@
+import { createBrowserSession } from "./pipeline/browser.js";
 import { createHttpClient } from "./pipeline/http.js";
 import { runPipeline } from "./pipeline/run.js";
 import { DB_PATH, FEEDS_DIR } from "./paths.js";
@@ -5,38 +6,52 @@ import { sources } from "./sources/registry.js";
 
 /**
  * The daily run — the only production caller of `runPipeline`, and the only
- * place in this repository that constructs a network client.
+ * place in this repository that constructs a network client or a browser session.
  *
- * `createHttpClient()` is passed explicitly because ADR-0010 removed the
- * default: reaching the live internet is something a caller says out loud. This
- * file is where it gets said, once.
+ * `createHttpClient()` and `createBrowserSession()` are passed explicitly because
+ * reaching the live internet — over HTTP (ADR-0010) or a headless browser
+ * (ADR-0005, Amendment 2) — is something a caller says out loud. This file is
+ * where it gets said, once.
+ *
+ * The browser's lifecycle is owned here: launched before the run and closed in a
+ * `finally`, so a source that throws mid-scrape still releases Chromium. MBCCS is
+ * the only source that reads it; the others cannot, by the shape of `FetchDeps`.
  */
 
 const main = async (): Promise<void> => {
-  const run = await runPipeline({
-    sources,
-    db: DB_PATH,
-    feedsDir: FEEDS_DIR,
-    now: () => new Date(),
-    http: createHttpClient(),
-  });
+  const browser = await createBrowserSession();
 
-  console.log(`Ran at ${run.ranAt}`);
+  try {
+    const run = await runPipeline({
+      sources,
+      db: DB_PATH,
+      feedsDir: FEEDS_DIR,
+      now: () => new Date(),
+      http: createHttpClient(),
+      browser: browser.session,
+    });
 
-  for (const outcome of run.outcomes) {
-    if (!outcome.ok) {
-      console.log(`  ${outcome.source}: could not be read — ${outcome.reason}`);
-      continue;
+    console.log(`Ran at ${run.ranAt}`);
+
+    for (const outcome of run.outcomes) {
+      if (!outcome.ok) {
+        console.log(`  ${outcome.source}: could not be read — ${outcome.reason}`);
+        continue;
+      }
+
+      const broken = outcome.failures.length;
+      console.log(
+        `  ${outcome.source}: ${outcome.records} record(s)` +
+          (broken === 0 ? "" : `, ${broken} row(s) failed to parse`),
+      );
+      for (const failure of outcome.failures) {
+        console.log(`    ! expected ${failure.expected} in: ${failure.fragment.slice(0, 120)}`);
+      }
     }
-
-    const broken = outcome.failures.length;
-    console.log(
-      `  ${outcome.source}: ${outcome.records} record(s)` +
-        (broken === 0 ? "" : `, ${broken} row(s) failed to parse`),
-    );
-    for (const failure of outcome.failures) {
-      console.log(`    ! expected ${failure.expected} in: ${failure.fragment.slice(0, 120)}`);
-    }
+  } finally {
+    // The core owns the browser's lifecycle: it is released whether the run
+    // completed or a source threw, so Chromium never outlives the process's work.
+    await browser.close();
   }
 };
 
