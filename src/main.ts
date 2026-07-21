@@ -1,7 +1,7 @@
 import { createBrowserSession } from "./pipeline/browser.js";
 import { createHttpClient } from "./pipeline/http.js";
 import { runPipeline } from "./pipeline/run.js";
-import { DB_PATH, FEEDS_DIR } from "./paths.js";
+import { DB_PATH, FEEDS_DIR, SITE_PAYLOAD } from "./paths.js";
 import { sources } from "./sources/registry.js";
 
 /**
@@ -26,6 +26,7 @@ const main = async (): Promise<void> => {
       sources,
       db: DB_PATH,
       feedsDir: FEEDS_DIR,
+      payloadPath: SITE_PAYLOAD,
       now: () => new Date(),
       http: createHttpClient(),
       browser: browser.session,

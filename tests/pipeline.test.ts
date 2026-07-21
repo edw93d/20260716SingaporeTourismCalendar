@@ -105,11 +105,14 @@ const noHttp: HttpClient = {
   },
 };
 
+const payloadPath = () => join(workspace, "calendar.json");
+
 const run = (sources: (Source<VenueEvent> | Source<PortCall>)[], at: string) =>
   runPipeline({
     sources,
     db: dbPath(),
     feedsDir: feedsDir(),
+    payloadPath: payloadPath(),
     now: clockAt(at),
     http: noHttp,
   });
@@ -531,6 +534,40 @@ describe("port-calls.ics", () => {
     const block = vevents(portCallFeed())[0]!;
     expect(valueOf(block, "DTSTART")).toBe("20260718T000000Z");
     expect(valueOf(block, "DTEND")).toBe("20260718T100000Z");
+  });
+});
+
+describe("the web calendar payload", () => {
+  const payload = () =>
+    JSON.parse(readFileSync(payloadPath(), "utf8")) as {
+      venueEvents: { summary: string; source: string }[];
+      portCalls: { summary: string; source: string }[];
+    };
+
+  it("is emitted beside the feeds, from the same store", async () => {
+    // #38: the page is built from this file. It is re-emitted from the store on
+    // every run, so — like the feeds — a record absent from today's scrape still
+    // reaches the page.
+    await run([venueSourceOf("suntec", [bniVision()]), portCallSourceOf("scc", [odyssey()])], RUN_ONE);
+
+    expect(payload().venueEvents.map((entry) => entry.summary)).toEqual(["BNI Vision"]);
+    expect(payload().portCalls[0]?.summary).toBe(
+      "Cruise: ODYSSEY / VILLA VIE RESIDENCES at Singapore Cruise Centre",
+    );
+  });
+
+  it("carries the everything-view — both types, every source, duplicates unmerged", async () => {
+    // The load-bearing property (#11): two sources publishing the same event
+    // arrive as two labelled entries, merged by nothing (ADR-0004).
+    await run(
+      [
+        venueSourceOf("suntec", [bniVision()]),
+        venueSourceOf("other", [bniVision({ source: "other", sourceKey: "dup" })]),
+      ],
+      RUN_ONE,
+    );
+
+    expect(payload().venueEvents.map((entry) => entry.source).sort()).toEqual(["other", "suntec"]);
   });
 });
 

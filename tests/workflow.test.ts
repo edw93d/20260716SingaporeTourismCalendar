@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
-import { DB_PATH, FEEDS_DIR, SITE_DIR } from "../src/paths.js";
+import { DB_PATH, FEEDS_DIR, SITE_DIR, SITE_PAYLOAD } from "../src/paths.js";
 
 /**
  * The daily run is the one part of this project that nobody watches. Its
@@ -106,6 +106,11 @@ describe("the daily workflow", () => {
     const body = text(DAILY);
     expect(body).toContain(DB_PATH);
     expect(body).toContain(FEEDS_DIR);
+    // The web calendar's data payload is committed beside the feeds (#38): the
+    // page is built from it, and like the feeds it is the diffable record of what
+    // the day's calendar holds, next to a store blob that only says *that* it
+    // changed (ADR-0011).
+    expect(body).toContain(SITE_PAYLOAD);
     expect(body).toMatch(/git\s+push/);
   });
 

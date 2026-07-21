@@ -17,5 +17,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "tests", "vitest.config.ts"]
+  "include": ["src", "tests", "vitest.config.ts"],
+  "//": "The seam-3 client test imports the browser `.js` module and needs the DOM lib; it is typechecked by `tsconfig.site.json` instead, so the Node config stays DOM-free.",
+  "exclude": ["tests/calendar.test.ts"]
 }

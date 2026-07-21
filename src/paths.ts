@@ -22,6 +22,15 @@ export const DB_PATH = "data/calendar.sqlite";
 export const SITE_DIR = "site";
 
 /**
+ * The web calendar's data payload — the everything-view the static page is built
+ * from (#38). Written *inside* the published root, beside the shell that fetches
+ * it, and committed for the same reason as the feeds: it is the one legible,
+ * diffable record of what the day's calendar actually holds, sitting next to a
+ * store blob that only says *that* it changed (ADR-0011).
+ */
+export const SITE_PAYLOAD = `${SITE_DIR}/calendar.json`;
+
+/**
  * The `.ics` files, written *inside* the published directory rather than beside
  * it, so that one location is both what Pages uploads and what git commits.
  * See ADR-0011 for why it is both rather than either.

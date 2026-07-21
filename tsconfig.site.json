@@ -1,0 +1,23 @@
+{
+  "//": "The client layer typechecked in isolation (#38). It is the one part of the repo that runs in a browser, so it — and only it — gets the DOM lib and `checkJs`. Kept separate from the root config so the Node pipeline stays DOM-free: a stray `document` or `fetch` in `src/` should not typecheck. The seam-3 test lives here too, because it imports the `.js` module and needs `allowJs` to resolve it.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["site/calendar.js", "tests/calendar.test.ts"]
+}

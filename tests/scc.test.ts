@@ -265,6 +265,7 @@ describe("through the pipeline", () => {
       sources: [scc],
       db: join(workspace, "calendar.sqlite"),
       feedsDir: join(workspace, "feeds"),
+      payloadPath: join(workspace, "calendar.json"),
       now: () => NOW,
       http: {
         get: async (url) => {
