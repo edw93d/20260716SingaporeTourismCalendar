@@ -1,0 +1,37 @@
+{
+  "_capturedFrom": "https://mbccs.com.sg/cruise-information?tab=cruise-schedule",
+  "_capturedOn": "2026-07-21",
+  "_note": "Harvested from the page's React state (ADR-0005 Amendment 2). id/berthing/unberthing are UTC and NOT in the rendered DOM. duration/lastPort/nextPort are present and deliberately unread. Genting Dream appears twice with distinct UUIDs — which is why the id keys the record and vessel+date does not.",
+  "schedule": [
+    {
+      "id": "e21dc665-714e-4e63-8c19-5384e785a771",
+      "vesselName": "Genting Dream",
+      "berthingDateTime": "2026-07-20T23:00:00Z",
+      "unberthingDateTime": "2026-07-21T05:00:00Z",
+      "duration": "6",
+      "lastPort": "PORT KLANG",
+      "nextPort": "PORT KLANG",
+      "berthNo": 1
+    },
+    {
+      "id": "e64ef858-6dc2-48d6-8544-70549f187c47",
+      "vesselName": "Disney Adventure",
+      "berthingDateTime": "2026-07-22T21:30:00Z",
+      "unberthingDateTime": "2026-07-23T09:00:00Z",
+      "duration": "11.5",
+      "lastPort": "OTHER",
+      "nextPort": "OTHER",
+      "berthNo": 1
+    },
+    {
+      "id": "f441d98c-4969-4e71-a759-cec0e19fa0ad",
+      "vesselName": "Genting Dream",
+      "berthingDateTime": "2026-07-24T06:00:00Z",
+      "unberthingDateTime": "2026-07-24T12:00:00Z",
+      "duration": "6",
+      "lastPort": "SINGAPORE",
+      "nextPort": "PORT KLANG",
+      "berthNo": 1
+    }
+  ]
+}

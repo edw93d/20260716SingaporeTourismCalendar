@@ -1,0 +1,31 @@
+{
+  "_note": "One good record beside two broken ones. The anchor is present, so parse must land the good record AND surface the failures — never silently drop a bad one (ADR-0006). The berthing-less record was read far enough to carry its id as the failure's sourceKey; the id-less record carries none rather than a half-made key.",
+  "schedule": [
+    {
+      "id": "e21dc665-714e-4e63-8c19-5384e785a771",
+      "vesselName": "Genting Dream",
+      "berthingDateTime": "2026-07-20T23:00:00Z",
+      "unberthingDateTime": "2026-07-21T05:00:00Z",
+      "duration": "6",
+      "lastPort": "PORT KLANG",
+      "nextPort": "PORT KLANG",
+      "berthNo": 1
+    },
+    {
+      "id": "b8c1f0a2-0000-4000-8000-000000000000",
+      "vesselName": "Spectrum of the Seas",
+      "berthingDateTime": null,
+      "unberthingDateTime": "2026-07-25T09:00:00Z",
+      "duration": "8",
+      "lastPort": "OTHER",
+      "nextPort": "OTHER",
+      "berthNo": 2
+    },
+    {
+      "vesselName": "",
+      "berthingDateTime": "2026-07-26T22:00:00Z",
+      "unberthingDateTime": "2026-07-27T06:00:00Z",
+      "berthNo": 2
+    }
+  ]
+}

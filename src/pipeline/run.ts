@@ -4,7 +4,7 @@ import { instantFromDate, type Instant } from "../domain/instant.js";
 import { projectPortCall, projectVenueEvent } from "../domain/project.js";
 import type { PortCall, Scraped, SourceId, VenueEvent } from "../domain/types.js";
 import { serializeCalendar } from "../feeds/ical.js";
-import type { FetchDeps, HttpClient, ParseFailure, Source } from "../sources/types.js";
+import type { BrowserSession, FetchDeps, HttpClient, ParseFailure, Source } from "../sources/types.js";
 import { openStore, type Store } from "../store/store.js";
 
 /**
@@ -41,6 +41,18 @@ export type PipelineOptions = {
    * `createHttpClient()`.
    */
   http: HttpClient;
+  /**
+   * The headless browser session, injected **only** because MBCCS declares a need
+   * for one. Optional and undefaulted for the same reason `http` is required but
+   * `browser` is not: an adapter that does not ask for a browser cannot acquire
+   * one, so headless stays scoped to the single source that needs it (ADR-0005).
+   *
+   * The core owns its lifecycle — the entry point launches it and closes it in a
+   * `finally`; the pipeline only forwards it. A run whose sources include none
+   * that need a browser (every test in `pipeline.test.ts`) passes nothing, and
+   * MBCCS's `fetch` throws loudly if it is ever reached without one.
+   */
+  browser?: BrowserSession;
 };
 
 /**
@@ -73,13 +85,15 @@ export const runPipeline = async ({
   feedsDir,
   now,
   http,
+  browser,
 }: PipelineOptions): Promise<PipelineRun> => {
   const ranAt = instantFromDate(now());
 
-  // No `browser` key: it is optional on `FetchDeps`, and leaving it off is what
-  // scopes headless to the one adapter that will declare a need for it. Suntec
-  // cannot acquire one, enforced by the type rather than by a note in a doc.
-  const deps: FetchDeps = { http, now };
+  // `browser` is forwarded only when the caller supplied one. Leaving it
+  // `undefined` is what scopes headless to the one adapter that declares a need:
+  // Suntec and SCC destructure `http` and never `browser`, so they cannot acquire
+  // one, enforced by the type rather than by a note in a doc.
+  const deps: FetchDeps = { http, now, ...(browser ? { browser } : {}) };
 
   const store = openStore(db);
 

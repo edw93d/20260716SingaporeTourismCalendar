@@ -59,6 +59,15 @@ jobs:
 
       - run: npm ci
 
+      # MBCCS is the one source that needs a real browser (ADR-0005, Amendment 2):
+      # its schedule is a hydrated Next.js app with the stable ids only in React
+      # state. Chromium and its OS libraries are installed here so the headless
+      # session `src/pipeline/browser.ts` launches has a browser to drive. No
+      # credential is involved — the page authenticates itself and we only read
+      # what it has already loaded (#37).
+      - name: Install the headless browser
+        run: npx playwright install --with-deps chromium
+
       # Scrapes every source, folds what it saw into the store, and re-emits the
       # feeds from the store. A source that cannot be read is reported and does
       # not fail the run — see the note in `src/main.ts`.
