@@ -37,10 +37,10 @@ const withoutComments = (yaml: string): string => yaml.replace(/(^|\s)#.*$/gm, "
 const DAILY = "daily.yml";
 
 type Workflow = {
-  on?: { schedule?: { cron?: string }[] };
+  on?: { schedule?: { cron?: string }[]; pull_request?: unknown; push?: { branches?: string[] } };
   concurrency?: { group?: string; "cancel-in-progress"?: boolean };
   permissions?: Record<string, string> | string;
-  jobs?: Record<string, { steps?: { uses?: string; with?: Record<string, unknown> }[] }>;
+  jobs?: Record<string, { steps?: { uses?: string; with?: Record<string, unknown>; run?: string }[] }>;
 };
 
 const daily = parse(text(DAILY)) as Workflow;
@@ -127,6 +127,76 @@ describe("the daily workflow", () => {
     const upload = steps.find((step) => step.uses?.startsWith("actions/upload-pages-artifact"));
     expect(upload?.with?.path).toBe(SITE_DIR);
     expect(steps.some((step) => step.uses?.startsWith("actions/deploy-pages"))).toBe(true);
+  });
+
+  it("installs the headless browser before running the pipeline", () => {
+    // MBCCS is scraped through a real Chromium session (ADR-0005, Amendment 2),
+    // which is not on the runner unless this step puts it there. Criterion 12 of
+    // #37 (no credential) is already test-enforced; criterion 11 — Playwright
+    // runs in the daily workflow — was not, so a future edit dropping the step
+    // would break the one source that needs a browser with the suite still
+    // green (#50). This holds the step exists and precedes the pipeline run.
+    const install = steps.findIndex((step) => /playwright\s+install/.test(step.run ?? ""));
+    const pipeline = steps.findIndex((step) => /npm\s+run\s+pipeline/.test(step.run ?? ""));
+    expect(install).toBeGreaterThanOrEqual(0);
+    expect(pipeline).toBeGreaterThan(install);
+  });
+});
+
+const CI = "ci.yml";
+
+const ci = parse(text(CI)) as Workflow;
+
+const ciOn = ci.on as { pull_request?: unknown; push?: { branches?: string[] } };
+
+const ciSteps = Object.values(ci.jobs ?? {}).flatMap((job) => job.steps ?? []);
+
+describe("the CI workflow", () => {
+  it("exists and is the workflow the guards below are reading", () => {
+    // Guards the guards: a rename would otherwise make every assertion vacuous.
+    expect(workflowFiles).toContain(CI);
+  });
+
+  it("runs on pull requests and on pushes to main", () => {
+    // The whole point of the file (#45): before it, nothing ran on a PR, so
+    // every test-enforced decision in this repo was a no-op on the change that
+    // broke it. The push trigger catches a merge that lands without a PR.
+    expect(ciOn.pull_request).toBeDefined();
+    expect(ciOn.push?.branches).toEqual(["main"]);
+  });
+
+  it("carries a concurrency group that cancels rather than queues", () => {
+    // The inverse of the daily pipeline, and correct for the inverse reason: a
+    // check run writes nothing, so a superseded run has nothing to tear and no
+    // result worth finishing. Pushing twice should grade the tip, not the stale
+    // commit. The group is keyed on the ref so distinct branches never contend.
+    expect(ci.concurrency?.group).toBeTruthy();
+    expect(ci.concurrency?.["cancel-in-progress"]).toBe(true);
+  });
+
+  it("grants itself read access to the code and nothing more", () => {
+    // Asserted exhaustively rather than with toMatchObject: the failure worth
+    // catching is a *write* scope appearing on a job that only reports a status.
+    expect(ci.permissions).toEqual({ contents: "read" });
+  });
+
+  it("runs the typecheck and the test suite", () => {
+    // The gate's substance. Both are asserted so that dropping either — the
+    // cheaper failure to overlook — fails this test rather than silently
+    // narrowing what a green check means.
+    const runs = ciSteps.map((step) => step.run ?? "");
+    expect(runs.some((run) => /npm\s+run\s+typecheck/.test(run))).toBe(true);
+    expect(runs.some((run) => /npm\s+test/.test(run))).toBe(true);
+  });
+
+  it("pins the same Node version as the daily pipeline", () => {
+    // A version skew is how a suite goes green here and breaks in production for
+    // a reason that has nothing to do with the change under review.
+    const nodeOf = (workflow: Workflow) =>
+      Object.values(workflow.jobs ?? {})
+        .flatMap((job) => job.steps ?? [])
+        .find((step) => step.uses?.startsWith("actions/setup-node"))?.with?.["node-version"];
+    expect(nodeOf(ci)).toBe(nodeOf(daily));
   });
 });
 
