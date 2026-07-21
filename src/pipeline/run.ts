@@ -1,9 +1,10 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { instantFromDate, type Instant } from "../domain/instant.js";
 import { projectPortCall, projectVenueEvent } from "../domain/project.js";
 import type { PortCall, Scraped, SourceId, VenueEvent } from "../domain/types.js";
 import { serializeCalendar } from "../feeds/ical.js";
+import { buildSitePayload } from "../site/payload.js";
 import type { BrowserSession, FetchDeps, HttpClient, ParseFailure, Source } from "../sources/types.js";
 import { openStore, type Store } from "../store/store.js";
 
@@ -24,6 +25,13 @@ export type PipelineOptions = {
   db: string;
   /** Where the `.ics` files land. */
   feedsDir: string;
+  /**
+   * Where the web calendar's data payload lands — the everything-view the static
+   * page is built from (#38). A path rather than a directory because it is one
+   * file, and it sits above `feedsDir` in the published root (ADR-0011), not
+   * inside it.
+   */
+  payloadPath: string;
   now: () => Date;
   /**
    * The rate-limited client every adapter reads through.
@@ -83,6 +91,7 @@ export const runPipeline = async ({
   sources,
   db,
   feedsDir,
+  payloadPath,
   now,
   http,
   browser,
@@ -114,12 +123,15 @@ export const runPipeline = async ({
     // duplicate-heavy stream is not a subscription anyone should hold. The
     // everything-view is the web calendar. Consequently the feed set grows with
     // types, not sources: a fourth source folds into one of these two.
+    const venueEvents = store.readVenueEvents();
+    const portCalls = store.readPortCalls();
+
     mkdirSync(feedsDir, { recursive: true });
     writeFileSync(
       join(feedsDir, "venue-events.ics"),
       serializeCalendar({
         name: "SG Venue Events",
-        entries: store.readVenueEvents().map(projectVenueEvent),
+        entries: venueEvents.map(projectVenueEvent),
         dtstamp: ranAt,
       }),
     );
@@ -127,10 +139,18 @@ export const runPipeline = async ({
       join(feedsDir, "port-calls.ics"),
       serializeCalendar({
         name: "SG Cruise Arrivals",
-        entries: store.readPortCalls().map(projectPortCall),
+        entries: portCalls.map(projectPortCall),
         dtstamp: ranAt,
       }),
     );
+
+    // The everything-view the web calendar is built from (#38, ADR-0009 §4):
+    // both types, every source, duplicates unmerged, emitted from the store like
+    // the feeds so retention is real — a record absent from today's scrape still
+    // ships to the page. No `DTSTAMP`, so unlike the feeds this file is byte-stable
+    // when nothing changed.
+    mkdirSync(dirname(payloadPath), { recursive: true });
+    writeFileSync(payloadPath, `${JSON.stringify(buildSitePayload(venueEvents, portCalls), null, 2)}\n`);
 
     return { ranAt, outcomes };
   } finally {

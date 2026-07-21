@@ -79,7 +79,7 @@ jobs:
           set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/calendar.sqlite site/feeds
+          git add data/calendar.sqlite site/feeds site/calendar.json
 
           # **Unreachable today, and kept anyway.** DTSTAMP is the run instant
           # (ADR-0011), so the feed differs on every run even when no source

@@ -1,0 +1,1566 @@
+{
+  "venueEvents": [
+    {
+      "uid": "b84c6c47-5f4e-468b-9bcd-f2a6a3a69a9e@sg-tourism-calendar",
+      "summary": "FOMO x The Great Food Assembly x The Wedding Upmarket",
+      "start": "2026-07-03T04:00:00Z",
+      "end": "2026-07-05T14:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 404-405",
+      "source": "suntec"
+    },
+    {
+      "uid": "65f60a9a-f1df-4b84-a88d-2122a4b75125@sg-tourism-calendar",
+      "summary": "CCF: Prayer Night (3 Jul 2026)",
+      "start": "2026-07-03T10:00:00Z",
+      "end": "2026-07-03T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "f39fb707-5d80-41c7-80fa-64264d6a0e35@sg-tourism-calendar",
+      "summary": "Rifbound Championship Series",
+      "start": "2026-07-04T01:00:00Z",
+      "end": "2026-07-04T14:00:00Z",
+      "location": "Suntec Convention Centre, Level 3, Room 324 to 326",
+      "source": "suntec"
+    },
+    {
+      "uid": "f507cafa-bac7-4b11-a1c9-560967885663@sg-tourism-calendar",
+      "summary": "Bai Yin Qigong (4th July 2026)",
+      "start": "2026-07-04T04:00:00Z",
+      "end": "2026-07-04T08:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "da8c3704-bd11-4bc6-ae43-b89b17a62b6b@sg-tourism-calendar",
+      "summary": "Covenant East Sunday Service (July 2026)",
+      "start": "2026-07-04T23:00:00Z",
+      "end": "2026-07-05T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "052cffc5-55e2-484f-9ddc-18406f6535e7@sg-tourism-calendar",
+      "summary": "CCF Sunday Services (Jul 2026)",
+      "start": "2026-07-05T00:00:00Z",
+      "end": "2026-07-05T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "e25b7105-cece-496f-9582-b4d24ca55c43@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (July 2026)",
+      "start": "2026-07-05T00:00:00Z",
+      "end": "2026-07-05T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "7982f161-f74b-4cd3-84ba-3ed3bc4e907f@sg-tourism-calendar",
+      "summary": "Faith Church Singapore (July 2026)",
+      "start": "2026-07-05T01:00:00Z",
+      "end": "2026-07-05T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "35529a7b-3ad1-4954-a639-a2e522cba34a@sg-tourism-calendar",
+      "summary": "CCF Movement (6 Jul 2026)",
+      "start": "2026-07-06T10:00:00Z",
+      "end": "2026-07-06T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "77c8f85c-c865-47c4-b655-16ebbf877f53@sg-tourism-calendar",
+      "summary": "25th Intl Conference on Solid State Ionics 2026",
+      "start": "2026-07-06T23:00:00Z",
+      "end": "2026-07-10T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "2ab415be-4d8e-46fe-8c4c-46de53bce677@sg-tourism-calendar",
+      "summary": "BNI-Empower(7/7/2026)",
+      "start": "2026-07-06T23:30:00Z",
+      "end": "2026-07-07T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "7fc5f0e5-4053-4b1e-8b8c-c10a9da647f1@sg-tourism-calendar",
+      "summary": "BNI-Vision(7/7/2026)",
+      "start": "2026-07-06T23:30:00Z",
+      "end": "2026-07-07T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "a31d05bd-1d14-407d-b547-8240d529f82c@sg-tourism-calendar",
+      "summary": "Chagee OKR Meeting - 8 - 9 July 2026",
+      "start": "2026-07-08T00:00:00Z",
+      "end": "2026-07-09T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "ad61ef4c-89e6-4c61-94f0-2d11d4875775@sg-tourism-calendar",
+      "summary": "Axis Communications Event (8 - 9 July 2026)",
+      "start": "2026-07-08T01:00:00Z",
+      "end": "2026-07-09T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "b12df4ad-3930-4fcb-9b0b-0482cfcb14e4@sg-tourism-calendar",
+      "summary": "BNI-Nexus(9/7/2026)",
+      "start": "2026-07-08T23:30:00Z",
+      "end": "2026-07-09T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "09447445-ac1d-4f04-912b-9c815b173875@sg-tourism-calendar",
+      "summary": "Engagement for Taskforce on Assurance for Families with Persons with Disabilities – Inclusive Employment, 10 July 2026",
+      "start": "2026-07-10T00:00:00Z",
+      "end": "2026-07-10T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "af9f4916-9957-4665-8df7-7959548c2779@sg-tourism-calendar",
+      "summary": "Disability Leaders Network, 10 July 2026",
+      "start": "2026-07-10T00:00:00Z",
+      "end": "2026-07-10T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "b1f474dd-11c1-4449-99e3-d579cc2f5cb4@sg-tourism-calendar",
+      "summary": "Creators Super Fest Singapore 2026",
+      "start": "2026-07-11T02:00:00Z",
+      "end": "2026-07-12T11:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 403-405",
+      "source": "suntec"
+    },
+    {
+      "uid": "879bf42c-8bc7-448c-8627-f95cd4b1e0f0@sg-tourism-calendar",
+      "summary": "Asia Art & Craft Fair 2026",
+      "start": "2026-07-11T03:00:00Z",
+      "end": "2026-07-11T13:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 401-402",
+      "source": "suntec"
+    },
+    {
+      "uid": "8738515c-2eb9-4d76-8c73-b7c556d232d6@sg-tourism-calendar",
+      "summary": "Covenant East Sunday Service (July 2026)",
+      "start": "2026-07-11T23:00:00Z",
+      "end": "2026-07-12T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "28fa4dd1-99ad-4e22-836c-05f6dae48624@sg-tourism-calendar",
+      "summary": "CCF Sunday Services (Jul 2026)",
+      "start": "2026-07-12T00:00:00Z",
+      "end": "2026-07-12T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "fbea58e1-a022-4031-a2b0-a7e853a69a85@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (July 2026)",
+      "start": "2026-07-12T00:00:00Z",
+      "end": "2026-07-12T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "8c3a5eb7-523e-46aa-a6bc-0643ddc40a0a@sg-tourism-calendar",
+      "summary": "Faith Church Singapore (July 2026)",
+      "start": "2026-07-12T01:00:00Z",
+      "end": "2026-07-12T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "2a555970-22bd-4579-8813-2afb69f5eaed@sg-tourism-calendar",
+      "summary": "Asia Art & Craft Fair 2026",
+      "start": "2026-07-12T02:00:00Z",
+      "end": "2026-07-12T13:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 401-402",
+      "source": "suntec"
+    },
+    {
+      "uid": "42960d72-9169-461e-8afb-582aae9d0b9b@sg-tourism-calendar",
+      "summary": "BNI-Vision(14/7/2026)",
+      "start": "2026-07-13T23:30:00Z",
+      "end": "2026-07-14T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "d89406a4-68c9-47be-afa3-e218b4d312ee@sg-tourism-calendar",
+      "summary": "HSBC Life Agency Leaders' Forum- 14 July 2026",
+      "start": "2026-07-14T04:00:00Z",
+      "end": "2026-07-14T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "e38791b7-7db9-4975-af67-f7d393f5e4c3@sg-tourism-calendar",
+      "summary": "EASIA Event - 14 July 2026",
+      "start": "2026-07-14T04:00:00Z",
+      "end": "2026-07-15T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "e0a64324-4704-4e7a-9101-794ed67e096c@sg-tourism-calendar",
+      "summary": "BNI-Nexus(16/7/2026)",
+      "start": "2026-07-15T23:30:00Z",
+      "end": "2026-07-16T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "efd9e4e0-a95a-4013-8cd3-951f71258066@sg-tourism-calendar",
+      "summary": "From Challenges to Solutions: Practical AI-Driven Enterprise & Workforce Transformation for SMEs",
+      "start": "2026-07-16T05:00:00Z",
+      "end": "2026-07-16T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "cc3a6b7e-b2ed-481b-b55c-e5bb86f98d56@sg-tourism-calendar",
+      "summary": "Wellness Fiesta by Guardian Health and Beauty",
+      "start": "2026-07-16T06:30:00Z",
+      "end": "2026-07-16T14:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 401-402",
+      "source": "suntec"
+    },
+    {
+      "uid": "5c8050df-beda-4c1e-82d9-d4b8885339f3@sg-tourism-calendar",
+      "summary": "Wellness Fiesta by Guardian Health and Beauty",
+      "start": "2026-07-17T02:00:00Z",
+      "end": "2026-07-19T14:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 401-402",
+      "source": "suntec"
+    },
+    {
+      "uid": "767b10ca-e4a2-480b-9a5c-db52db897574@sg-tourism-calendar",
+      "summary": "Cellar Fiesta 2026",
+      "start": "2026-07-17T04:00:00Z",
+      "end": "2026-07-18T14:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 404",
+      "source": "suntec"
+    },
+    {
+      "uid": "5049461e-d57d-4c9a-92e0-b0411bcb427c@sg-tourism-calendar",
+      "summary": "CWS Thanksgiving (18 July 2026)",
+      "start": "2026-07-18T00:00:00Z",
+      "end": "2026-07-18T04:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "6001631d-bd11-43f3-b2aa-ffa155dfa92d@sg-tourism-calendar",
+      "summary": "hololive Official Card Game Exstreamer Cup 25-26 Regional Finals - Singapore",
+      "start": "2026-07-18T01:00:00Z",
+      "end": "2026-07-18T14:00:00Z",
+      "location": "Suntec Convention Centre, Level 3, Meeting Room 335-336",
+      "source": "suntec"
+    },
+    {
+      "uid": "f963aedc-f6ff-4030-80f8-7f2340aaf60c@sg-tourism-calendar",
+      "summary": "Grow Your Health , Wealth and Beauty in 30 Days",
+      "start": "2026-07-18T01:00:00Z",
+      "end": "2026-07-18T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "41ab85c0-d099-4fc1-bcf9-bf066ba05bcf@sg-tourism-calendar",
+      "summary": "Aozora Market",
+      "start": "2026-07-18T03:00:00Z",
+      "end": "2026-07-19T11:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 405",
+      "source": "suntec"
+    },
+    {
+      "uid": "ed30c845-24f6-4f4f-bd21-47d0d1289fe3@sg-tourism-calendar",
+      "summary": "Hitcheed Wedding Wonderling X Bridal Marekt",
+      "start": "2026-07-18T04:00:00Z",
+      "end": "2026-07-19T12:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 403",
+      "source": "suntec"
+    },
+    {
+      "uid": "d5407f62-dbb6-4050-9289-2560dd9b0f80@sg-tourism-calendar",
+      "summary": "Covenant East Sunday Service (July 2026)",
+      "start": "2026-07-18T23:00:00Z",
+      "end": "2026-07-19T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "db7ad264-c65c-4517-a802-3f696e5f744d@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (July 2026)",
+      "start": "2026-07-19T00:00:00Z",
+      "end": "2026-07-19T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "fd6951af-8d89-4421-8fc6-5bb2d51460d4@sg-tourism-calendar",
+      "summary": "CCF Sunday Services (Jul 2026)",
+      "start": "2026-07-19T00:00:00Z",
+      "end": "2026-07-19T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "3ffb9ebf-c2e0-4613-bd37-33f1f5f2ee27@sg-tourism-calendar",
+      "summary": "Faith Church Singapore (July 2026)",
+      "start": "2026-07-19T01:00:00Z",
+      "end": "2026-07-19T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "40f76378-7369-4469-9735-99990d3cb903@sg-tourism-calendar",
+      "summary": "Fiestang Pinoy 2026, Istoryang OFW (19th July 2026)",
+      "start": "2026-07-19T01:00:00Z",
+      "end": "2026-07-19T11:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "0c87103c-3359-445b-81e4-4a68c470bee7@sg-tourism-calendar",
+      "summary": "Cellar Fiesta 2026",
+      "start": "2026-07-19T04:00:00Z",
+      "end": "2026-07-19T13:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 404",
+      "source": "suntec"
+    },
+    {
+      "uid": "b1e4da9b-8ac5-4b03-971e-789f2978b445@sg-tourism-calendar",
+      "summary": "BNI-HQ(20/7/2026)",
+      "start": "2026-07-20T05:00:00Z",
+      "end": "2026-07-20T09:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "cb326a9a-e47e-4260-b137-ddb016615c83@sg-tourism-calendar",
+      "summary": "BNI-Vision(21/7/2026)",
+      "start": "2026-07-20T23:30:00Z",
+      "end": "2026-07-21T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "d85ed24c-7b2b-4548-b538-4f92be0a7b5d@sg-tourism-calendar",
+      "summary": "Grant Thornton Event - 21- 22 July 2026",
+      "start": "2026-07-21T00:00:00Z",
+      "end": "2026-07-22T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "08e0178c-24d0-49f9-be5e-8f8c09eac177@sg-tourism-calendar",
+      "summary": "Convo Dinner 2026",
+      "start": "2026-07-21T10:00:00Z",
+      "end": "2026-07-21T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "826f9952-bde0-4403-a813-85fe2e5489e9@sg-tourism-calendar",
+      "summary": "Healthcare Scholarships Induction Course 2026",
+      "start": "2026-07-21T23:00:00Z",
+      "end": "2026-07-22T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "ef2e0598-6734-48fe-a2d8-fecadb4bdebc@sg-tourism-calendar",
+      "summary": "BNI-Nexus(23/7/2026)",
+      "start": "2026-07-22T23:30:00Z",
+      "end": "2026-07-23T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "41e8ed83-642f-4870-8fe4-7e1264ca3c83@sg-tourism-calendar",
+      "summary": "Vision China Singapore & International Eye Drug & Device Innovation Expo (VC-EDDI) 2026",
+      "start": "2026-07-23T23:00:00Z",
+      "end": "2026-07-26T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "a7290681-c39c-4f63-9412-f83ef6900bcc@sg-tourism-calendar",
+      "summary": "8th Asia Pacific Glaucoma Congress & 35th SNEC Anniversary International Meeting 2026 - Exhibition",
+      "start": "2026-07-23T23:00:00Z",
+      "end": "2026-07-26T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "bc76f680-ce74-4149-90fe-7faf1855a3e0@sg-tourism-calendar",
+      "summary": "APGC 2026 - Santen Meeting",
+      "start": "2026-07-23T23:00:00Z",
+      "end": "2026-07-25T04:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "3d972715-2f81-411b-9f23-69f0308fd689@sg-tourism-calendar",
+      "summary": "DDAS Event (24 July 2026)",
+      "start": "2026-07-24T01:00:00Z",
+      "end": "2026-07-24T08:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "03cf6af0-310d-45eb-87be-7d80650258d3@sg-tourism-calendar",
+      "summary": "HomeFest by Reno Fiesta 2026",
+      "start": "2026-07-24T02:00:00Z",
+      "end": "2026-07-26T13:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 403",
+      "source": "suntec"
+    },
+    {
+      "uid": "59fb9a6f-c7b9-40d1-b3d0-9d70f8f8e443@sg-tourism-calendar",
+      "summary": "Disney Lorcana TCG Asia Championship Qualifiers (SG)",
+      "start": "2026-07-25T01:00:00Z",
+      "end": "2026-07-25T14:00:00Z",
+      "location": "Suntec Convention Centre, Level 3, Meeting Room 321-322",
+      "source": "suntec"
+    },
+    {
+      "uid": "4ff3c93a-f84d-4f1d-923c-fc5cecba0c12@sg-tourism-calendar",
+      "summary": "Herbalife STS - (25th July 2026)",
+      "start": "2026-07-25T01:30:00Z",
+      "end": "2026-07-25T09:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "0f3788d6-c48c-4baf-adb7-e28616fe2305@sg-tourism-calendar",
+      "summary": "APGC 2026 - Bausch & Lomb Meeting",
+      "start": "2026-07-25T08:00:00Z",
+      "end": "2026-07-25T13:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "8943fcc4-a510-49fb-ae75-1752a1ef2a9d@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (July 2026)",
+      "start": "2026-07-26T00:00:00Z",
+      "end": "2026-07-26T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "fb1d9051-05bd-4e40-b1b9-3f479a8c90b2@sg-tourism-calendar",
+      "summary": "CCF Sunday Services (Jul 2026)",
+      "start": "2026-07-26T00:00:00Z",
+      "end": "2026-07-26T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "b8ff0248-d877-4d33-b03f-91f8a09fd602@sg-tourism-calendar",
+      "summary": "Faith Church Singapore (July 2026)",
+      "start": "2026-07-26T01:00:00Z",
+      "end": "2026-07-26T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "08f65d62-50bb-47b1-912e-9ae73347098a@sg-tourism-calendar",
+      "summary": "Atomy Leaders Workshop - 27/07/2026",
+      "start": "2026-07-27T03:30:00Z",
+      "end": "2026-07-28T09:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "54848c7d-cda7-4c89-a944-7d0281a1de00@sg-tourism-calendar",
+      "summary": "Healthcare Scholarships Award Ceremony in 2026",
+      "start": "2026-07-27T23:00:00Z",
+      "end": "2026-07-28T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "dac1efe5-51f1-4ffe-8526-1ed09f818a5d@sg-tourism-calendar",
+      "summary": "BNI-Vision(28/7/2026)",
+      "start": "2026-07-27T23:30:00Z",
+      "end": "2026-07-28T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "cfdc59a2-e3b7-4868-bb84-d05c7f8454d2@sg-tourism-calendar",
+      "summary": "BNI-Nexus(30/7/2026)",
+      "start": "2026-07-29T23:30:00Z",
+      "end": "2026-07-30T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "e6b7df54-d50f-4959-bb9a-013270e3c6b7@sg-tourism-calendar",
+      "summary": "BNI-Izaq(30/7/2026)",
+      "start": "2026-07-29T23:30:00Z",
+      "end": "2026-07-30T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "2d6edfd9-2636-41e6-9a0e-d67fe3c20a0c@sg-tourism-calendar",
+      "summary": "Boustead Singapore Limited AGM (30 July 2026)",
+      "start": "2026-07-30T05:30:00Z",
+      "end": "2026-07-30T09:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "c3e27b93-96b2-46a8-9bee-e5a2349deef6@sg-tourism-calendar",
+      "summary": "Boustead Singapore Limited AGM (30 July 2026)",
+      "start": "2026-07-30T05:30:00Z",
+      "end": "2026-07-30T09:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "a802744f-14b9-4913-899f-8ad31b54a3bb@sg-tourism-calendar",
+      "summary": "HoYo FEST 2026",
+      "start": "2026-07-31T02:00:00Z",
+      "end": "2026-08-02T13:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 403",
+      "source": "suntec"
+    },
+    {
+      "uid": "29e210c9-3eeb-4522-8653-a006d86be593@sg-tourism-calendar",
+      "summary": "Grand Market 2026",
+      "start": "2026-07-31T04:00:00Z",
+      "end": "2026-08-02T14:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 401-402",
+      "source": "suntec"
+    },
+    {
+      "uid": "f80a9d5a-52b0-4512-8422-8c2b828d8beb@sg-tourism-calendar",
+      "summary": "TableCon 2026",
+      "start": "2026-08-01T02:00:00Z",
+      "end": "2026-08-02T12:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 404-406",
+      "source": "suntec"
+    },
+    {
+      "uid": "07bf288c-e3d0-4a19-b092-9bd8ae1f16d0@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (August 2026) (Revised)",
+      "start": "2026-08-01T07:00:00Z",
+      "end": "2026-08-01T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "86fee381-9b21-4879-b6f3-f180b09b9de8@sg-tourism-calendar",
+      "summary": "Covenant East Sunday Service (August 2026)",
+      "start": "2026-08-01T23:00:00Z",
+      "end": "2026-08-02T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "0c208af0-bb01-4464-9d54-82664be4d66d@sg-tourism-calendar",
+      "summary": "CCF Sunday Services (Aug 2026)",
+      "start": "2026-08-02T00:00:00Z",
+      "end": "2026-08-02T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "aab773c8-4799-435f-ac16-ec06ce5edc36@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (August 2026) (Revised)",
+      "start": "2026-08-02T00:00:00Z",
+      "end": "2026-08-02T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "c25ed3e7-1bf6-44ad-aed1-1e42fa45db58@sg-tourism-calendar",
+      "summary": "Faith Church Singapore (Aug 2026)",
+      "start": "2026-08-02T01:00:00Z",
+      "end": "2026-08-02T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "5355e7ce-767f-409f-b2db-9c907cc631d4@sg-tourism-calendar",
+      "summary": "Ecom North Singapore (3 - 4 Aug 2026)",
+      "start": "2026-08-02T23:00:00Z",
+      "end": "2026-08-04T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "737bbd9b-bc9a-4ee5-8c48-5f4cad1c7b10@sg-tourism-calendar",
+      "summary": "BNI-Empower(4/8/2026)",
+      "start": "2026-08-03T23:30:00Z",
+      "end": "2026-08-04T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "87aa0e8b-0952-4372-b398-bf1d0a3f3848@sg-tourism-calendar",
+      "summary": "BNI-Vision(4/8/2026)",
+      "start": "2026-08-03T23:30:00Z",
+      "end": "2026-08-04T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "5fab7666-ed2a-450a-aee6-01c20cfc68a9@sg-tourism-calendar",
+      "summary": "BNI-Star(5/8/2026)",
+      "start": "2026-08-04T23:30:00Z",
+      "end": "2026-08-05T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "cd88ec20-0c9c-47a0-bf62-f59d8afb6250@sg-tourism-calendar",
+      "summary": "BNI-Nexus(6/8/2026)",
+      "start": "2026-08-05T23:30:00Z",
+      "end": "2026-08-06T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "425a7ba8-8f87-4ead-ad55-9d16fa929432@sg-tourism-calendar",
+      "summary": "BNI-Lighthouse(7/8/2026)",
+      "start": "2026-08-06T23:30:00Z",
+      "end": "2026-08-07T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "4dfa519b-a076-4ea0-98d6-688b9806a9f8@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (August 2026) (Revised)",
+      "start": "2026-08-08T07:00:00Z",
+      "end": "2026-08-08T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "fc952486-0990-4521-a188-510d3a3d520a@sg-tourism-calendar",
+      "summary": "Covenant East Sunday Service (August 2026)",
+      "start": "2026-08-08T23:00:00Z",
+      "end": "2026-08-09T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "9f3aecc6-2b00-4085-ace0-3960f61609bb@sg-tourism-calendar",
+      "summary": "CCF Sunday Services (Aug 2026)",
+      "start": "2026-08-09T00:00:00Z",
+      "end": "2026-08-09T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "ef632481-18f6-4217-a9e2-9b3c216deab0@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (August 2026) (Revised)",
+      "start": "2026-08-09T00:00:00Z",
+      "end": "2026-08-09T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "c5290a79-8ee8-4737-9d0e-4125393fbd5f@sg-tourism-calendar",
+      "summary": "Faith Church Singapore (Aug 2026)",
+      "start": "2026-08-09T01:00:00Z",
+      "end": "2026-08-09T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "5d1d1602-b371-480a-adae-3aa0fc9125d5@sg-tourism-calendar",
+      "summary": "BNI-Vision(11/8/2026)",
+      "start": "2026-08-10T23:30:00Z",
+      "end": "2026-08-11T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "f7393f60-5411-4b01-9748-1fde41a7c050@sg-tourism-calendar",
+      "summary": "BNI-Nexus(13/8/2026)",
+      "start": "2026-08-12T23:30:00Z",
+      "end": "2026-08-13T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "53814712-906c-4b52-968d-9ce194213b9e@sg-tourism-calendar",
+      "summary": "HiEnd Art Exhibition 2026",
+      "start": "2026-08-13T01:00:00Z",
+      "end": "2026-08-16T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "e36740b2-4f0c-400a-995b-2100a4ba2834@sg-tourism-calendar",
+      "summary": "Monetarium Intl Banknote and Coin Fair 2026",
+      "start": "2026-08-14T02:00:00Z",
+      "end": "2026-08-16T10:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 406",
+      "source": "suntec"
+    },
+    {
+      "uid": "44af469c-aaa4-4ab2-b0e2-00d754ef8fb7@sg-tourism-calendar",
+      "summary": "BlastOff! 2026",
+      "start": "2026-08-14T04:00:00Z",
+      "end": "2026-08-14T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "d0f866d2-5ac1-4960-a7b2-3edae9381ccf@sg-tourism-calendar",
+      "summary": "The Outdoor Fair 2026",
+      "start": "2026-08-15T03:00:00Z",
+      "end": "2026-08-16T14:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 404",
+      "source": "suntec"
+    },
+    {
+      "uid": "eba3bdf7-c69a-41b5-b681-50546f7eeaed@sg-tourism-calendar",
+      "summary": "Randamu World 2026",
+      "start": "2026-08-15T03:00:00Z",
+      "end": "2026-08-16T11:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 401-402",
+      "source": "suntec"
+    },
+    {
+      "uid": "0dbd651a-adb5-4415-8bdd-e0b699a16fe8@sg-tourism-calendar",
+      "summary": "Graduate Evening 2026",
+      "start": "2026-08-15T06:00:00Z",
+      "end": "2026-08-15T15:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "c0e39992-3d19-4360-854b-1183f9ce84a7@sg-tourism-calendar",
+      "summary": "Covenant East Sunday Service (August 2026)",
+      "start": "2026-08-15T23:00:00Z",
+      "end": "2026-08-16T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "f2967f4d-c345-441b-bded-e28893371352@sg-tourism-calendar",
+      "summary": "CCF Sunday Services (Aug 2026)",
+      "start": "2026-08-16T00:00:00Z",
+      "end": "2026-08-16T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "24f7d577-f26f-480d-8bce-42550af843d4@sg-tourism-calendar",
+      "summary": "Faith Church Singapore (Aug 2026)",
+      "start": "2026-08-16T01:00:00Z",
+      "end": "2026-08-16T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "c2372297-ac8e-40f6-ac6e-18829d996608@sg-tourism-calendar",
+      "summary": "Auction 2026",
+      "start": "2026-08-17T02:00:00Z",
+      "end": "2026-08-17T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "c3c57b28-43fe-4e57-a7c5-f4a47f970ffe@sg-tourism-calendar",
+      "summary": "BNI-Nexus(20/8/2026)",
+      "start": "2026-08-19T23:30:00Z",
+      "end": "2026-08-20T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "48ed94e3-484b-48fc-b04f-09794bc930d3@sg-tourism-calendar",
+      "summary": "Celebfest 2026",
+      "start": "2026-08-21T04:00:00Z",
+      "end": "2026-08-23T14:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 403-404",
+      "source": "suntec"
+    },
+    {
+      "uid": "87960ed5-f9aa-4fa9-8eec-3989e7d1702d@sg-tourism-calendar",
+      "summary": "Nexus Tradeshow",
+      "start": "2026-08-22T03:00:00Z",
+      "end": "2026-08-23T12:00:00Z",
+      "location": "Suntec Convention Centre, Level 4, Hall 405",
+      "source": "suntec"
+    },
+    {
+      "uid": "fa2779af-5af1-4c35-a4e2-3041ee4483b8@sg-tourism-calendar",
+      "summary": "Bai Yin Qigong (22nd Aug 2026)",
+      "start": "2026-08-22T04:00:00Z",
+      "end": "2026-08-22T08:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "c2374fc4-44df-4415-bc8b-510ce898a38b@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (August 2026) (Revised)",
+      "start": "2026-08-22T07:00:00Z",
+      "end": "2026-08-22T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "a5954a2c-9ec9-41b4-8e2f-034fe092ada8@sg-tourism-calendar",
+      "summary": "Covenant East Sunday Service (August 2026)",
+      "start": "2026-08-22T23:00:00Z",
+      "end": "2026-08-23T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "63d8046e-36c7-442e-aeb5-7b94415a4c00@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (August 2026) (Revised)",
+      "start": "2026-08-23T00:00:00Z",
+      "end": "2026-08-23T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "a9561408-4bdb-4336-b547-cbf84b0a4391@sg-tourism-calendar",
+      "summary": "CCF Sunday Services (Aug 2026)",
+      "start": "2026-08-23T00:00:00Z",
+      "end": "2026-08-23T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "b2ed8fd9-8d71-4659-afa7-f7da998176a3@sg-tourism-calendar",
+      "summary": "Hijrah Wanita: Jalan menuju Syurga",
+      "start": "2026-08-23T00:00:00Z",
+      "end": "2026-08-23T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "4721b93f-29ee-4c25-a952-7cb7c7d824d9@sg-tourism-calendar",
+      "summary": "Faith Church Singapore (Aug 2026)",
+      "start": "2026-08-23T01:00:00Z",
+      "end": "2026-08-23T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "5dd22476-5b56-4703-978b-c3cebcdda4ff@sg-tourism-calendar",
+      "summary": "BNI-Vision(25/8/2026)",
+      "start": "2026-08-24T23:30:00Z",
+      "end": "2026-08-25T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "07c0b5d0-2ae8-46ed-8b31-8f3fd94b7267@sg-tourism-calendar",
+      "summary": "Geronpreneurship Innovation Festival 2026",
+      "start": "2026-08-26T01:00:00Z",
+      "end": "2026-08-26T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "903f9a5b-dc72-401a-b12a-db090be99702@sg-tourism-calendar",
+      "summary": "Hiend Asia 2026",
+      "start": "2026-08-26T02:00:00Z",
+      "end": "2026-08-29T11:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "68103a15-f4d9-4c06-8a40-de87197547d7@sg-tourism-calendar",
+      "summary": "BNI-Nexus(27/8/2026)",
+      "start": "2026-08-27T03:30:00Z",
+      "end": "2026-08-28T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "fb81085b-f87d-4190-868a-c2c115129b99@sg-tourism-calendar",
+      "summary": "Denodo User Group",
+      "start": "2026-08-27T05:00:00Z",
+      "end": "2026-08-27T09:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "74ea920b-0c28-4f98-890d-c2a440d84b5f@sg-tourism-calendar",
+      "summary": "Fencing ACC event",
+      "start": "2026-08-29T00:00:00Z",
+      "end": "2026-08-30T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "89839d73-6618-4861-809e-085f5e79272a@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (August 2026) (Revised)",
+      "start": "2026-08-29T07:00:00Z",
+      "end": "2026-08-29T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "a1bfb008-b12e-4a7e-8144-08775dc16bcb@sg-tourism-calendar",
+      "summary": "Covenant East Sunday Service (August 2026)",
+      "start": "2026-08-29T23:00:00Z",
+      "end": "2026-08-30T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "a2861bdd-1d86-462f-90e5-f31c5adfdf9f@sg-tourism-calendar",
+      "summary": "CCF Sunday Services (Aug 2026)",
+      "start": "2026-08-30T00:00:00Z",
+      "end": "2026-08-30T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "e49817b1-c4ba-48e1-8ec7-7dda57a23489@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (August 2026) (Revised)",
+      "start": "2026-08-30T00:00:00Z",
+      "end": "2026-08-30T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "a6c2a601-38f7-4cb0-978c-ce73d752e9f6@sg-tourism-calendar",
+      "summary": "Faith Church Singapore (Aug 2026)",
+      "start": "2026-08-30T01:00:00Z",
+      "end": "2026-08-30T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "43585f22-5dbe-4cbb-b8a5-e6f2af7d5dde@sg-tourism-calendar",
+      "summary": "BNI-Vision(1/9/2026)",
+      "start": "2026-08-31T23:30:00Z",
+      "end": "2026-09-01T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "2f710e53-324e-4dd5-b4d4-4cef062d3643@sg-tourism-calendar",
+      "summary": "BNI-Star(2/9/2026)",
+      "start": "2026-09-01T23:30:00Z",
+      "end": "2026-09-02T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "8194fbd5-2ca8-433a-935c-5115a30c0028@sg-tourism-calendar",
+      "summary": "BNI-Nexus(3/9/2026)",
+      "start": "2026-09-02T23:30:00Z",
+      "end": "2026-09-03T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "660a3052-0808-43a8-8bc9-c3833d7f4f5b@sg-tourism-calendar",
+      "summary": "BNI-Lighthouse(4/9/2026)",
+      "start": "2026-09-03T23:30:00Z",
+      "end": "2026-09-04T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "4b4f00d3-8d90-4b40-8399-c7b7e8bf2bf4@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (Sep 2026)",
+      "start": "2026-09-05T07:00:00Z",
+      "end": "2026-09-05T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "71b8e449-624c-4e5c-9f55-a0fac15fb457@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (Sep 2026)",
+      "start": "2026-09-06T00:00:00Z",
+      "end": "2026-09-06T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "bd9d269c-6853-43e8-a584-d56a9f025a81@sg-tourism-calendar",
+      "summary": "Culture Connection Event - 06 Sep 2026",
+      "start": "2026-09-06T00:00:00Z",
+      "end": "2026-09-06T09:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "c0b4d7eb-3305-4597-989e-04adbea02014@sg-tourism-calendar",
+      "summary": "CCF Sunday Services (Sep 2026)",
+      "start": "2026-09-06T00:00:00Z",
+      "end": "2026-09-06T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "40401f89-e3e1-4a5d-a052-cd344867b575@sg-tourism-calendar",
+      "summary": "Faith Church Singapore (Sept 2026)",
+      "start": "2026-09-06T01:00:00Z",
+      "end": "2026-09-06T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "63b26722-f49e-458f-85ad-d5e18c81c560@sg-tourism-calendar",
+      "summary": "3G Abacus Event - 6 Sep 2026",
+      "start": "2026-09-06T01:30:00Z",
+      "end": "2026-09-06T07:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "1369b5f1-de69-443e-b2b6-9a2e910d84cf@sg-tourism-calendar",
+      "summary": "BNI-Vision(8/9/2026)",
+      "start": "2026-09-07T23:30:00Z",
+      "end": "2026-09-08T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "db4fe007-b963-4766-bc2f-2660bb178d9c@sg-tourism-calendar",
+      "summary": "BNI-Nexus (10/9/2026)",
+      "start": "2026-09-09T23:30:00Z",
+      "end": "2026-09-10T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "10c024fa-bf6b-46da-8008-8ae29d7e2da9@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (Sep 2026)",
+      "start": "2026-09-12T07:00:00Z",
+      "end": "2026-09-12T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "7ef593a9-0abb-4d11-acf9-46bd7a4d647e@sg-tourism-calendar",
+      "summary": "Covenant East Sunday Service (September 2026)",
+      "start": "2026-09-12T23:00:00Z",
+      "end": "2026-09-13T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "43270f69-81fd-416f-9edb-a4d98d64b520@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (Sep 2026)",
+      "start": "2026-09-13T00:00:00Z",
+      "end": "2026-09-13T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "87b28d23-0960-48d5-9902-ba9e43691248@sg-tourism-calendar",
+      "summary": "CCF Sunday Services (Sep 2026)",
+      "start": "2026-09-13T00:00:00Z",
+      "end": "2026-09-13T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "696ecbfa-062c-447c-9dda-045ed03e9a0f@sg-tourism-calendar",
+      "summary": "Faith Church Singapore (Sept 2026)",
+      "start": "2026-09-13T01:00:00Z",
+      "end": "2026-09-13T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "fd763055-d62e-4dfd-a476-d5462fdaa195@sg-tourism-calendar",
+      "summary": "BNI-Vision(15/9/2026)",
+      "start": "2026-09-14T23:30:00Z",
+      "end": "2026-09-15T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "e8f07991-dea6-4269-9548-a2b37da7863f@sg-tourism-calendar",
+      "summary": "GovTech CON2026",
+      "start": "2026-09-15T23:00:00Z",
+      "end": "2026-09-16T07:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "1f3ef6bf-3f26-46b4-aa7f-98d13b6ee23e@sg-tourism-calendar",
+      "summary": "BNI-Nexus(17/9/2026)",
+      "start": "2026-09-16T23:30:00Z",
+      "end": "2026-09-17T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "f400c1b7-78fe-4090-bbf2-24b36d9c0909@sg-tourism-calendar",
+      "summary": "Good Start SG 2026 Early Childhood Conference",
+      "start": "2026-09-17T23:00:00Z",
+      "end": "2026-09-18T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "faf0770a-0483-4b03-8e02-1389ea57c2ad@sg-tourism-calendar",
+      "summary": "Alita Resources Ltd AGM (18 Sept 2026)",
+      "start": "2026-09-18T00:00:00Z",
+      "end": "2026-09-18T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "236580d8-87c4-49be-90b5-e9f6ab0d7929@sg-tourism-calendar",
+      "summary": "Honeykids International School Fair Sep 2026",
+      "start": "2026-09-19T02:00:00Z",
+      "end": "2026-09-19T08:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "00c98477-e29a-45da-ad2e-c4a336ebf86e@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (Sep 2026)",
+      "start": "2026-09-19T07:00:00Z",
+      "end": "2026-09-19T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "03e3b835-c6a9-4942-a984-33c50f060eba@sg-tourism-calendar",
+      "summary": "Covenant East Sunday Service (September 2026)",
+      "start": "2026-09-19T23:00:00Z",
+      "end": "2026-09-20T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "f0e6d9e5-dfd3-4673-bea4-436560d8d913@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (Sep 2026)",
+      "start": "2026-09-20T00:00:00Z",
+      "end": "2026-09-20T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "f5b1f84f-f52e-471e-979a-a2c1b1381b96@sg-tourism-calendar",
+      "summary": "CCF Sunday Services (Sep 2026)",
+      "start": "2026-09-20T00:00:00Z",
+      "end": "2026-09-20T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "1773f1ae-0575-4ca2-a77d-4a567e3017bc@sg-tourism-calendar",
+      "summary": "Faith Church Singapore (Sept 2026)",
+      "start": "2026-09-20T01:00:00Z",
+      "end": "2026-09-20T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "2c63b8ca-b906-4eac-ae52-55abe4b84652@sg-tourism-calendar",
+      "summary": "BNI-Vision(22/9/2026)",
+      "start": "2026-09-21T23:30:00Z",
+      "end": "2026-09-22T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "a334605d-f795-4940-8015-e245123f21a0@sg-tourism-calendar",
+      "summary": "BNI-Nexus(24/9/2026)",
+      "start": "2026-09-23T23:30:00Z",
+      "end": "2026-09-24T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "2e159ffc-8f35-454d-9f16-98029d2241be@sg-tourism-calendar",
+      "summary": "Backstage Siblings Concert( Engage Theatre) - 26 September 2026",
+      "start": "2026-09-26T09:00:00Z",
+      "end": "2026-09-26T15:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "1a9016ef-7ca4-4d61-95c9-7ba51467b303@sg-tourism-calendar",
+      "summary": "Human Proteome Organisation World Congress (HUPO) 2026 - Conference",
+      "start": "2026-09-27T00:00:00Z",
+      "end": "2026-09-29T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "d89b48ea-c9f7-444b-bcb6-3cdb5907b0bd@sg-tourism-calendar",
+      "summary": "Asia Pacific MedTech Forum 2026",
+      "start": "2026-09-28T23:00:00Z",
+      "end": "2026-09-30T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "dbe80589-668f-4b15-810c-eb961c2e1e68@sg-tourism-calendar",
+      "summary": "BNI-Lighthouse(2/10/2026)",
+      "start": "2026-10-01T23:30:00Z",
+      "end": "2026-10-02T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "1df1012e-ea4b-48c0-bbb4-f859dc47ed64@sg-tourism-calendar",
+      "summary": "Eldex Asia 2026",
+      "start": "2026-10-02T02:00:00Z",
+      "end": "2026-10-04T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "b524b772-cd8a-4c65-bb63-49dedb838c7d@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (Oct 2026)",
+      "start": "2026-10-03T07:00:00Z",
+      "end": "2026-10-03T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "bcd39871-4062-429c-8cda-a6d200cd3d75@sg-tourism-calendar",
+      "summary": "ATA Travel Fair and Conference",
+      "start": "2026-10-03T09:00:00Z",
+      "end": "2026-10-03T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "0f378c1d-2047-4c0c-aee0-9cf2aea62f18@sg-tourism-calendar",
+      "summary": "Covenant East Sunday Service (October 2026)",
+      "start": "2026-10-03T23:00:00Z",
+      "end": "2026-10-04T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "1eb20843-2e53-4717-bc70-a9fbd625aa9b@sg-tourism-calendar",
+      "summary": "CCF Sunday Services (Oct 2026)",
+      "start": "2026-10-04T00:00:00Z",
+      "end": "2026-10-04T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "f128caf3-d368-4201-aec8-450a31d52ee1@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (Oct 2026)",
+      "start": "2026-10-04T00:00:00Z",
+      "end": "2026-10-04T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "3759af82-bb88-46b0-87f6-817b53deb5e1@sg-tourism-calendar",
+      "summary": "Faith Church Singapore (Oct 2026)",
+      "start": "2026-10-04T01:00:00Z",
+      "end": "2026-10-04T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "0ac6eead-ac1a-4d1f-b204-7802e21aa539@sg-tourism-calendar",
+      "summary": "F1 2026 Ticket Collection",
+      "start": "2026-10-05T00:00:00Z",
+      "end": "2026-10-11T15:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "25d6e2a1-bb29-4f11-b9fa-52a93a9f664e@sg-tourism-calendar",
+      "summary": "BNI-Vision(6/10/2026)",
+      "start": "2026-10-05T23:30:00Z",
+      "end": "2026-10-06T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "57b3ba11-e7c9-4ba5-97c8-126a84e98710@sg-tourism-calendar",
+      "summary": "GCD Service Convention (7 Oct 2026)",
+      "start": "2026-10-07T08:00:00Z",
+      "end": "2026-10-07T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "15485a30-006c-472c-a4d1-1721b9f2d4de@sg-tourism-calendar",
+      "summary": "BNI - Accelerate F1 Networking (9th October 2026)",
+      "start": "2026-10-09T06:00:00Z",
+      "end": "2026-10-09T15:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "fe930ed8-cc73-4ee5-bc11-8cc2a52b0b1d@sg-tourism-calendar",
+      "summary": "DBS Asia Future Forward Conference 2026 -Engage Theatre (10 October to 12 October 2026)",
+      "start": "2026-10-10T01:00:00Z",
+      "end": "2026-10-12T07:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "cf2959e9-c9aa-4c45-8235-4b3e2d92dd84@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (Oct 2026)",
+      "start": "2026-10-10T07:00:00Z",
+      "end": "2026-10-10T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "8fd43367-36d7-48c9-a31c-e589d2f70325@sg-tourism-calendar",
+      "summary": "Covenant East Sunday Service (October 2026)",
+      "start": "2026-10-10T23:00:00Z",
+      "end": "2026-10-11T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "6f9bf2a0-1f01-47f9-95f0-c0eb9fd86472@sg-tourism-calendar",
+      "summary": "CCF Sunday Services (Oct 2026)",
+      "start": "2026-10-11T00:00:00Z",
+      "end": "2026-10-11T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "c57da6ee-1f5c-4125-832b-f69697ff54be@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (Oct 2026)",
+      "start": "2026-10-11T00:00:00Z",
+      "end": "2026-10-11T05:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "cd2bcd16-ae1b-4496-a8ee-eefa3f5b7a8b@sg-tourism-calendar",
+      "summary": "Faith Church Singapore (Oct 2026)",
+      "start": "2026-10-11T01:00:00Z",
+      "end": "2026-10-11T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "7218408c-e88c-4589-845e-de4f3b696b36@sg-tourism-calendar",
+      "summary": "DBS Asia Future Forward 2026",
+      "start": "2026-10-11T23:00:00Z",
+      "end": "2026-10-12T12:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "284e132e-eb1c-4098-96c7-3bf88fcff968@sg-tourism-calendar",
+      "summary": "BNI-Vision(13/10/2026)",
+      "start": "2026-10-12T23:30:00Z",
+      "end": "2026-10-13T03:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "c73b41a5-f168-4b21-b86b-63e7a23c6689@sg-tourism-calendar",
+      "summary": "ECDA Scholarships and Training Awards Presentation Ceremony 2026",
+      "start": "2026-10-13T00:00:00Z",
+      "end": "2026-10-13T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "94e9b417-38ea-4006-b928-87db3f602b9b@sg-tourism-calendar",
+      "summary": "SMEs Go Digital Day 2026",
+      "start": "2026-10-13T01:00:00Z",
+      "end": "2026-10-13T10:00:00Z",
+      "location": "Suntec Convention Centre, Halls 401 – 403",
+      "source": "suntec"
+    },
+    {
+      "uid": "0250e7f3-427a-462b-8f4a-032db549e6b5@sg-tourism-calendar",
+      "summary": "7-Eleven Network Briefing 2026 (October 2026)",
+      "start": "2026-10-14T23:00:00Z",
+      "end": "2026-10-16T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "548d9af6-ee64-4559-bf53-a55d45065b91@sg-tourism-calendar",
+      "summary": "Diwali Bazaar October 2026",
+      "start": "2026-10-16T01:30:00Z",
+      "end": "2026-10-16T12:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "be716279-e53a-401a-a961-23514784aa2c@sg-tourism-calendar",
+      "summary": "EU Tour Briefing (17 Oct 2026)",
+      "start": "2026-10-17T01:00:00Z",
+      "end": "2026-10-17T12:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "f000d7aa-2eda-4dc3-80d7-28c9ad88b2e4@sg-tourism-calendar",
+      "summary": "FCBC Weekly Service (Oct 2026)",
+      "start": "2026-10-17T07:00:00Z",
+      "end": "2026-10-17T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    }
+  ],
+  "portCalls": [
+    {
+      "uid": "befcd305-1504-4a6e-acee-f8eceb8570ef@sg-tourism-calendar",
+      "summary": "Cruise: ODYSSEY VILLA VIE RESIDENCES at Singapore Cruise Centre",
+      "start": "2026-07-30T00:00:00Z",
+      "end": "2026-08-01T11:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "ee330a81-caba-48c1-bedc-87af7fbddc3e@sg-tourism-calendar",
+      "summary": "Cruise: ISLAND SKY NOBLE CALEDONIA at Singapore Cruise Centre",
+      "start": "2026-08-08T04:00:00Z",
+      "end": "2026-08-08T10:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "ee7977bf-83e9-4a15-8cd3-b76828e4bd9f@sg-tourism-calendar",
+      "summary": "Cruise: AEGEAN PARADISE NEW CENTURY TOURS at Singapore Cruise Centre",
+      "start": "2026-08-11T23:30:00Z",
+      "end": "2026-08-12T04:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "fa4f5a1f-4915-4e9c-86a5-ac80cb524d7b@sg-tourism-calendar",
+      "summary": "Cruise: GINGA MARU JAPAN AGENCY OF MARITIME EDUCATION AND TRAINING FOR SEAFARERS at Singapore Cruise Centre",
+      "start": "2026-08-21T02:00:00Z",
+      "end": "2026-08-26T02:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "4147249f-77db-4ebd-a353-d93aa3702d76@sg-tourism-calendar",
+      "summary": "Cruise: PACIFIC WORLD JAPAN GRACE CO.,LTD. at Singapore Cruise Centre",
+      "start": "2026-08-29T11:00:00Z",
+      "end": "2026-08-30T10:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "674e6e71-c11c-4200-bfa8-65d5e634ea79@sg-tourism-calendar",
+      "summary": "Cruise: STAR VOYAGER STAR CRUISES at Singapore Cruise Centre",
+      "start": "2026-09-06T06:00:00Z",
+      "end": "2026-09-06T12:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "0d88b575-7ed3-4ecd-adc0-61fc2ba1f2a7@sg-tourism-calendar",
+      "summary": "Cruise: STAR VOYAGER STAR CRUISES at Singapore Cruise Centre",
+      "start": "2026-09-07T23:00:00Z",
+      "end": "2026-09-08T04:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "542d637e-f558-4a95-a71f-371463698da4@sg-tourism-calendar",
+      "summary": "Cruise: STAR VOYAGER STAR CRUISES at Singapore Cruise Centre",
+      "start": "2026-09-11T06:00:00Z",
+      "end": "2026-09-11T12:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "c4e5a190-a518-4431-8129-00bc8656db73@sg-tourism-calendar",
+      "summary": "Cruise: STAR VOYAGER STAR CRUISES at Singapore Cruise Centre",
+      "start": "2026-09-13T06:00:00Z",
+      "end": "2026-09-13T12:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "e24e2f0d-b454-44f2-a1e8-2851c95d6fb1@sg-tourism-calendar",
+      "summary": "Cruise: STAR VOYAGER STAR CRUISES at Singapore Cruise Centre",
+      "start": "2026-09-14T23:00:00Z",
+      "end": "2026-09-15T04:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "e6a09336-444e-4e37-9540-c0cd428e2e53@sg-tourism-calendar",
+      "summary": "Cruise: AEGEAN PARADISE NEW CENTURY TOURS at Singapore Cruise Centre",
+      "start": "2026-09-17T23:30:00Z",
+      "end": "2026-09-18T04:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "fb45feb7-d18c-4244-9fc8-c08e596b5635@sg-tourism-calendar",
+      "summary": "Cruise: STAR VOYAGER STAR CRUISES at Singapore Cruise Centre",
+      "start": "2026-09-18T06:00:00Z",
+      "end": "2026-09-18T12:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "985d4a68-505a-4fd8-95b9-633e8ed58c44@sg-tourism-calendar",
+      "summary": "Cruise: STAR VOYAGER STAR CRUISES at Singapore Cruise Centre",
+      "start": "2026-09-20T06:00:00Z",
+      "end": "2026-09-20T12:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "1bcb0aac-ecdc-41b0-b58a-54576d0d3c7c@sg-tourism-calendar",
+      "summary": "Cruise: HERITAGE ADVENTURER CMI LEISURE at Singapore Cruise Centre",
+      "start": "2026-09-21T05:00:00Z",
+      "end": "2026-09-21T09:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "e8555de8-ee54-4849-881e-ca43ced54812@sg-tourism-calendar",
+      "summary": "Cruise: STAR VOYAGER STAR CRUISES at Singapore Cruise Centre",
+      "start": "2026-09-21T23:00:00Z",
+      "end": "2026-09-22T04:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "4a9e5c86-e9f3-4b7d-9221-c84e55824d91@sg-tourism-calendar",
+      "summary": "Cruise: STAR VOYAGER STAR CRUISES at Singapore Cruise Centre",
+      "start": "2026-09-25T06:00:00Z",
+      "end": "2026-09-25T12:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "51b9c643-7554-46d1-8eea-6f687c3529e7@sg-tourism-calendar",
+      "summary": "Cruise: HERITAGE ADVENTURER CMI LEISURE at Singapore Cruise Centre",
+      "start": "2026-09-28T00:00:00Z",
+      "end": "2026-09-29T08:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    }
+  ]
+}
