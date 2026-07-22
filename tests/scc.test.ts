@@ -250,6 +250,48 @@ describe("the three parse outcomes", () => {
   });
 });
 
+describe("a same-local-date sourceKey collision", () => {
+  // #48. `{vessel}|{arrivalDate}` collapses a vessel calling twice on one local
+  // date to a single key. Left silent, the store upserts the second over the
+  // first and no Source-health signal shows the loss. The parser makes it audible.
+  it("keeps one record and reports the colliding row as a failure", () => {
+    const result = parsed("same-day-collision.html");
+
+    expect(recordsOf(result)).toHaveLength(1);
+    expect(result.ok && result.failures).toHaveLength(1);
+  });
+
+  it("keeps the first row seen, so the outcome does not depend on table order", () => {
+    // Both rows are ODYSSEY on 30 Jul; the first arrives 0800 SGT (00:00Z), the
+    // second 1600 SGT (08:00Z). Keeping the first makes the survivor independent
+    // of an order the source could reshuffle.
+    const record = recordsOf(parsed("same-day-collision.html"))[0]!;
+
+    expect(record.arrival).toBe("2026-07-30T00:00:00Z");
+  });
+
+  it("carries the colliding row as the fragment and names the collision in expected", () => {
+    const [failure] = (parsed("same-day-collision.html") as { failures: import("../src/sources/types.js").ParseFailure[] })
+      .failures;
+
+    // The colliding (second) row travels with the failure, not the survivor's.
+    expect(failure?.fragment).toContain("1600");
+    expect(failure?.fragment).not.toContain("0800");
+    expect(failure?.fragment.length).toBeGreaterThan(40);
+    // The colliding key is named, and the reason says it collided.
+    expect(failure?.sourceKey).toBe("ODYSSEY VILLA VIE RESIDENCES|2026-07-30");
+    expect(failure?.expected).toMatch(/collid|already/i);
+  });
+
+  it("does not fire on the real published window", () => {
+    // 17 sailings, 17 distinct keys. This detection must never fire here.
+    const result = parsed("schedule.html");
+
+    expect(recordsOf(result)).toHaveLength(17);
+    expect(result.ok && result.failures).toEqual([]);
+  });
+});
+
 describe("through the pipeline", () => {
   /**
    * The registered adapter, driven end to end over the bytes SCC really served —

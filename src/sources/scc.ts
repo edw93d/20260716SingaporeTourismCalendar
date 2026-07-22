@@ -127,10 +127,13 @@ const callTime = (value: string): { at: ReturnType<typeof instant>; date: string
  *
  * Two consequences worth stating rather than discovering:
  *
- * - A vessel calling **twice on one local date** collapses to one key, and the
- *   later row overwrites the earlier. Not observed in the published window
- *   (17 sailings, 17 distinct keys), and the same missing identifier that causes
- *   the reschedule flaw is what leaves no honest alternative.
+ * - A vessel calling **twice on one local date** collapses to one key. The key
+ *   is not made unique — there is no honest way to, the same missing identifier
+ *   that causes the reschedule flaw — but the collision is no longer silent: when
+ *   two rows in one `parse` produce this key the first is kept and the second is
+ *   reported as a `ParseFailure` (#48), rather than overwriting the first in the
+ *   store where no § Source health signal would show the loss. Not observed in
+ *   the published window (17 sailings, 17 distinct keys).
  * - ADR-0007's breakage detection absorbs the reschedule case by construction:
  *   one out and one in is net zero, while a dead selector takes rows away and
  *   puts nothing back.
@@ -242,14 +245,43 @@ export const scc: Source<PortCall, string> = {
 
     const records: Scraped<PortCall>[] = [];
     const failures: ParseFailure[] = [];
+    // Keys already claimed within this one parse. A second row producing a key a
+    // prior row already produced would upsert over it in the store — a silent
+    // overwrite invisible to every § Source health signal (#48). So the first row
+    // keeps the key and the collider is reported rather than allowed to land.
+    const seen = new Set<SourceKey>();
     for (const [, row] of table.matchAll(ROW)) {
       // The header row carries `<th>` and no labelled `<td>`, so it produces no
       // cells at all — skipped without a rule that could mistake a real row for it.
       if (!/<td\b/.test(row!)) continue;
 
       const outcome = parseRow(row!);
-      if ("record" in outcome) records.push(outcome.record);
-      else failures.push(outcome.failure);
+      if ("failure" in outcome) {
+        failures.push(outcome.failure);
+        continue;
+      }
+
+      const { record } = outcome;
+      if (seen.has(record.sourceKey)) {
+        // The same `{vessel}|{arrivalDate}` twice: a vessel calling twice on one
+        // local date, indistinguishable by a key the source gives no id to make
+        // unique. Reported per ADR-0006 so the operator hears about the call that
+        // could not be represented, rather than losing it to the earlier row.
+        failures.push({
+          sourceKey: record.sourceKey,
+          fragment: row!.trim(),
+          expected:
+            `a sourceKey unique within one scrape, but ${JSON.stringify(record.sourceKey)} ` +
+            `was already produced by an earlier row — SCC keys on {vessel}|{arrivalDate} and ` +
+            `the table publishes no per-call identifier, so a vessel calling twice on one ` +
+            `local date collides. The first row is kept; this one is reported rather than ` +
+            `silently overwriting it in the store.`,
+        });
+        continue;
+      }
+
+      seen.add(record.sourceKey);
+      records.push(record);
     }
 
     // Anchor present with zero rows lands here as `records: []` — a genuinely
