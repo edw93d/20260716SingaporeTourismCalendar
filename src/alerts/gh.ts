@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { SourceId } from "../domain/types.js";
-import { type IssueGateway, markerFor } from "./issues.js";
+import { type IssueGateway, landedKinds, markerFor } from "./issues.js";
 
 /**
  * The one place this repository shells out to `gh`, and the one place the alert
@@ -39,7 +39,9 @@ type ListedIssue = { number: number; body: string | null };
 /**
  * An {@link IssueGateway} backed by `gh`. Finds a source's open issue by scanning
  * open issue bodies for the hidden marker (title-edit-proof identity), opens with
- * `gh issue create`, and closes with `gh issue close --comment`.
+ * `gh issue create`, closes with `gh issue close --comment`, appends a late signal
+ * with `gh issue comment`, and reads which signal kinds already landed by scanning
+ * an issue's body and comments (`gh issue view`).
  */
 export const createGhGateway = (gh: Gh = runGh): IssueGateway => ({
   findOpen: async (source: SourceId) => {
@@ -59,5 +61,22 @@ export const createGhGateway = (gh: Gh = runGh): IssueGateway => ({
 
   close: async (issue, comment) => {
     await gh(["issue", "close", String(issue.number), "--comment", comment]);
+  },
+
+  comment: async (issue, body) => {
+    await gh(["issue", "comment", String(issue.number), "--body", body]);
+  },
+
+  landed: async (issue) => {
+    // Read the issue's own body and every comment, and let the shared marker
+    // scan decide which signal kinds are already represented — the append path
+    // (#55) commutes with the open path because both write the same markers.
+    const stdout = await gh(["issue", "view", String(issue.number), "--json", "body,comments"]);
+    const { body, comments } = JSON.parse(stdout) as {
+      body: string | null;
+      comments: { body: string | null }[];
+    };
+    const text = [body ?? "", ...comments.map((c) => c.body ?? "")].join("\n");
+    return landedKinds(text);
   },
 });
