@@ -4,6 +4,7 @@ import {
   assignLanes,
   entriesOnDay,
   filterEntries,
+  freshness,
   monthGridCells,
   mountCalendar,
   normalizeEntries,
@@ -34,7 +35,8 @@ type Entry = {
   source: string;
 };
 
-type Payload = { venueEvents: Entry[]; portCalls: Entry[] };
+type Freshness = { source: string; lastConfirmed: string };
+type Payload = { venueEvents: Entry[]; portCalls: Entry[]; sources?: Freshness[] };
 
 // Instants are UTC; Singapore is +08:00, so these land squarely inside a
 // Singapore July day well away from either midnight boundary.
@@ -399,5 +401,84 @@ describe("four switchable reading surfaces", () => {
       switchView(view);
       expect(root.textContent ?? "").not.toMatch(/\+\s*\d+\s*more/i);
     }
+  });
+});
+
+describe("per-source freshness disclosure (#40)", () => {
+  const freshItem = (source: string) =>
+    root.querySelector(`.calendar__freshness-item[data-source="${source}"]`);
+  const agoText = (source: string) =>
+    freshItem(source)?.querySelector(".calendar__freshness-ago")?.textContent;
+  const isStale = (source: string) =>
+    freshItem(source)?.classList.contains("calendar__freshness-item--stale") ?? false;
+
+  it("computes 'X ago' from the baked instant and the injected clock (never a baked string)", () => {
+    // The instant is machine-readable and baked at build; the elapsed text is the
+    // browser's, against the clock the page is given — which is what makes the
+    // disclosure honest when the build that produced it has since died.
+    mount(
+      payloadOf({ sources: [{ source: "suntec", lastConfirmed: "2026-07-21T00:00:00Z" }] }),
+      new Date("2026-07-21T03:00:00Z"),
+    );
+    expect(agoText("suntec")).toBe("last confirmed 3 hours ago");
+  });
+
+  it("keeps the disclosure visible in every view", () => {
+    mount(payloadOf({ sources: [{ source: "suntec", lastConfirmed: "2026-07-21T00:00:00Z" }] }));
+    for (const view of ["month", "week", "agenda", "spine"]) {
+      switchView(view);
+      expect(freshItem("suntec")).not.toBeNull();
+    }
+  });
+
+  it("renders a large, growing lag when the baked instant is far in the past", () => {
+    // The failure the whole mechanism exists to survive: the pipeline is dead, so
+    // the page is frozen — but read against a live clock the lag grows rather than
+    // reassuring. Asserted explicitly with an injected clock.
+    const frozen = payloadOf({ sources: [{ source: "suntec", lastConfirmed: "2026-07-01T00:00:00Z" }] });
+
+    mount(frozen, new Date("2026-07-06T00:00:00Z"));
+    expect(agoText("suntec")).toBe("last confirmed 5 days ago");
+    expect(isStale("suntec")).toBe(true);
+
+    // The same frozen bytes, opened ten days later, disclose a larger lag.
+    mount(frozen, new Date("2026-07-16T00:00:00Z"));
+    expect(agoText("suntec")).toBe("last confirmed 15 days ago");
+  });
+
+  it("stays calm under two days and escalates to a prominent warning at >= two days", () => {
+    const payload = payloadOf({ sources: [{ source: "suntec", lastConfirmed: "2026-07-20T00:00:00Z" }] });
+
+    mount(payload, new Date("2026-07-21T23:00:00Z")); // ~1.96 days — still calm
+    expect(isStale("suntec")).toBe(false);
+    expect(freshItem("suntec")?.querySelector(".calendar__freshness-warn")).toBeNull();
+
+    mount(payload, new Date("2026-07-22T00:00:00Z")); // exactly two days — escalated
+    expect(isStale("suntec")).toBe(true);
+    expect(freshItem("suntec")?.querySelector(".calendar__freshness-warn")).not.toBeNull();
+  });
+
+  it("discloses each source on its own line, per source and never per record", () => {
+    mount(
+      payloadOf({
+        sources: [
+          { source: "suntec", lastConfirmed: "2026-07-21T00:00:00Z" },
+          { source: "scc", lastConfirmed: "2026-07-19T00:00:00Z" },
+        ],
+      }),
+      new Date("2026-07-21T02:00:00Z"),
+    );
+    expect(agoText("suntec")).toBe("last confirmed 2 hours ago");
+    expect(agoText("scc")).toBe("last confirmed 2 days ago");
+  });
+
+  it("the model reads elapsed from the instant and flips stale at the two-day line", () => {
+    const at = (iso: string) => freshness("2026-07-20T00:00:00Z", new Date(iso));
+    expect(at("2026-07-20T00:00:30Z").text).toBe("just now");
+    expect(at("2026-07-20T00:01:00Z").text).toBe("1 minute ago");
+    expect(at("2026-07-20T01:00:00Z").text).toBe("1 hour ago");
+    expect(at("2026-07-21T00:00:00Z").text).toBe("1 day ago");
+    expect(at("2026-07-21T23:59:00Z").stale).toBe(false);
+    expect(at("2026-07-22T00:00:00Z").stale).toBe(true);
   });
 });

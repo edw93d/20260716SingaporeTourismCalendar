@@ -111,3 +111,65 @@ describe("the site payload", () => {
     expect(keys).toEqual(["end", "location", "source", "start", "summary", "uid"]);
   });
 });
+
+describe("per-source freshness (#40)", () => {
+  it("bakes one last-confirmed instant per source, machine-readable", () => {
+    // The page computes 'X ago' from this; the build only bakes the instant.
+    const payload = buildSitePayload(
+      [venueEvent({ source: "suntec", lastSeenAt: instant("2026-07-20T20:51:02Z") })],
+      [portCall({ source: "scc", lastSeenAt: instant("2026-07-20T20:51:02Z") })],
+    );
+
+    expect(payload.sources).toEqual([
+      { source: "scc", lastConfirmed: "2026-07-20T20:51:02Z" },
+      { source: "suntec", lastConfirmed: "2026-07-20T20:51:02Z" },
+    ]);
+  });
+
+  it("takes the source's MAX lastSeenAt — the source's liveness, not a record's", () => {
+    // A source stays healthy while individual records drop: the dropped record's
+    // lastSeenAt freezes, but another record confirms the source is still live.
+    // Freshness is the source's most recent confirmation (max), never a single
+    // record's — ADR-0004 forbids the per-record cancellation judgment.
+    const payload = buildSitePayload(
+      [
+        venueEvent({ uid: "stale@x", sourceKey: "a", lastSeenAt: instant("2026-07-20T05:54:48Z") }),
+        venueEvent({ uid: "live@x", sourceKey: "b", lastSeenAt: instant("2026-07-20T20:51:02Z") }),
+      ],
+      [],
+    );
+
+    expect(payload.sources).toEqual([
+      { source: "suntec", lastConfirmed: "2026-07-20T20:51:02Z" },
+    ]);
+  });
+
+  it("orders sources deterministically, so the committed payload diff stays stable", () => {
+    const payload = buildSitePayload(
+      [
+        venueEvent({ source: "suntec", uid: "s@x" }),
+        venueEvent({ source: "mbccs", uid: "m@x" }),
+      ],
+      [portCall({ source: "scc", uid: "c@x" })],
+    );
+
+    expect(payload.sources.map((entry) => entry.source)).toEqual(["mbccs", "scc", "suntec"]);
+  });
+
+  it("lists a source once even when it spans both record types", () => {
+    // A source is not guaranteed to publish one type; if one ever published both,
+    // its freshness is still one line, maxed across every record it owns.
+    const payload = buildSitePayload(
+      [venueEvent({ source: "dual", uid: "v@x", lastSeenAt: instant("2026-07-19T00:00:00Z") })],
+      [portCall({ source: "dual", uid: "p@x", lastSeenAt: instant("2026-07-21T00:00:00Z") })],
+    );
+
+    expect(payload.sources).toEqual([
+      { source: "dual", lastConfirmed: "2026-07-21T00:00:00Z" },
+    ]);
+  });
+
+  it("is empty when there is nothing to attribute", () => {
+    expect(buildSitePayload([], []).sources).toEqual([]);
+  });
+});

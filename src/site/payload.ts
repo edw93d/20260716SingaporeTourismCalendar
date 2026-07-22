@@ -40,9 +40,27 @@ export type SiteEntry = {
   source: SourceId;
 };
 
+/**
+ * One source's freshness — the **only always-true proof the pipeline ran** (#40,
+ * #17). `lastConfirmed` is the source's most recent confirmation, a
+ * machine-readable ISO instant; the *page* computes the "X ago" text from it at
+ * load, never the build (a baked relative string would freeze at "4 hours ago"
+ * forever the moment the pipeline died — reassuring at exactly the wrong moment).
+ *
+ * **The unit is the source, never a record** (ADR-0004): it is the *max*
+ * `lastSeenAt` across every record the source owns, so a source stays live in the
+ * disclosure while individual records drop. This is no `status` field on a
+ * record — absence is still never resolved into a verdict (ADR-0007 §7).
+ */
+export type SourceFreshness = {
+  source: SourceId;
+  lastConfirmed: Instant;
+};
+
 export type SitePayload = {
   venueEvents: SiteEntry[];
   portCalls: SiteEntry[];
+  sources: SourceFreshness[];
 };
 
 const toSiteEntry = (entry: CalendarEntry): SiteEntry => ({
@@ -54,10 +72,31 @@ const toSiteEntry = (entry: CalendarEntry): SiteEntry => ({
   source: entry.source,
 });
 
+/**
+ * The per-source last-confirmed instant, maxed across every record either type
+ * carries. `Instant` sorts chronologically as plain text (see `instant.ts`), so
+ * the newest is a string comparison — no parsing. Sorted by source id so the
+ * committed payload's diff is a stable ordering, not insertion order.
+ */
+const freshnessOf = (
+  venueEvents: VenueEvent[],
+  portCalls: PortCall[],
+): SourceFreshness[] => {
+  const latest = new Map<SourceId, Instant>();
+  for (const { source, lastSeenAt } of [...venueEvents, ...portCalls]) {
+    const seen = latest.get(source);
+    if (seen === undefined || lastSeenAt > seen) latest.set(source, lastSeenAt);
+  }
+  return [...latest.entries()]
+    .map(([source, lastConfirmed]) => ({ source, lastConfirmed }))
+    .sort((a, b) => (a.source < b.source ? -1 : a.source > b.source ? 1 : 0));
+};
+
 export const buildSitePayload = (
   venueEvents: VenueEvent[],
   portCalls: PortCall[],
 ): SitePayload => ({
   venueEvents: venueEvents.map(projectVenueEvent).map(toSiteEntry),
   portCalls: portCalls.map(projectPortCall).map(toSiteEntry),
+  sources: freshnessOf(venueEvents, portCalls),
 });
