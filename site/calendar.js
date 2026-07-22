@@ -19,11 +19,18 @@
  * no count badge, no `+N more` collapse, no ranking. Every entry on a day is
  * rendered; a busy day simply grows.
  *
+ * Four switchable views (ADR-0009): **Month** navigates; **Week**, **Agenda**
+ * and **Date-spine** are the reading surfaces this file adds in #39. No single
+ * one is *the* view — reading demand from several angles is the feature. Still
+ * **no magnitude** in any of them (ADR-0009 §5): span and names stand in for the
+ * size the data does not carry, and nothing is ranked, scored or collapsed.
+ *
  * @typedef {{ uid: string, summary: string, start: string, end: string, location: string, source: string }} SiteEntry
  * @typedef {{ venueEvents: SiteEntry[], portCalls: SiteEntry[] }} SitePayload
  * @typedef {"VenueEvent" | "PortCall"} RecordType
  * @typedef {"all" | RecordType} Filter
- * @typedef {SiteEntry & { type: RecordType, startKey: number, endKey: number }} DayEntry
+ * @typedef {"month" | "week" | "agenda" | "spine"} View
+ * @typedef {SiteEntry & { type: RecordType, startKey: number, endKey: number, startIndex: number, endIndex: number, startValue: number, endValue: number }} DayEntry
  */
 
 /**
@@ -43,13 +50,79 @@ const SGT_OFFSET_MS = 8 * 60 * 60 * 1000;
  */
 const toSgt = (instant) => new Date(instant.getTime() + SGT_OFFSET_MS);
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * A continuous **SGT-day axis**: whole days since 1970-01-01 in Singapore time,
+ * fractional within a day. This is the one number Week and Date-spine position
+ * against — subtracting two of them is an elapsed span with no month-boundary or
+ * DST special case (Singapore has had neither since 1982). `Math.floor` of it is
+ * the integer day index a civil SGT date maps to.
+ * @param {Date} instant
+ * @returns {number}
+ */
+const sgtDayValue = (instant) => (instant.getTime() + SGT_OFFSET_MS) / MS_PER_DAY;
+
+/**
+ * The integer day index of a civil SGT date `Y-M-D` — the same axis as
+ * `sgtDayValue`, so `dayIndexOf(y, m, d) === Math.floor(sgtDayValue(midnight))`.
+ * @param {number} year @param {number} month @param {number} day @returns {number}
+ */
+const dayIndexOf = (year, month, day) => Math.round(Date.UTC(year, month - 1, day) / MS_PER_DAY);
+
+/**
+ * The inverse: the civil SGT date an integer day index names.
+ * @param {number} index @returns {{ year: number, month: number, day: number }}
+ */
+const civilOf = (index) => {
+  const at = new Date(index * MS_PER_DAY);
+  return { year: at.getUTCFullYear(), month: at.getUTCMonth() + 1, day: at.getUTCDate() };
+};
+
+/**
+ * The integer SGT day an instant falls on, on the `sgtDayValue` axis.
+ * @param {Date} instant @returns {number}
+ */
+export const sgtDayIndex = (instant) => Math.floor(sgtDayValue(instant));
+
+/**
+ * Minutes since Singapore midnight (0–1439) — the vertical position Week reads
+ * from an entry's **true published clock time**, not the viewer's.
+ * @param {Date} instant @returns {number}
+ */
+export const sgtMinutesOfDay = (instant) => {
+  const shifted = toSgt(instant);
+  return shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
+};
+
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
 
+const MONTHS_SHORT = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
 /** Monday-first: business planning reads the working week as a unit. */
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** The number of days in a civil month. @param {number} year @param {number} month @returns {number} */
+const monthLength = (year, month) => new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+/**
+ * The Monday-starting day index of the week that contains `index`. Day index 0
+ * (1970-01-01) is a Thursday — three days past Monday — so `(index + 3) % 7` is
+ * any day's distance back to its Monday, and its position in a Monday-first
+ * `WEEKDAYS`. Both the week views' geometry and their weekday labels read from
+ * this single fact.
+ * @param {number} index @returns {number}
+ */
+const mondayOf = (index) => index - ((index + 3) % 7);
+
+/** The Monday-first weekday label for a day index. @param {number} index @returns {string} */
+const weekdayLabel = (index) => WEEKDAYS[(index + 3) % 7] ?? "";
 
 /**
  * A calendar day in Singapore time, as a comparable `YYYYMMDD` integer — which
@@ -67,9 +140,6 @@ export const sgtDayKey = (instant) => {
     shifted.getUTCDate()
   );
 };
-
-/** @param {string} value @returns {number} */
-const keyOf = (value) => sgtDayKey(new Date(value));
 
 /** @param {number} year @param {number} month @param {number} day */
 const dayKey = (year, month, day) => year * 10000 + month * 100 + day;
@@ -95,12 +165,20 @@ export const sgtMonthOf = (now) => {
  */
 export const normalizeEntries = (payload) => {
   /** @param {SiteEntry} entry @param {RecordType} type @returns {DayEntry} */
-  const tag = (entry, type) => ({
-    ...entry,
-    type,
-    startKey: keyOf(entry.start),
-    endKey: keyOf(entry.end),
-  });
+  const tag = (entry, type) => {
+    const start = new Date(entry.start);
+    const end = new Date(entry.end);
+    return {
+      ...entry,
+      type,
+      startKey: sgtDayKey(start),
+      endKey: sgtDayKey(end),
+      startIndex: sgtDayIndex(start),
+      endIndex: sgtDayIndex(end),
+      startValue: sgtDayValue(start),
+      endValue: sgtDayValue(end),
+    };
+  };
   return [
     ...payload.venueEvents.map((entry) => tag(entry, "VenueEvent")),
     ...payload.portCalls.map((entry) => tag(entry, "PortCall")),
@@ -166,6 +244,72 @@ export const monthGridCells = (year, month, todayKey) => {
   return cells;
 };
 
+/**
+ * The seven days of the Monday-first week that contains `anchorIndex` (a
+ * `sgtDayIndex`). Week paging works by moving the anchor ±7; the view always
+ * shows the whole working-and-weekend week the anchor lands in.
+ *
+ * @param {number} anchorIndex
+ * @param {number} todayIndex
+ * @returns {{ year: number, month: number, day: number, index: number, key: number, isToday: boolean }[]}
+ */
+export const weekDaysOf = (anchorIndex, todayIndex) => {
+  // 1970-01-01 (index 0) is a Thursday, three days after Monday, so
+  // `(index + 3) % 7` is the day's distance back to Monday.
+  const monday = anchorIndex - ((anchorIndex + 3) % 7);
+  const days = [];
+  for (let offset = 0; offset < 7; offset += 1) {
+    const index = monday + offset;
+    const { year, month, day } = civilOf(index);
+    days.push({
+      year,
+      month,
+      day,
+      index,
+      key: dayKey(year, month, day),
+      isToday: index === todayIndex,
+    });
+  }
+  return days;
+};
+
+/**
+ * Greedy interval layout: place each item in the first **lane** (column, in
+ * Week; row-stack, in Date-spine) whose previous occupant has already ended,
+ * opening a new lane only when every existing one is still busy. Items are
+ * visited in start order, ties keeping input order — so simultaneous entries
+ * never reorder by anything, magnitude least of all (ADR-0009 §5). Returns each
+ * item with its `lane` and the total `lanes` the set needed, which is what a
+ * renderer turns into a width or an offset.
+ *
+ * @template T
+ * @param {T[]} items
+ * @param {(item: T) => number} startOf
+ * @param {(item: T) => number} endOf
+ * @returns {{ item: T, lane: number, lanes: number }[]}
+ */
+export const assignLanes = (items, startOf, endOf) => {
+  const ordered = items
+    .map((item, order) => ({ item, order }))
+    .sort((a, b) => startOf(a.item) - startOf(b.item) || a.order - b.order);
+
+  /** @type {number[]} the end value currently occupying each lane */
+  const laneEnds = [];
+  const placed = ordered.map(({ item }) => {
+    let lane = laneEnds.findIndex((end) => end <= startOf(item));
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(endOf(item));
+    } else {
+      laneEnds[lane] = endOf(item);
+    }
+    return { item, lane };
+  });
+
+  const lanes = laneEnds.length;
+  return placed.map((p) => ({ ...p, lanes }));
+};
+
 /** @param {number} value @returns {string} */
 const pad2 = (value) => String(value).padStart(2, "0");
 
@@ -184,9 +328,16 @@ export const mountCalendar = (root, payload, now) => {
 
   const entries = normalizeEntries(payload);
   const todayKey = sgtDayKey(now);
+  const todayIndex = sgtDayIndex(now);
 
-  /** @type {{ focus: { year: number, month: number }, filter: Filter }} */
-  const state = { focus: sgtMonthOf(now), filter: "all" };
+  // The whole navigation state is **one anchor day**, plus the view and the
+  // filter. Each view derives its own window from that single anchor — Month and
+  // Agenda/Date-spine show the anchor's month, Week the anchor's week — so
+  // switching view keeps position without any per-view cursor to reconcile
+  // (AC 6), and the filter, applied once here, persists across every switch
+  // (AC 5).
+  /** @type {{ view: View, anchor: number, filter: Filter }} */
+  const state = { view: "month", anchor: todayIndex, filter: "all" };
 
   /** @param {string} tag @param {string} [className] @param {string} [text] */
   const el = (tag, className, text) => {
@@ -196,22 +347,68 @@ export const mountCalendar = (root, payload, now) => {
     return node;
   };
 
-  /** Step the focus month by `delta`, wrapping the year. @param {number} delta */
+  /**
+   * Page by the current view's unit: Week moves the anchor a whole week, every
+   * other view a whole month (keeping the day-of-month where the target month is
+   * long enough). @param {number} delta
+   */
   const step = (delta) => {
-    const zeroBased = state.focus.month - 1 + delta;
-    state.focus = {
-      year: state.focus.year + Math.floor(zeroBased / 12),
-      month: ((zeroBased % 12) + 12) % 12 + 1,
-    };
+    if (state.view === "week") {
+      state.anchor += delta * 7;
+    } else {
+      const { year, month, day } = civilOf(state.anchor);
+      const zeroBased = month - 1 + delta;
+      const nextYear = year + Math.floor(zeroBased / 12);
+      const nextMonth = ((zeroBased % 12) + 12) % 12 + 1;
+      const lastDay = monthLength(nextYear, nextMonth);
+      state.anchor = dayIndexOf(nextYear, nextMonth, Math.min(day, lastDay));
+    }
     render();
+  };
+
+  /** The nav title for the current view. @returns {string} */
+  const titleText = () => {
+    const { year, month } = civilOf(state.anchor);
+    if (state.view !== "week") return `${MONTHS[month - 1]} ${year}`;
+
+    const weekStart = mondayOf(state.anchor);
+    const a = civilOf(weekStart);
+    const b = civilOf(weekStart + 6);
+    return a.month === b.month
+      ? `${a.day} – ${b.day} ${MONTHS_SHORT[b.month - 1]} ${b.year}`
+      : `${a.day} ${MONTHS_SHORT[a.month - 1]} – ${b.day} ${MONTHS_SHORT[b.month - 1]} ${b.year}`;
   };
 
   const render = () => {
     root.textContent = "";
     root.className = "calendar";
 
-    // --- Controls: the type filter and month navigation ------------------
+    // --- Controls: view switcher, type filter, navigation ----------------
     const controls = el("div", "calendar__controls");
+
+    // Every view is present as a tab, so any one is reachable from any other in
+    // a single click — the switching *is* the feature, not a fallback (§1).
+    const views = el("div", "calendar__views");
+    views.setAttribute("role", "tablist");
+    for (const [value, label] of /** @type {[View, string][]} */ ([
+      ["month", "Month"],
+      ["week", "Week"],
+      ["agenda", "Agenda"],
+      ["spine", "Date-spine"],
+    ])) {
+      const button = /** @type {HTMLButtonElement} */ (el("button", "calendar__viewbtn", label));
+      button.type = "button";
+      button.dataset["view"] = value;
+      button.setAttribute("role", "tab");
+      const active = value === state.view;
+      button.setAttribute("aria-selected", String(active));
+      if (active) button.classList.add("calendar__viewbtn--active");
+      button.addEventListener("click", () => {
+        state.view = value;
+        render();
+      });
+      views.appendChild(button);
+    }
 
     const filter = /** @type {HTMLSelectElement} */ (el("select", "calendar__filter"));
     filter.setAttribute("aria-label", "Filter by type");
@@ -239,25 +436,38 @@ export const mountCalendar = (root, payload, now) => {
       button.addEventListener("click", onClick);
       return button;
     };
-    const title = el("span", "calendar__title", `${MONTHS[state.focus.month - 1]} ${state.focus.year}`);
+    const title = el("span", "calendar__title", titleText());
 
     nav.appendChild(navButton("prev", "‹ Prev", () => step(-1)));
-    // Today returns to the present from anywhere — and the focus is *reset*, not
-    // stepped, so it lands home regardless of how far back the reader wandered.
+    // Today returns to the present from anywhere — and the anchor is *reset*, not
+    // stepped, so it lands home regardless of how far the reader wandered.
     nav.appendChild(navButton("today", "Today", () => {
-      state.focus = sgtMonthOf(now);
+      state.anchor = todayIndex;
       render();
     }));
     nav.appendChild(navButton("next", "Next ›", () => step(1)));
     nav.appendChild(title);
 
+    controls.appendChild(views);
     controls.appendChild(filter);
     controls.appendChild(nav);
     root.appendChild(controls);
 
-    // --- The month grid --------------------------------------------------
+    // The one place the filter is applied — every view reads this same list (§4).
     const visible = filterEntries(entries, state.filter);
-    const cells = monthGridCells(state.focus.year, state.focus.month, todayKey);
+    const surface =
+      state.view === "week" ? renderWeek(visible)
+      : state.view === "agenda" ? renderAgenda(visible)
+      : state.view === "spine" ? renderSpine(visible)
+      : renderMonth(visible);
+    root.appendChild(surface);
+  };
+
+  // --- Month: the navigator (unchanged from #38) -------------------------
+  /** @param {DayEntry[]} visible @returns {HTMLElement} */
+  const renderMonth = (visible) => {
+    const { year, month } = civilOf(state.anchor);
+    const cells = monthGridCells(year, month, todayKey);
 
     const grid = el("div", "calendar__grid");
 
@@ -283,13 +493,175 @@ export const mountCalendar = (root, payload, now) => {
       body.appendChild(dayNode);
     }
     grid.appendChild(body);
-    root.appendChild(grid);
+    return grid;
   };
 
-  /** @param {DayEntry} entry */
-  const renderEntry = (entry) => {
+  // --- Week: the working week, hour by hour, in published clock time -----
+  /** @param {DayEntry[]} visible @returns {HTMLElement} */
+  const renderWeek = (visible) => {
+    const weekStart = mondayOf(state.anchor);
+    const weekEnd = weekStart + 6;
+    const days = weekDaysOf(state.anchor, todayIndex);
+    const wrap = el("div", "week");
+
+    // Column headers: Mon–Sun with each day's date.
+    const head = el("div", "week__head");
+    head.appendChild(el("span", "week__corner"));
+    days.forEach((d, i) => {
+      const cell = el("div", "week__day");
+      if (d.isToday) cell.classList.add("week__day--today");
+      cell.dataset["day"] = `${d.year}-${pad2(d.month)}-${pad2(d.day)}`;
+      cell.appendChild(el("span", "week__dayname", WEEKDAYS[i] ?? ""));
+      cell.appendChild(el("span", "week__daynum", String(d.day)));
+      head.appendChild(cell);
+    });
+    wrap.appendChild(head);
+
+    // The all-day band: a multi-day entry has no single hour, so it rides a band
+    // spanning the columns it covers (ADR-0009 §3), stacked into rows where two
+    // bands overlap.
+    const multiDay = visible.filter(
+      (e) => e.startIndex !== e.endIndex && e.endIndex >= weekStart && e.startIndex <= weekEnd,
+    );
+    if (multiDay.length) {
+      const band = el("div", "week__allday");
+      band.appendChild(el("span", "week__corner", "All-day"));
+      const grid = el("div", "week__band-grid");
+      for (const { item, lane } of assignLanes(multiDay, (e) => e.startIndex, (e) => e.endIndex)) {
+        const leftCol = Math.max(item.startIndex, weekStart) - weekStart;
+        const rightCol = Math.min(item.endIndex, weekEnd) - weekStart;
+        const node = renderEntry(item);
+        node.classList.add("week__band");
+        node.style.gridColumn = `${leftCol + 1} / ${rightCol + 2}`;
+        node.style.gridRow = String(lane + 1);
+        grid.appendChild(node);
+      }
+      band.appendChild(grid);
+      wrap.appendChild(band);
+    }
+
+    // The hour grid: a gutter of hour marks, then one column per day with each
+    // single-day entry positioned by its true published clock time. Overlapping
+    // entries split the column into side-by-side lanes.
+    const body = el("div", "week__grid");
+    const gutter = el("div", "week__gutter");
+    for (let hour = 0; hour < 24; hour += 3) {
+      const mark = el("span", "week__hour", `${pad2(hour)}:00`);
+      mark.style.top = `${(hour / 24) * 100}%`;
+      gutter.appendChild(mark);
+    }
+    body.appendChild(gutter);
+
+    for (const d of days) {
+      const col = el("div", "week__col");
+      if (d.isToday) col.classList.add("week__col--today");
+      col.dataset["day"] = `${d.year}-${pad2(d.month)}-${pad2(d.day)}`;
+      const timed = visible.filter((e) => e.startIndex === e.endIndex && e.startIndex === d.index);
+      const laid = assignLanes(
+        timed,
+        (e) => sgtMinutesOfDay(new Date(e.start)),
+        (e) => sgtMinutesOfDay(new Date(e.end)),
+      );
+      for (const { item, lane, lanes } of laid) {
+        const startMin = sgtMinutesOfDay(new Date(item.start));
+        const endMin = sgtMinutesOfDay(new Date(item.end));
+        const node = renderEntry(item, `${clockText(item.start)}–${clockText(item.end)}`);
+        node.classList.add("week__event");
+        node.style.top = `${(startMin / 1440) * 100}%`;
+        node.style.height = `${Math.max(((endMin - startMin) / 1440) * 100, 2)}%`;
+        node.style.left = `${(lane / lanes) * 100}%`;
+        node.style.width = `${(1 / lanes) * 100}%`;
+        col.appendChild(node);
+      }
+      body.appendChild(col);
+    }
+    wrap.appendChild(body);
+    return wrap;
+  };
+
+  // --- Agenda: every entry named, with where and when --------------------
+  /** @param {DayEntry[]} visible @returns {HTMLElement} */
+  const renderAgenda = (visible) => {
+    const { year, month } = civilOf(state.anchor);
+    const daysInMonth = monthLength(year, month);
+    const list = el("div", "agenda");
+    let any = false;
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const onDay = entriesOnDay(visible, dayKey(year, month, day));
+      if (!onDay.length) continue;
+      any = true;
+      const index = dayIndexOf(year, month, day);
+      const dayNode = el("div", "agenda__day");
+      dayNode.dataset["day"] = `${year}-${pad2(month)}-${pad2(day)}`;
+      if (index === todayIndex) dayNode.classList.add("agenda__day--today");
+      dayNode.appendChild(
+        el("span", "agenda__date", `${weekdayLabel(index)} ${day} ${MONTHS_SHORT[month - 1]}`),
+      );
+      const items = el("div", "agenda__items");
+      // `entriesOnDay` repeats a multi-day entry under each day it spans, so a
+      // congress appears on each of its days here — as it should (§3).
+      for (const entry of onDay) items.appendChild(renderEntry(entry, clockText(entry.start)));
+      dayNode.appendChild(items);
+      list.appendChild(dayNode);
+    }
+    if (!any) list.appendChild(el("p", "agenda__empty", "No entries this month."));
+    return list;
+  };
+
+  // --- Date-spine: duration as literal span ------------------------------
+  /** @param {DayEntry[]} visible @returns {HTMLElement} */
+  const renderSpine = (visible) => {
+    const { year, month } = civilOf(state.anchor);
+    const daysInMonth = monthLength(year, month);
+    const monthStart = dayIndexOf(year, month, 1);
+    const monthEnd = monthStart + daysInMonth; // exclusive
+    const span = daysInMonth;
+
+    const wrap = el("div", "spine");
+
+    const axis = el("div", "spine__axis");
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const index = dayIndexOf(year, month, day);
+      const row = el("div", "spine__date");
+      row.dataset["day"] = `${year}-${pad2(month)}-${pad2(day)}`;
+      if (index === todayIndex) row.classList.add("spine__date--today");
+      row.appendChild(el("span", "spine__dayname", weekdayLabel(index)));
+      row.appendChild(el("span", "spine__datenum", String(day)));
+      axis.appendChild(row);
+    }
+    wrap.appendChild(axis);
+
+    // Each entry is a vertical bar whose **height is its duration**, so a
+    // multi-day congress physically dominates a three-hour fair. Span standing
+    // in for magnitude is the whole point of this view (ADR-0009 §3/§5) — it is
+    // still not a score: nothing is ranked, only measured against the clock.
+    const track = el("div", "spine__track");
+    const inMonth = visible.filter((e) => e.endValue > monthStart && e.startValue < monthEnd);
+    for (const { item, lane, lanes } of assignLanes(inMonth, (e) => e.startValue, (e) => e.endValue)) {
+      const start = Math.max(item.startValue, monthStart);
+      const end = Math.min(item.endValue, monthEnd);
+      const node = renderEntry(item, spanText(item.endValue - item.startValue));
+      node.classList.add("spine__bar");
+      node.style.top = `${((start - monthStart) / span) * 100}%`;
+      node.style.height = `${Math.max(((end - start) / span) * 100, 0.8)}%`;
+      node.style.left = `${(lane / lanes) * 100}%`;
+      node.style.width = `${(1 / lanes) * 100}%`;
+      track.appendChild(node);
+    }
+    wrap.appendChild(track);
+    return wrap;
+  };
+
+  /**
+   * One entry, rendered the same in every view: type, an optional time/duration
+   * label, the name, where, and the source that produced it. `timeText` is the
+   * one thing that differs — Month omits it, the reading surfaces supply it.
+   * @param {DayEntry} entry @param {string} [timeText]
+   */
+  const renderEntry = (entry, timeText) => {
     const node = el("div", "calendar__entry");
     node.dataset["type"] = entry.type;
+    if (timeText) node.appendChild(el("span", "calendar__entry-time", timeText));
     // `summary` already names a port call's vessel and terminal, and a venue
     // event's name (the projection in `src/domain/project.ts`).
     node.appendChild(el("span", "calendar__entry-title", entry.summary));
@@ -300,6 +672,24 @@ export const mountCalendar = (root, payload, now) => {
     // attribution that lets two labelled duplicates read as two, not one.
     node.appendChild(el("span", "calendar__source", entry.source));
     return node;
+  };
+
+  /** `HH:MM` in Singapore time. @param {string} instant @returns {string} */
+  const clockText = (instant) => {
+    const minutes = sgtMinutesOfDay(new Date(instant));
+    return `${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}`;
+  };
+
+  /**
+   * A human duration for Date-spine's label — hours under a day, else days to
+   * one decimal. The number the eye reads off the bar's height, spelled out.
+   * @param {number} days @returns {string}
+   */
+  const spanText = (days) => {
+    const hours = days * 24;
+    if (hours < 24) return `${Math.max(1, Math.round(hours))} hr`;
+    const rounded = Math.round(days * 10) / 10;
+    return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)} days`;
   };
 
   render();
