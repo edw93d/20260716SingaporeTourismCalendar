@@ -1562,5 +1562,15 @@
       "location": "Singapore Cruise Centre",
       "source": "scc"
     }
+  ],
+  "sources": [
+    {
+      "source": "scc",
+      "lastConfirmed": "2026-07-20T20:51:02Z"
+    },
+    {
+      "source": "suntec",
+      "lastConfirmed": "2026-07-20T20:51:02Z"
+    }
   ]
 }

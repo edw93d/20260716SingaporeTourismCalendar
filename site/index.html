@@ -85,6 +85,43 @@
       }
       .calendar__navbtn:hover, .calendar__filter:hover { border-color: var(--dim); }
 
+      /* Per-source freshness (#40): the always-visible line that is the only
+         proof the pipeline ran, escalating to a prominent warning once a source
+         has gone quiet for two days or more. The elapsed text is computed in the
+         browser at load — see `calendar.js` — so a frozen page grows its own lag. */
+      .calendar__freshness {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem 0.75rem;
+        margin-bottom: 1rem;
+        font-size: 0.8rem;
+      }
+      .calendar__freshness-item {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 0.4rem;
+        padding: 0.2rem 0.5rem;
+        border: 1px solid var(--line);
+        border-radius: 0.4rem;
+        color: var(--dim);
+      }
+      .calendar__freshness-source {
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: inherit;
+      }
+      .calendar__freshness-ago { font-variant-numeric: tabular-nums; }
+      /* Escalation is border + fill + weight, not hue alone, so it reads for a
+         viewer who cannot tell calm from alarmed by colour. */
+      .calendar__freshness-item--stale {
+        color: inherit;
+        border-color: #dc2626;
+        background: color-mix(in srgb, #dc2626 14%, transparent);
+        font-weight: 600;
+      }
+      .calendar__freshness-warn { color: #ef4444; font-weight: 700; }
+
       /* The grid scrolls sideways rather than crushing cells on a phone — the
          body itself never scrolls horizontally. */
       .calendar__grid { overflow-x: auto; }
@@ -277,8 +314,9 @@
     <p class="lede">
       Public listings of what is happening in Singapore — conferences, exhibitions,
       concerts, consumer festivals, and cruise arrivals — aggregated into
-      <strong>existence and timing</strong> records and refreshed daily, for people
-      who plan around demand landing. Days shown in Singapore time.
+      <strong>existence and timing</strong> records, for people who plan around
+      demand landing. Each source shows when it was last confirmed, below — the
+      calendar is only ever as current as that. Days shown in Singapore time.
     </p>
 
     <div id="calendar" class="calendar">

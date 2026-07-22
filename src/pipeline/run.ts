@@ -147,8 +147,10 @@ export const runPipeline = async ({
     // The everything-view the web calendar is built from (#38, ADR-0009 §4):
     // both types, every source, duplicates unmerged, emitted from the store like
     // the feeds so retention is real — a record absent from today's scrape still
-    // ships to the page. No `DTSTAMP`, so unlike the feeds this file is byte-stable
-    // when nothing changed.
+    // ships to the page. It also bakes the per-source last-confirmed instant (#40)
+    // — a machine-readable proof-of-life the page turns into a growing "X ago"
+    // client-side; that instant advances every healthy run, so the entries stay
+    // byte-stable when nothing changed but the freshness line does not, by design.
     mkdirSync(dirname(payloadPath), { recursive: true });
     writeFileSync(payloadPath, `${JSON.stringify(buildSitePayload(venueEvents, portCalls), null, 2)}\n`);
 

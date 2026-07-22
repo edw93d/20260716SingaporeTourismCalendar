@@ -26,7 +26,8 @@
  * size the data does not carry, and nothing is ranked, scored or collapsed.
  *
  * @typedef {{ uid: string, summary: string, start: string, end: string, location: string, source: string }} SiteEntry
- * @typedef {{ venueEvents: SiteEntry[], portCalls: SiteEntry[] }} SitePayload
+ * @typedef {{ source: string, lastConfirmed: string }} SourceFreshness
+ * @typedef {{ venueEvents: SiteEntry[], portCalls: SiteEntry[], sources?: SourceFreshness[] }} SitePayload
  * @typedef {"VenueEvent" | "PortCall"} RecordType
  * @typedef {"all" | RecordType} Filter
  * @typedef {"month" | "week" | "agenda" | "spine"} View
@@ -152,6 +153,46 @@ const dayKey = (year, month, day) => year * 10000 + month * 100 + day;
 export const sgtMonthOf = (now) => {
   const shifted = toSgt(now);
   return { year: shifted.getUTCFullYear(), month: shifted.getUTCMonth() + 1 };
+};
+
+const MS_PER_MINUTE = 60 * 1000;
+const MS_PER_HOUR = 60 * MS_PER_MINUTE;
+
+/**
+ * Two days is where a calm disclosure escalates to a prominent warning (#40). It
+ * is comfortably past a single skipped daily run — a dropped schedule costs one
+ * day of freshness and self-heals — so the warning fires on a *pattern*, not a
+ * one-off miss, and never on a healthy overnight gap.
+ */
+const STALE_AFTER_MS = 2 * MS_PER_DAY;
+
+/** @param {number} count @param {string} unit @returns {string} */
+const agoUnit = (count, unit) => `${count} ${unit}${count === 1 ? "" : "s"} ago`;
+
+/**
+ * The freshness disclosure for one source, **computed at page load** from the
+ * baked ISO instant and the injected clock — never a baked relative string. That
+ * is load-bearing (#40, #17): the static site is built by the same workflow that
+ * scrapes, so a baked "4 hours ago" would freeze *forever* the moment the
+ * pipeline died, reassuring the operator at exactly the moment it is dead.
+ * Computed here, a frozen page instead shows an ever-growing lag — which is the
+ * page's role as the only always-true proof the pipeline ran.
+ *
+ * `stale` escalates at {@link STALE_AFTER_MS}; a clock earlier than the instant
+ * (skew, or a same-second build) reads as "just now", never a negative age.
+ *
+ * @param {string} lastConfirmed ISO-8601 instant baked by the build
+ * @param {Date} now the injected clock
+ * @returns {{ elapsedMs: number, text: string, stale: boolean }}
+ */
+export const freshness = (lastConfirmed, now) => {
+  const elapsedMs = now.getTime() - new Date(lastConfirmed).getTime();
+  const text =
+    elapsedMs < MS_PER_MINUTE ? "just now"
+    : elapsedMs < MS_PER_HOUR ? agoUnit(Math.floor(elapsedMs / MS_PER_MINUTE), "minute")
+    : elapsedMs < MS_PER_DAY ? agoUnit(Math.floor(elapsedMs / MS_PER_HOUR), "hour")
+    : agoUnit(Math.floor(elapsedMs / MS_PER_DAY), "day");
+  return { elapsedMs, text, stale: elapsedMs >= STALE_AFTER_MS };
 };
 
 /**
@@ -379,6 +420,37 @@ export const mountCalendar = (root, payload, now) => {
       : `${a.day} ${MONTHS_SHORT[a.month - 1]} – ${b.day} ${MONTHS_SHORT[b.month - 1]} ${b.year}`;
   };
 
+  /**
+   * The per-source freshness disclosure (#40) — always visible, in every view,
+   * because it is the page's role as the only always-true proof the pipeline ran.
+   * One line per source, its elapsed lag computed here from the baked instant and
+   * the injected `now`; a source two days or more stale escalates to a prominent
+   * warning. The unit is the source, never a record (ADR-0004).
+   * @returns {HTMLElement | null}
+   */
+  const renderFreshness = () => {
+    const sources = payload.sources ?? [];
+    if (!sources.length) return null;
+
+    const list = el("div", "calendar__freshness");
+    // A live region: a screen reader hears the freshness, and the warning, without
+    // the reader having to go looking for the one line that says the page is stale.
+    list.setAttribute("role", "status");
+    for (const { source, lastConfirmed } of sources) {
+      const { text, stale } = freshness(lastConfirmed, now);
+      const item = el("div", "calendar__freshness-item");
+      item.dataset["source"] = source;
+      if (stale) item.classList.add("calendar__freshness-item--stale");
+      item.appendChild(el("span", "calendar__freshness-source", source));
+      item.appendChild(el("span", "calendar__freshness-ago", `last confirmed ${text}`));
+      // The escalation is a distinct element, not just a colour: the warning has to
+      // survive a reader who cannot tell calm from alarmed by hue alone.
+      if (stale) item.appendChild(el("span", "calendar__freshness-warn", "⚠ pipeline may be stalled"));
+      list.appendChild(item);
+    }
+    return list;
+  };
+
   const render = () => {
     root.textContent = "";
     root.className = "calendar";
@@ -452,6 +524,11 @@ export const mountCalendar = (root, payload, now) => {
     controls.appendChild(filter);
     controls.appendChild(nav);
     root.appendChild(controls);
+
+    // The freshness disclosure sits above every view's surface — it is not a
+    // property of the month or the week, but of the data behind all of them.
+    const fresh = renderFreshness();
+    if (fresh) root.appendChild(fresh);
 
     // The one place the filter is applied — every view reads this same list (§4).
     const visible = filterEntries(entries, state.filter);
