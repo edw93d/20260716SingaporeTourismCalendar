@@ -158,7 +158,8 @@ const parseRecord = (
 };
 
 // ---------------------------------------------------------------------------
-// fetch — drives the browser; the untested I/O seam (ADR-0005)
+// fetch — drives the browser; the I/O seam (ADR-0005), exercised in tests
+// through a fake BrowserSession rather than a live page.
 // ---------------------------------------------------------------------------
 
 /**

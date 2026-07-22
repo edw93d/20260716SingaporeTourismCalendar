@@ -1,4 +1,7 @@
 {
+  "_capturedFrom": "https://mbccs.com.sg/cruise-information?tab=cruise-schedule",
+  "_capturedOn": "2026-07-21",
+  "_handAuthored": "Not bytes the source served: a staged edge state, hand-built from schedule.json (the real capture of the same date) by emptying its harvested records. Carries the ADR-0005 provenance header even so.",
   "_note": "The genuine 'There are no scheduled cruises' state. fetch harvests it as an empty array (ADR-0006 Amendment 1) — a fact about the source, not a failure to read it. Distinct from absent.json, whose null means fetch never located the schedule state at all.",
   "schedule": []
 }
