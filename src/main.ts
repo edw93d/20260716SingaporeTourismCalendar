@@ -1,3 +1,5 @@
+import { createGhGateway } from "./alerts/gh.js";
+import { reconcile } from "./alerts/issues.js";
 import { createBrowserSession } from "./pipeline/browser.js";
 import { createHttpClient } from "./pipeline/http.js";
 import { runPipeline } from "./pipeline/run.js";
@@ -48,6 +50,18 @@ const main = async (): Promise<void> => {
       for (const failure of outcome.failures) {
         console.log(`    ! expected ${failure.expected} in: ${failure.fragment.slice(0, 120)}`);
       }
+    }
+
+    // Raise or clear the operator's breakage issues (ADR-0007, #41). This runs
+    // **after** the feeds were written inside `runPipeline`, so an alerting
+    // failure — a `gh` hiccup, a token that expired mid-run — is logged and
+    // swallowed rather than allowed to fail a run that already published. The
+    // gateway authenticates with `GITHUB_TOKEN` only, read by `gh` from the
+    // environment the workflow injects.
+    try {
+      await reconcile(run.breakage, createGhGateway());
+    } catch (error) {
+      console.error("Alert reconciliation failed:", error);
     }
   } finally {
     // The core owns the browser's lifecycle: it is released whether the run

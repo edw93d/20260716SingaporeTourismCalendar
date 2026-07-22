@@ -36,11 +36,19 @@ const withoutComments = (yaml: string): string => yaml.replace(/(^|\s)#.*$/gm, "
 
 const DAILY = "daily.yml";
 
+type Step = {
+  name?: string;
+  uses?: string;
+  with?: Record<string, unknown>;
+  run?: string;
+  env?: Record<string, string>;
+};
+
 type Workflow = {
   on?: { schedule?: { cron?: string }[]; pull_request?: unknown; push?: { branches?: string[] } };
   concurrency?: { group?: string; "cancel-in-progress"?: boolean };
   permissions?: Record<string, string> | string;
-  jobs?: Record<string, { steps?: { uses?: string; with?: Record<string, unknown>; run?: string }[] }>;
+  jobs?: Record<string, { steps?: Step[] }>;
 };
 
 const daily = parse(text(DAILY)) as Workflow;
@@ -88,15 +96,27 @@ describe("the daily workflow", () => {
     expect(daily.concurrency?.["cancel-in-progress"]).toBe(false);
   });
 
-  it("grants itself exactly the three permissions it uses, and no others", () => {
+  it("grants itself exactly the four permissions it uses, and no others", () => {
     // Scoped rather than `write-all`, and asserted exhaustively rather than with
-    // toMatchObject: the failure worth catching is a *fourth* scope appearing,
-    // which a partial match would wave through.
+    // toMatchObject: the failure worth catching is a *fifth* scope appearing,
+    // which a partial match would wave through. `issues: write` is the breakage
+    // alerter's (ADR-0007, #41) — `gh` raises and closes the operator's issues.
     expect(daily.permissions).toEqual({
       contents: "write",
       pages: "write",
       "id-token": "write",
+      issues: "write",
     });
+  });
+
+  it("injects GITHUB_TOKEN into the pipeline step, so gh can authenticate", () => {
+    // The breakage alerter (#41) shells out to `gh`, which reads the run-scoped
+    // token from its environment. This is the one place a credential is named,
+    // and it is `secrets.GITHUB_TOKEN` — the token Actions mints and expires with
+    // the run — which the GITHUB_TOKEN-only guard below explicitly allows. No
+    // token here would leave every `gh` call unauthenticated and every alert lost.
+    const pipeline = steps.find((step) => /npm\s+run\s+pipeline/.test(step.run ?? ""));
+    expect(pipeline?.env?.["GITHUB_TOKEN"]).toBe("${{ secrets.GITHUB_TOKEN }}");
   });
 
   it("commits the store and the feeds back to the repository", () => {
