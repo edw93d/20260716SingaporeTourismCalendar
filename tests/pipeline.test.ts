@@ -682,3 +682,114 @@ describe("idempotence", () => {
     expect(backwards).toEqual(forwards);
   });
 });
+
+describe("breakage detection", () => {
+  // Every record here ends well after both run instants, so it sits in the
+  // future-dated cohort the drop is measured against (ADR-0007 §2).
+  const future = (key: string): Scraped<VenueEvent> =>
+    bniVision({
+      sourceKey: key,
+      name: key,
+      start: instant("2026-09-01T04:00:00Z"),
+      end: instant("2026-09-01T10:00:00Z"),
+    });
+
+  const futureCohort = (n: number): Scraped<VenueEvent>[] =>
+    Array.from({ length: n }, (_, i) => future(`event-${i}`));
+
+  const signalsFor = (run: Awaited<ReturnType<typeof runPipeline>>, source: SourceId) =>
+    run.breakage.find((entry) => entry.source === source)?.signals ?? [];
+
+  it("stays silent on a cold start — the first run has no cohort to drop from", async () => {
+    const first = await run([venueSourceOf("suntec", futureCohort(20))], RUN_ONE);
+    expect(signalsFor(first, "suntec")).toEqual([]);
+  });
+
+  it("raises a cohort-drop when the future cohort collapses across runs", async () => {
+    // The quiet redesign ADR-0006 cannot catch: anchor still matches, rows drop,
+    // every survivor parses cleanly. Twenty upcoming events fall to two.
+    await run([venueSourceOf("suntec", futureCohort(20))], RUN_ONE);
+    const second = await run([venueSourceOf("suntec", futureCohort(2))], RUN_TWO);
+
+    expect(signalsFor(second, "suntec")).toEqual([
+      { kind: "cohort-drop", vanished: 18, appeared: 0 },
+    ]);
+  });
+
+  it("does not fire when appearances offset vanishings — the reschedule shape", async () => {
+    // SCC's `sourceKey` makes a reschedule a delete-plus-create: one dated key
+    // out, one dated key in, net zero. Netting silences it by construction.
+    const before = [
+      odyssey({ sourceKey: "SHIP|2026-09-01", departure: instant("2026-09-01T10:00:00Z") }),
+    ];
+    const after = [
+      odyssey({ sourceKey: "SHIP|2026-09-02", departure: instant("2026-09-02T10:00:00Z") }),
+    ];
+
+    await run([portCallSourceOf("scc", before)], RUN_ONE);
+    const second = await run([portCallSourceOf("scc", after)], RUN_TWO);
+
+    expect(signalsFor(second, "scc")).toEqual([]);
+  });
+
+  it("does not treat a source that genuinely publishes nothing as broken", async () => {
+    // Empty both runs: emptiness is not a signal, only a drop from a populated
+    // cohort is (ADR-0006 — "genuinely empty. A fact.").
+    await run([venueSourceOf("suntec", [])], RUN_ONE);
+    const second = await run([venueSourceOf("suntec", [])], RUN_TWO);
+
+    expect(signalsFor(second, "suntec")).toEqual([]);
+  });
+
+  it("raises an unreadable signal for a not-ok parse and skips drift detection", async () => {
+    // A challenge page returns HTTP 200 and reads as a 100% drop; the honest
+    // report is "the page isn't ours", with no mass-cancellation alert stacked on.
+    await run([venueSourceOf("suntec", futureCohort(20))], RUN_ONE);
+    const second = await run(
+      [
+        sourceReturning<VenueEvent>("suntec", {
+          ok: false,
+          reason: "listing anchor absent — likely a challenge page",
+        }),
+      ],
+      RUN_TWO,
+    );
+
+    expect(signalsFor(second, "suntec")).toEqual([
+      { kind: "unreadable", reason: "listing anchor absent — likely a challenge page" },
+    ]);
+  });
+
+  it("raises an unreadable signal when fetch throws post-retry", async () => {
+    const unreachable: Source<VenueEvent> = {
+      key: "suntec",
+      fetch: async () => {
+        throw new Error("connect ETIMEDOUT");
+      },
+      parse: () => ({ ok: true, records: [], failures: [] }),
+    };
+
+    const first = await run([unreachable], RUN_ONE);
+    const [signal] = signalsFor(first, "suntec");
+    expect(signal).toMatchObject({ kind: "unreadable" });
+    expect(signal).toHaveProperty("reason", expect.stringContaining("ETIMEDOUT"));
+  });
+
+  it("raises a rows-failed signal carrying the fragment and what was expected", async () => {
+    // Debuggable without re-scraping: the failing material and the parser's
+    // expectation travel with the signal.
+    const failure = { fragment: "<article data-bad/>", expected: "a start instant" };
+    const first = await run(
+      [
+        sourceReturning<VenueEvent>("suntec", {
+          ok: true,
+          records: [future("event-0")],
+          failures: [failure],
+        }),
+      ],
+      RUN_ONE,
+    );
+
+    expect(signalsFor(first, "suntec")).toEqual([{ kind: "rows-failed", failures: [failure] }]);
+  });
+});

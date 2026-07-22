@@ -36,6 +36,10 @@ permissions:
   # Publish the site.
   pages: write
   id-token: write
+  # Raise and auto-close the operator's breakage issues (ADR-0007, #41). The
+  # pipeline shells out to `gh`, which authenticates with the run-scoped
+  # `GITHUB_TOKEN` — still zero stored credentials.
+  issues: write
 
 jobs:
   run:
@@ -70,9 +74,14 @@ jobs:
 
       # Scrapes every source, folds what it saw into the store, and re-emits the
       # feeds from the store. A source that cannot be read is reported and does
-      # not fail the run — see the note in `src/main.ts`.
+      # not fail the run — see the note in `src/main.ts`. The same process then
+      # raises or clears the operator's breakage issues (ADR-0007, #41) via `gh`,
+      # which reads `GITHUB_TOKEN` from this step's environment — the only place a
+      # credential is named, and it is the run-scoped token, not a stored secret.
       - name: Run the pipeline
         run: npm run pipeline
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Commit the refreshed store and feeds
         run: |

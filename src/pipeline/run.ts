@@ -2,11 +2,12 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { instantFromDate, type Instant } from "../domain/instant.js";
 import { projectPortCall, projectVenueEvent } from "../domain/project.js";
-import type { PortCall, Scraped, SourceId, VenueEvent } from "../domain/types.js";
+import type { DomainRecord, PortCall, Scraped, SourceId, VenueEvent } from "../domain/types.js";
 import { serializeCalendar } from "../feeds/ical.js";
 import { buildSitePayload } from "../site/payload.js";
 import type { BrowserSession, FetchDeps, HttpClient, ParseFailure, Source } from "../sources/types.js";
 import { openStore, type Store } from "../store/store.js";
+import { assess, cohortDelta, type BreakageSignal } from "./breakage.js";
 
 /**
  * One pipeline run: every source is read, what it observed is folded into the
@@ -73,9 +74,22 @@ export type SourceOutcome =
   | { source: SourceId; ok: true; records: number; failures: ParseFailure[] }
   | { source: SourceId; ok: false; reason: string };
 
+/**
+ * The breakage signals raised against one source this run — the alerting layer's
+ * whole input (ADR-0007, #41). Empty means healthy. Returned per source rather
+ * than logged because a break is stateful: the caller reconciles these against
+ * the one open GitHub issue per source, opening it when signals appear and
+ * closing it when they clear.
+ */
+export type SourceBreakage = {
+  source: SourceId;
+  signals: BreakageSignal[];
+};
+
 export type PipelineRun = {
   ranAt: Instant;
   outcomes: SourceOutcome[];
+  breakage: SourceBreakage[];
 };
 
 /**
@@ -107,14 +121,32 @@ export const runPipeline = async ({
   const store = openStore(db);
 
   try {
+    // Snapshot the store **before any upsert**, so breakage detection compares
+    // against the previous run's memory rather than this run's own writes. Taken
+    // once up front because no source's upsert has landed yet — a source only
+    // ever owns rows in one table, so filtering both by `source` recovers exactly
+    // its previous cohort (ADR-0007 §2).
+    const previousVenueEvents = store.readVenueEvents();
+    const previousPortCalls = store.readPortCalls();
+    const previousFor = (key: SourceId): DomainRecord[] =>
+      [...previousVenueEvents, ...previousPortCalls].filter((record) => record.source === key);
+
     const outcomes: SourceOutcome[] = [];
+    const breakage: SourceBreakage[] = [];
 
     for (const source of sources) {
       // Sequential, not concurrent: politeness is the posture the facts-only
       // legal position rests on, and one source failing must not take the run
       // — and with it every other source's `lastSeenAt` — down with it.
-      const outcome = await readSource(source, deps, ranAt, store);
+      const { outcome, signals } = await readSource(
+        source,
+        deps,
+        ranAt,
+        store,
+        previousFor(source.key),
+      );
       outcomes.push(outcome);
+      breakage.push({ source: source.key, signals });
     }
 
     // Two feeds, split by **type** — never a single firehose, never split by
@@ -154,7 +186,7 @@ export const runPipeline = async ({
     mkdirSync(dirname(payloadPath), { recursive: true });
     writeFileSync(payloadPath, `${JSON.stringify(buildSitePayload(venueEvents, portCalls), null, 2)}\n`);
 
-    return { ranAt, outcomes };
+    return { ranAt, outcomes, breakage };
   } finally {
     store.close();
   }
@@ -165,16 +197,21 @@ const readSource = async (
   deps: FetchDeps,
   seenAt: Instant,
   store: Store,
-): Promise<SourceOutcome> => {
+  previous: DomainRecord[],
+): Promise<{ outcome: SourceOutcome; signals: BreakageSignal[] }> => {
   let result;
   try {
     result = source.parse(await source.fetch(deps), deps.now());
   } catch (error) {
-    return {
+    // A `fetch` that threw here is **post-retry** — the core-injected client has
+    // already exhausted its backoff (ADR-0007 §5), so this is a break, not a
+    // flaky moment. Drift detection is skipped: there are no records to compare.
+    const outcome: SourceOutcome = {
       source: source.key,
       ok: false,
       reason: `fetch or parse threw: ${error instanceof Error ? error.message : String(error)}`,
     };
+    return { outcome, signals: assess(outcome, null) };
   }
 
   if (!result.ok) {
@@ -182,8 +219,12 @@ const readSource = async (
     // Singapore Cruise Centre challenge page returns HTTP 200 and is
     // byte-plausible as a quiet week. Writing nothing here is deliberate:
     // nothing is upserted, so no `lastSeenAt` advances and every record this
-    // source owns is left exactly as the last real reading left it.
-    return { source: source.key, ok: false, reason: result.reason };
+    // source owns is left exactly as the last real reading left it. Drift
+    // detection is skipped too (ADR-0007 §4): an absent anchor reads as a 100%
+    // drop, and firing a mass-cancellation alert on top of "the page isn't ours"
+    // would be a second, misleading signal.
+    const outcome: SourceOutcome = { source: source.key, ok: false, reason: result.reason };
+    return { outcome, signals: assess(outcome, null) };
   }
 
   // Failed rows do not block the good ones — but they are reported, never
@@ -197,10 +238,15 @@ const readSource = async (
     }
   });
 
-  return {
+  const outcome: SourceOutcome = {
     source: source.key,
     ok: true,
     records: result.records.length,
     failures: result.failures,
   };
+
+  // The one signal a parser cannot raise: the net change in the future-dated
+  // cohort against the store's memory of the previous run (ADR-0007 §2).
+  const delta = cohortDelta(previous, result.records, deps.now());
+  return { outcome, signals: assess(outcome, delta) };
 };
