@@ -1,4 +1,7 @@
 {
+  "_capturedFrom": "https://mbccs.com.sg/cruise-information?tab=cruise-schedule",
+  "_capturedOn": "2026-07-21",
+  "_handAuthored": "Not bytes the source served: a staged edge state, hand-built from schedule.json (the real capture of the same date) by replacing its harvested records with the absent anchor. Carries the ADR-0005 provenance header even so.",
   "_note": "fetch could not locate the schedule state — the app did not hydrate, a redesign moved it, or the page is not ours. The JSON equivalent of SCC's missing <table>: the anchor is absent, so parse returns ok:false rather than reading it as a quiet week.",
   "schedule": null
 }

@@ -1,4 +1,7 @@
 {
+  "_capturedFrom": "https://mbccs.com.sg/cruise-information?tab=cruise-schedule",
+  "_capturedOn": "2026-07-21",
+  "_handAuthored": "Not bytes the source served: a staged edge state, hand-built from schedule.json (the real capture of the same date) — one good record kept verbatim, two broken ones authored beside it (a berthing-less record and an id-less one). Carries the ADR-0005 provenance header even so.",
   "_note": "One good record beside two broken ones. The anchor is present, so parse must land the good record AND surface the failures — never silently drop a bad one (ADR-0006). The berthing-less record was read far enough to carry its id as the failure's sourceKey; the id-less record carries none rather than a half-made key.",
   "schedule": [
     {
