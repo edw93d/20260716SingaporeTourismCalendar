@@ -60,7 +60,7 @@ jobs:
       # alarm must not fire on one. The watcher sees ~8h after a good run, ~32h
       # after one miss and ~56h after two; 48 separates the last two with margin
       # on both sides.
-      STALE_AFTER_HOURS: 0
+      STALE_AFTER_HOURS: -1
       # Machine identity, in the body rather than the title, so retitling the
       # issue while triaging does not orphan it — the same trick `src/alerts`
       # uses one level down.
@@ -173,9 +173,17 @@ jobs:
             exit 0
           fi
 
+          # **Anchored to the end of the body, not merely contained in it.** The
+          # alarm writes the marker as the last line and nothing else does, so
+          # that is the identity. A plain `contains` also matches any issue that
+          # *talks about* the marker — a ticket about this workflow, a triage
+          # note quoting it — and the first such issue was #64, which this alarm
+          # promptly closed as if it were its own. Discussing the alarm must not
+          # make you the alarm.
           existing=$(printf '%s' "$listed" \
             | jq -r --arg marker "$MARKER" \
-                'map(select((.body // "") | contains($marker))) | .[0].number // empty')
+                'map(select((.body // "") | sub("\\s+$"; "") | endswith($marker)))
+                 | .[0].number // empty')
 
           if [ -n "$reason" ]; then
             if [ -n "$existing" ]; then
