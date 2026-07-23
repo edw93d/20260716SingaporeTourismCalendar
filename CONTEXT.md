@@ -326,6 +326,15 @@ exists to prevent — a calendar that was correct on the day it was compiled and
 silently wrong afterwards. A reader cannot tell a fresh calendar from a frozen one by
 looking at it; both render.
 
+**The measure is the instant the artifact says it was published** (`generatedAt`), which
+advances on every run that publishes — including a run that could read no source at all.
+
+It is emphatically **not** the per-source `lastConfirmed` the page shows beside each
+source. That is a **Source health** signal wearing a Freshness costume: it freezes when a
+*scraper* breaks, so reading it as freshness reports a stale calendar on the day the
+pipeline published perfectly and on time. The two properties are orthogonal, and this is
+the one place in the published artifact where they sit side by side and can be confused.
+
 ## Decisions
 
 See `docs/adr/`.

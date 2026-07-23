@@ -48,7 +48,11 @@ type Workflow = {
   on?: { schedule?: { cron?: string }[]; pull_request?: unknown; push?: { branches?: string[] } };
   concurrency?: { group?: string; "cancel-in-progress"?: boolean };
   permissions?: Record<string, string> | string;
-  jobs?: Record<string, { steps?: Step[] }>;
+  // A job's `env` values are `string | number` because YAML says so: quoting is
+  // optional, so `STALE_AFTER_HOURS: 48` parses as a number while the tokens
+  // beside it parse as strings. Typing it `string` would be a lie the `Number()`
+  // call below quietly covers for.
+  jobs?: Record<string, { steps?: Step[]; env?: Record<string, string | number> }>;
 };
 
 const daily = parse(text(DAILY)) as Workflow;
@@ -165,6 +169,110 @@ describe("the daily workflow", () => {
     const pipeline = steps.findIndex((step) => /npm\s+run\s+pipeline/.test(step.run ?? ""));
     expect(install).toBeGreaterThanOrEqual(0);
     expect(pipeline).toBeGreaterThan(install);
+  });
+});
+
+const FRESHNESS = "freshness.yml";
+
+const freshness = parse(text(FRESHNESS)) as Workflow;
+
+const freshnessJobs = Object.values(freshness.jobs ?? {});
+
+const freshnessSteps = freshnessJobs.flatMap((job) => job.steps ?? []);
+
+/** A cron's fire time as minutes past midnight UTC. */
+const fireMinute = (workflow: Workflow): number => {
+  const [minute, hour] = (workflow.on?.schedule ?? [])[0]!.cron!.split(/\s+/);
+  return Number(hour) * 60 + Number(minute);
+};
+
+describe("the freshness watcher", () => {
+  it("exists and is the workflow the guards below are reading", () => {
+    // Guards the guards: a rename would otherwise make every assertion vacuous.
+    expect(workflowFiles).toContain(FRESHNESS);
+  });
+
+  it("runs once a day, off the top of the hour", () => {
+    // Off the hour for the same reason `daily.yml` is: GitHub drops scheduled
+    // runs under load, and load concentrates on the minute everybody picked.
+    const crons = (freshness.on?.schedule ?? []).map((entry) => entry.cron ?? "");
+    expect(crons).toHaveLength(1);
+
+    const [minute, , dayOfMonth, month, dayOfWeek] = crons[0]!.split(/\s+/);
+    expect({ dayOfMonth, month, dayOfWeek }).toEqual({
+      dayOfMonth: "*",
+      month: "*",
+      dayOfWeek: "*",
+    });
+    expect(Number(minute)).toBeGreaterThan(5);
+    expect(Number(minute)).toBeLessThan(55);
+  });
+
+  it("grants itself the right to write an issue and nothing else", () => {
+    // Asserted exhaustively, like the daily job's: the failure worth catching is
+    // a *second* scope appearing. `contents: write` in particular would make the
+    // watcher a writer of the repository it watches — and a workflow that can
+    // commit is one edit away from being the dummy-commit trick #19 bans. With
+    // no write scope, that is foreclosed structurally rather than by the grep.
+    expect(freshness.permissions).toEqual({ issues: "write" });
+  });
+
+  it("checks out nothing and runs no npm or node step", () => {
+    // **The watcher's defining property is independence** (ADR-0013). It exists
+    // to observe a pipeline that may be broken, so it must not share that
+    // pipeline's failure modes: a checkout lets a broken repository break it, and
+    // `npm ci` lets a broken build, a bad lockfile, or a failed dependency
+    // install silence the one thing that would have reported the silence.
+    //
+    // This is the guard that stops that being undone for convenience. Without
+    // it, a future edit adds a checkout to reuse `src/alerts`, and the alarm
+    // quietly inherits everything it was built to be immune to.
+    expect(freshnessSteps.some((step) => step.uses?.startsWith("actions/checkout"))).toBe(false);
+    expect(freshnessSteps.some((step) => /\b(npm|npx|node)\b/.test(step.run ?? ""))).toBe(false);
+    expect(freshnessSteps.some((step) => step.uses?.startsWith("actions/setup-node"))).toBe(false);
+  });
+
+  it("tolerates exactly one missed daily run, and alarms on the second", () => {
+    // **This holds the reasoning behind the threshold, not the number.**
+    //
+    // `daily.yml`'s cron comment explicitly tolerates a dropped run — "a dropped
+    // run costs a day of freshness and nothing else (the store is upserted, so
+    // the next run heals it)". An alarm that fires on one miss therefore alarms
+    // on something the design already accepted, and gets ignored.
+    //
+    // The watcher fires a fixed offset after the pipeline, so the age it observes
+    // is offset + 24h per missed run. The threshold has to separate one miss from
+    // two — and that is a relationship between *three* values (both crons and the
+    // threshold), which is exactly the kind of thing that silently stops holding
+    // when someone moves one of them. Moving either cron now fails here.
+    const offsetHours = (((fireMinute(freshness) - fireMinute(daily) + 1440) % 1440) / 60);
+
+    // **The offset must clear the pipeline itself**, or every number below is
+    // wrong by a day. The pipeline scrapes three sources — one through a real
+    // Chromium session — commits, and waits on a Pages deploy and its CDN; a
+    // watcher firing minutes after it *starts* reads yesterday's artifact on a
+    // perfectly healthy day, which reads as one missed run. The margin does not
+    // shrink, it silently shifts, and the alarm alarms on nothing.
+    expect(offsetHours).toBeGreaterThanOrEqual(2);
+
+    const afterOneMiss = offsetHours + 24;
+    const afterTwoMisses = offsetHours + 48;
+
+    const threshold = Number(freshnessJobs[0]?.env?.["STALE_AFTER_HOURS"]);
+    expect(Number.isFinite(threshold)).toBe(true);
+
+    expect(threshold).toBeGreaterThan(afterOneMiss);
+    expect(threshold).toBeLessThan(afterTwoMisses);
+  });
+
+  it("reads the published site over HTTPS, not the repository", () => {
+    // Freshness is what *a reader actually reaches* (CONTEXT.md). The commit-back
+    // and the Pages deploy are separate steps that fail separately, so a watcher
+    // reading the committed file would report fresh while every reader saw a
+    // frozen page. Only the published URL observes the thing end to end.
+    const body = text(FRESHNESS);
+    expect(body).toMatch(/https:\/\/[a-z0-9-]+\.github\.io\//i);
+    expect(body).toContain("calendar.json");
   });
 });
 
