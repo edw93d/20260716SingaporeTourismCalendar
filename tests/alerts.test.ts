@@ -221,8 +221,8 @@ describe("the gh-backed gateway", () => {
   it("finds a source's open issue by scanning bodies for its marker", async () => {
     const gh: Gh = vi.fn(async () =>
       JSON.stringify([
-        { number: 1, body: "unrelated issue" },
-        { number: 9, body: `broken\n${markerFor("scc")}` },
+        { number: 1, body: "unrelated issue", author: { is_bot: true } },
+        { number: 9, body: `broken\n${markerFor("scc")}`, author: { is_bot: true } },
       ]),
     );
 
@@ -231,8 +231,41 @@ describe("the gh-backed gateway", () => {
   });
 
   it("returns null when no open issue carries the source's marker", async () => {
-    const gh: Gh = async () => JSON.stringify([{ number: 1, body: markerFor("suntec") }]);
+    const gh: Gh = async () =>
+      JSON.stringify([{ number: 1, body: markerFor("suntec"), author: { is_bot: true } }]);
     expect(await createGhGateway(gh).findOpen("scc")).toBeNull();
+  });
+
+  it("ignores a human-authored issue that merely quotes the marker", async () => {
+    // **Observed one level up, not theorised.** The freshness alarm identifies
+    // its issue the same way, and on its first live run it adopted #64 — the
+    // ticket asking for that run, which quoted the marker in its checklist — and
+    // closed it as a recovered alarm. Here the same shape would suppress a real
+    // health alarm while the source is broken, then close someone's ticket with
+    // a recovery comment. The marker is text; text can be quoted. Authorship
+    // cannot.
+    const gh: Gh = async () =>
+      JSON.stringify([
+        { number: 64, body: `we should test ${markerFor("scc")} somehow`, author: { is_bot: false } },
+      ]);
+    expect(await createGhGateway(gh).findOpen("scc")).toBeNull();
+  });
+
+  it("still recognises its issue after a triager has appended to the body", async () => {
+    // The marker rides in the body rather than the title so that triaging does
+    // not orphan the issue (`src/alerts/issues.ts`). Identifying it by *where*
+    // the marker sits would take that back: one appended note and the alerter
+    // opens a duplicate every run and never closes the original. Editing an
+    // issue does not change its author, so the identity survives.
+    const gh: Gh = async () =>
+      JSON.stringify([
+        {
+          number: 9,
+          body: `broken\n${markerFor("scc")}\n\ntriage: upstream changed their markup`,
+          author: { is_bot: true },
+        },
+      ]);
+    expect(await createGhGateway(gh).findOpen("scc")).toEqual({ number: 9 });
   });
 
   it("creates an issue with the given title and body via gh", async () => {

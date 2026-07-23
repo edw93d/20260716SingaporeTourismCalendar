@@ -44,8 +44,8 @@ opens an issue when readers cannot get a current one.**
 - **It runs at 03:47 UTC**, about eight hours after the pipeline's 19:37.
 - **It is entirely YAML and shell.** No checkout, no `npm`, no project code.
   `permissions: issues: write` and nothing else.
-- **One open alarm at a time**, found by a hidden body marker, auto-closed with a comment
-  when freshness returns.
+- **One open alarm at a time**, found by a hidden body marker on a **bot-authored** issue,
+  auto-closed with a comment when freshness returns.
 
 ### Why `generatedAt` and not something that already exists
 
@@ -116,6 +116,26 @@ foreclosed structurally rather than by the text scan.
   healthy calendar *and* reddened the run; the other opened a duplicate issue. Every `gh`
   read is now retried and every failure has a named branch, because in this workflow an
   unhandled error is not a loud failure — it is silence.
+- **The marker alone was not an identity; authorship is** (#64). The first live dispatch
+  of this workflow closed **#64** — the ticket asking for that dispatch, which quoted the
+  marker in its checklist. The lookup matched the marker anywhere in any open body, the
+  calendar was healthy, so the run took the recovery branch and closed a human's ticket as
+  a recovered alarm. A third defect of the shape the two above share, and the first found
+  in production rather than under a stub, which is the argument for having run the ticket.
+
+  The fix filters on `.author.is_bot` *and* the marker. Anchoring the marker to the end of
+  the body also fixes it, and was tried first, but it takes back the property the marker
+  exists for: the marker sits in the body so triaging cannot orphan the alarm, and
+  requiring it to sit *last* means one appended triage note orphans it permanently — a
+  duplicate every day and an alarm that never auto-closes. Editing an issue does not change
+  its author. `src/alerts/gh.ts` carried the same defect and took the same fix.
+
+  The one thing this trades away: `is_bot` is `gh`'s field and `app/github-actions` is
+  `gh`'s spelling of the login, so the identity now depends on a CLI's JSON shape. If that
+  field ever disappears the alarm stops recognising itself and opens a duplicate daily —
+  loud rather than silent, which is the right direction for this workflow to fail, and
+  `tests/workflow.test.ts` runs the real selector so a local `gh`/`jq` change surfaces
+  there first.
 - **A failed issue listing costs a day, by choice.** If the Issues API cannot be read after
   three attempts the run writes nothing rather than guessing, since guessing "no open
   alarm" opens duplicates and guessing the reverse suppresses real ones. The alarm
