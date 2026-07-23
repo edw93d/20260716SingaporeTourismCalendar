@@ -308,6 +308,24 @@ MBCCS (Marina Bay Cruise Centre) or Singapore Cruise Centre — confirmed by MPA
 the only two cruise terminals, so cruise coverage is complete. SCC relocated from
 HarbourFront on 15 July 2026; this was a relocation, not a closure.
 
+### Freshness
+
+The published calendar is **stale** when what a reader can see is older than the last
+run that should have refreshed it. Freshness is a property of the **published
+artifact** — the feeds and the site a reader actually reaches — and never of a source
+or of a record.
+
+**Freshness is orthogonal to Source health, in both directions.** Every source can be
+unhealthy while the published calendar is perfectly fresh: yesterday's data, published
+today, is a correct answer to a bad scrape. Every source can be healthy while the
+published calendar is days stale, if the step that publishes it fails downstream of
+every signal **Source health** watches.
+
+The second direction is the one worth naming, because it is the failure this project
+exists to prevent — a calendar that was correct on the day it was compiled and is
+silently wrong afterwards. A reader cannot tell a fresh calendar from a frozen one by
+looking at it; both render.
+
 ## Decisions
 
 See `docs/adr/`.
