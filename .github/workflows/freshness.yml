@@ -1,0 +1,227 @@
+# The freshness alarm (#61, ADR-0013). Unattended, like the pipeline it watches
+# — and deliberately **out of band** from it.
+#
+# `daily.yml` publishes; this reads what was published and alarms when a reader
+# cannot get a current calendar. It watches the *symptom*, not any cause: a step
+# inside a job cannot report that job's own failure, so an alarm living in the
+# pipeline is blind to the pipeline failing — and blind entirely to the run that
+# never starts. Only an observer outside sees both.
+#
+# **Independence is the whole property.** It checks nothing out, installs
+# nothing, and runs no project code, so a broken repository, a bad lockfile or a
+# failed build cannot silence the one thing that would have reported the
+# silence. `tests/workflow.test.ts` holds that.
+name: Freshness alarm
+
+on:
+  # 03:47 UTC = 11:47 SGT — about eight hours after the daily pipeline's 19:37,
+  # which leaves room for a slow run and the Pages CDN, and lands mid-morning in
+  # Singapore where an alarm can actually be acted on. Off the top of the hour
+  # for the same reason `daily.yml` is: GitHub drops scheduled runs under load,
+  # and load concentrates on the minute everybody picked.
+  #
+  # **The gap between this and the pipeline's cron is load-bearing** — it sets
+  # the age the watcher observes, and so what STALE_AFTER_HOURS has to be.
+  # `tests/workflow.test.ts` holds the three values in the right relationship.
+  schedule:
+    - cron: "47 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: freshness-alarm
+  cancel-in-progress: false
+
+# **Exactly one scope, and it is not `contents`.** The watcher needs to read a
+# public URL (no permission at all) and write an issue. It has no business
+# writing this repository, and with no write scope it cannot become a
+# dummy-commit trick against the 60-day inactivity disable — banned by #19, and
+# foreclosed here structurally rather than by a text scan.
+permissions:
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    env:
+      # Run-scoped, minted by Actions and expired with the run — the same zero
+      # stored credentials the pipeline has.
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # `gh` normally infers the repository from a checkout's git remote. There
+      # is no checkout here, on purpose, so it is named instead.
+      GH_REPO: ${{ github.repository }}
+      # The reader's own address. Not the committed copy: the commit-back and the
+      # Pages deploy are separate steps in `daily.yml` that fail separately, and
+      # a watcher reading git would report fresh while every reader saw a frozen
+      # page. Freshness is what a reader actually reaches (CONTEXT.md).
+      CALENDAR_URL: https://edw93d.github.io/20260716SingaporeTourismCalendar/calendar.json
+      # **Two days, and the reasoning is in the test, not here.** One missed run
+      # is explicitly tolerated by `daily.yml` ("costs a day of freshness and
+      # nothing else — the store is upserted, so the next run heals it"), so the
+      # alarm must not fire on one. The watcher sees ~8h after a good run, ~32h
+      # after one miss and ~56h after two; 48 separates the last two with margin
+      # on both sides.
+      STALE_AFTER_HOURS: 48
+      # Machine identity, in the body rather than the title, so retitling the
+      # issue while triaging does not orphan it — the same trick `src/alerts`
+      # uses one level down.
+      MARKER: "<!-- freshness-alarm -->"
+    steps:
+      - name: Alarm if the published calendar is stale or unreachable
+        # **No `set -e`.** A `curl` that fails must be a *result this script
+        # handles*, never an unhandled step failure — a red run in the Actions
+        # tab that nobody is watching is precisely the invisible operational
+        # signal #61 exists to replace. Every failure path below ends in an
+        # issue, not an exit code.
+        run: |
+          set -uo pipefail
+
+          # Retried, because a single transient blip at 03:47 UTC would otherwise
+          # open an issue to be closed by hand in the morning — and that is the
+          # fatigue that erodes an alarm until it is ignored. The failure being
+          # caught lasts days; it survives three attempts easily.
+          payload=""
+          for attempt in 1 2 3; do
+            if payload=$(curl -fsSL --max-time 30 "$CALENDAR_URL"); then
+              break
+            fi
+            echo "Attempt $attempt could not read $CALENDAR_URL"
+            payload=""
+            # Not after the last attempt: there is nothing left to wait for, and
+            # the step would sit idle for ten seconds on its way to the alarm.
+            [ "$attempt" -lt 3 ] && sleep 10
+          done
+
+          # `reason` empty means fresh. Every branch that cannot prove freshness
+          # fills it — including the ones where the answer is unknown, because an
+          # alarm that stays quiet when it cannot tell is the failure being fixed.
+          reason=""
+          generated_at=""
+
+          if [ -z "$payload" ]; then
+            # Unreachable is not the quieter case: a reader getting a 404 is
+            # worse off than one getting a two-day-old page.
+            reason="**The published calendar could not be read at all** after three attempts.
+
+          \`$CALENDAR_URL\` did not return a document. Pages may be down, the deploy may have
+          failed, or the site may never have been published."
+          else
+            generated_at=$(printf '%s' "$payload" | jq -r '.generatedAt // empty')
+          fi
+
+          if [ -z "$reason" ] && [ -z "$generated_at" ]; then
+            # **Deliberately alarm-worthy rather than tolerated.** A missing field
+            # long-term means the payload shape regressed and the alarm has been
+            # watching nothing — treating it as "fine, not published yet" would
+            # buy one day of convenience for a permanent blind spot, which is #61's
+            # own bug reintroduced as a grace period.
+            reason="**The published calendar carries no \`generatedAt\`.**
+
+          The alarm reads that field and nothing else, so it cannot tell how old the calendar is.
+          Either the payload shape regressed (\`src/site/payload.ts\`) or the published copy predates
+          the field. See ADR-0013."
+          fi
+
+          if [ -z "$reason" ]; then
+            # **Shape-checked before it is parsed, because `date -d` is lenient.**
+            # It accepts `now`, `yesterday`, a bare year, a bare time — all of
+            # which resolve to a plausible recent instant and would be scored
+            # *fresh*. A regressed field carrying garbage would then read as a
+            # healthy calendar forever, which is the same permanent blind spot the
+            # missing-field branch above refuses to accept.
+            published=""
+            if printf '%s' "$generated_at" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'; then
+              published=$(date -u -d "$generated_at" +%s 2>/dev/null)
+            fi
+            if [ -z "$published" ]; then
+              reason="**The published calendar's \`generatedAt\` could not be parsed.**
+
+          The field held \`$generated_at\`, which is not an instant this alarm can read."
+            else
+              age_hours=$(( ( $(date -u +%s) - published ) / 3600 ))
+              echo "Published $generated_at — ${age_hours}h ago (threshold ${STALE_AFTER_HOURS}h)."
+              if [ "$age_hours" -gt "$STALE_AFTER_HOURS" ]; then
+                reason="**The published calendar is ${age_hours} hours old**, past the ${STALE_AFTER_HOURS}-hour threshold.
+
+          It was last published at \`$generated_at\`. That is more than one missed run, which the daily
+          pipeline tolerates by design — so something is failing rather than being skipped."
+              fi
+            fi
+          fi
+
+          # One open alarm at a time, found by the marker rather than a label:
+          # a label has to exist before an issue can carry one, and
+          # `gh issue create` errors on a label that does not yet exist.
+          #
+          # **A failed listing is not "no open alarm."** Conflating the two is how
+          # a transient Issues-API blip opens a second issue for a fault already
+          # being tracked. The read is retried like the fetch, and if it still
+          # cannot be made, this run writes nothing at all and says so — a day of
+          # latency on an alarm that re-checks daily, rather than a duplicate or a
+          # false recovery.
+          listed=""
+          for attempt in 1 2 3; do
+            if listed=$(gh issue list --state open --limit 200 --json number,body); then
+              break
+            fi
+            echo "Attempt $attempt could not list issues"
+            listed=""
+            [ "$attempt" -lt 3 ] && sleep 10
+          done
+
+          if [ -z "$listed" ]; then
+            echo "Could not read the open issues; taking no action this run."
+            exit 0
+          fi
+
+          existing=$(printf '%s' "$listed" \
+            | jq -r --arg marker "$MARKER" \
+                'map(select((.body // "") | contains($marker))) | .[0].number // empty')
+
+          if [ -n "$reason" ]; then
+            if [ -n "$existing" ]; then
+              echo "Already alarming on #$existing; not opening a second issue."
+              exit 0
+            fi
+            gh issue create \
+              --title "The published calendar is stale" \
+              --body "$reason
+
+          Readers see a page that renders perfectly and is out of date — a reader cannot tell a fresh
+          calendar from a frozen one by looking at it. This alarm watches the published artifact from
+          outside the pipeline, so it fires whatever the cause: a failed scrape-to-publish run, a failed
+          deploy, a run that never started, or branch protection quietly changing under the daily
+          commit (ADR-0012).
+
+          Where to look: the [daily pipeline runs](../../actions/workflows/daily.yml).
+
+          **Auto-closes** on the next check that finds the calendar fresh again.
+
+          $MARKER"
+          elif [ -n "$existing" ]; then
+            # The closing comment is the outage's only written record of how long
+            # it lasted — nothing else in the repository captures that number.
+            #
+            # **The duration is decoration; the close is the point.** Computed
+            # defensively for exactly that reason: if `gh issue view` blips or the
+            # timestamp will not parse, the unguarded arithmetic leaves
+            # `outage_hours` unset, `set -u` kills the shell *before* the close
+            # runs, and the alarm stays open forever on a healthy calendar while
+            # the run goes red — an invisible operational signal, which is the
+            # failure this whole workflow exists to replace. Losing a number from
+            # a comment is not worth any part of that.
+            duration="for an unknown period (the opening timestamp could not be read)"
+            opened_at=$(gh issue view "$existing" --json createdAt --jq .createdAt 2>/dev/null || true)
+            if printf '%s' "$opened_at" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}T'; then
+              opened_epoch=$(date -u -d "$opened_at" +%s 2>/dev/null || true)
+              if [ -n "$opened_epoch" ]; then
+                duration="for $(( ( $(date -u +%s) - opened_epoch ) / 3600 )) hours"
+              fi
+            fi
+
+            gh issue close "$existing" --comment "The published calendar is current again \
+          (last published \`$generated_at\`) — auto-closing (ADR-0013).
+
+          The alarm was open $duration. Reopens if freshness lapses again."
+          else
+            echo "Fresh, and no open alarm. Nothing to do."
+          fi

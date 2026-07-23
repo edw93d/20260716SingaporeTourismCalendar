@@ -58,6 +58,23 @@ export type SourceFreshness = {
 };
 
 export type SitePayload = {
+  /**
+   * When this artifact was published — the run instant (#61, ADR-0013). The
+   * freshness alarm reads this field and nothing else.
+   *
+   * **Deliberately not derived from any source.** `sources[].lastConfirmed`
+   * below looks like it would serve, and does not: it freezes when a *scraper*
+   * breaks, so an alarm reading it would fire on a calendar that published
+   * perfectly on time. Freshness is a property of the published artifact and is
+   * orthogonal to Source health in both directions (CONTEXT.md § Freshness);
+   * this field is the only one in the payload that respects that, because it is
+   * present and current on a run that confirmed no source at all.
+   *
+   * It also makes `calendar.json` differ on every run, as `DTSTAMP` already
+   * makes the feeds differ (ADR-0011) — bounded churn, beside a store blob that
+   * changes every run anyway.
+   */
+  generatedAt: Instant;
   venueEvents: SiteEntry[];
   portCalls: SiteEntry[];
   sources: SourceFreshness[];
@@ -95,7 +112,9 @@ const freshnessOf = (
 export const buildSitePayload = (
   venueEvents: VenueEvent[],
   portCalls: PortCall[],
+  generatedAt: Instant,
 ): SitePayload => ({
+  generatedAt,
   venueEvents: venueEvents.map(projectVenueEvent).map(toSiteEntry),
   portCalls: portCalls.map(projectPortCall).map(toSiteEntry),
   sources: freshnessOf(venueEvents, portCalls),

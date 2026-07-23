@@ -184,7 +184,10 @@ export const runPipeline = async ({
     // client-side; that instant advances every healthy run, so the entries stay
     // byte-stable when nothing changed but the freshness line does not, by design.
     mkdirSync(dirname(payloadPath), { recursive: true });
-    writeFileSync(payloadPath, `${JSON.stringify(buildSitePayload(venueEvents, portCalls), null, 2)}\n`);
+    writeFileSync(
+      payloadPath,
+      `${JSON.stringify(buildSitePayload(venueEvents, portCalls, ranAt), null, 2)}\n`,
+    );
 
     return { ranAt, outcomes, breakage };
   } finally {
