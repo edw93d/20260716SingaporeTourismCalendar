@@ -232,6 +232,23 @@ describe("the freshness watcher", () => {
     expect(freshnessSteps.some((step) => step.uses?.startsWith("actions/setup-node"))).toBe(false);
   });
 
+  it("recognises its own alarm by a marker that ends the body, not one anywhere in it", () => {
+    // **Observed, not theorised: the first live dispatch of this workflow closed
+    // #64** — the ticket asking for that dispatch, which quotes the marker in its
+    // checklist. `contains` cannot tell a machine identity from a discussion of
+    // one, so writing about the alarm made you the alarm, and the alarm closed
+    // you as recovered.
+    //
+    // The marker is written as the body's last line, so the end is the identity.
+    // This is a text scan rather than a behavioural test on purpose: ADR-0013
+    // accepts that this policy has no unit tests, because a watcher that shares
+    // the build's toolchain shares its failure modes. A grep costs none of that
+    // independence, and locks the one shape the live run proved was wrong.
+    const script = freshnessSteps.map((step) => step.run ?? "").join("\n");
+    expect(script).toMatch(/endswith\(\$marker\)/);
+    expect(script).not.toMatch(/contains\(\$marker\)/);
+  });
+
   it("tolerates exactly one missed daily run, and alarms on the second", () => {
     // **This holds the reasoning behind the threshold, not the number.**
     //
