@@ -1427,12 +1427,228 @@
   ],
   "portCalls": [
     {
+      "uid": "2cd1b428-d58b-47f0-b863-71c39fee5e56@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-07-01T21:30:00Z",
+      "end": "2026-07-02T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "3f74ba1c-e4a2-4547-bfa4-911b105127cc@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-07-03T06:00:00Z",
+      "end": "2026-07-03T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "4da606e4-d688-4049-a703-57a51c6febdd@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-07-05T06:00:00Z",
+      "end": "2026-07-05T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "75252f21-a32d-437f-82be-0f05c96f9f07@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-07-05T21:30:00Z",
+      "end": "2026-07-06T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "39bab46f-97d2-4fa5-9213-911143e79d0b@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-07-06T23:00:00Z",
+      "end": "2026-07-07T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "437455d6-71c4-4c9f-a332-229021cb1798@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-07-08T21:30:00Z",
+      "end": "2026-07-09T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "56457637-4567-40dc-aa2a-44210dfcad72@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-07-10T06:00:00Z",
+      "end": "2026-07-10T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "7d5c4a42-ed57-421a-8414-5f2d38c984ed@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-07-12T06:00:00Z",
+      "end": "2026-07-12T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "e9e5968b-5235-4c13-9186-bed7fdedc4f3@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-07-12T21:30:00Z",
+      "end": "2026-07-13T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "68ab8e08-5f48-4412-aabf-3bb2530ccf56@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-07-13T23:00:00Z",
+      "end": "2026-07-14T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "1d377087-56fb-4651-b94f-04d37b9d3015@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-07-15T21:30:00Z",
+      "end": "2026-07-16T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "14055eb3-a6d7-4b3d-90ce-3379025fe8ec@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-07-17T06:00:00Z",
+      "end": "2026-07-17T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "59446001-4ca8-470c-ac19-7671e6383455@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-07-19T06:00:00Z",
+      "end": "2026-07-19T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "283981dd-dbed-4bce-bca9-d2a1e0ecc800@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-07-19T21:30:00Z",
+      "end": "2026-07-20T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "521ead52-d07d-4f26-8aa9-7abef937d198@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-07-20T23:00:00Z",
+      "end": "2026-07-21T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "bf302c5d-1aca-4185-acb3-53a4e97043b7@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-07-22T21:30:00Z",
+      "end": "2026-07-23T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "ebe91bf2-0d32-4d6d-80d5-ddf5ace8cdc7@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-07-24T06:00:00Z",
+      "end": "2026-07-24T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "43137dd7-f15d-413f-a14e-c8f8d737eb8d@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-07-26T06:00:00Z",
+      "end": "2026-07-26T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "7d5b4150-3698-484d-9ba6-7e961b6a4cb0@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-07-26T21:30:00Z",
+      "end": "2026-07-27T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "cb4551be-e5ed-4a4e-b331-0964adc7c413@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-07-27T23:00:00Z",
+      "end": "2026-07-28T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "0fdae182-0a67-4132-a414-7b265b3d26f3@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-07-29T21:30:00Z",
+      "end": "2026-07-30T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
       "uid": "befcd305-1504-4a6e-acee-f8eceb8570ef@sg-tourism-calendar",
       "summary": "Cruise: ODYSSEY VILLA VIE RESIDENCES at Singapore Cruise Centre",
       "start": "2026-07-30T00:00:00Z",
       "end": "2026-08-01T11:00:00Z",
       "location": "Singapore Cruise Centre",
       "source": "scc"
+    },
+    {
+      "uid": "02a1171f-62c5-493a-b1be-0d84a2c94575@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-07-31T01:00:00Z",
+      "end": "2026-07-31T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "7875bfc9-ffad-4841-bc9a-41b6f5c478eb@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-08-02T06:00:00Z",
+      "end": "2026-08-02T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "4462d253-7a62-4b88-9174-dcc1017af132@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-08-02T21:30:00Z",
+      "end": "2026-08-03T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "d55ddf82-a8aa-440e-aad4-2b5ac9792b50@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-08-03T23:00:00Z",
+      "end": "2026-08-04T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "c1086db3-e63c-4ab9-b832-8a2f5e21cccf@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-08-05T21:30:00Z",
+      "end": "2026-08-06T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "6b4ebbf8-92c5-4815-b801-a7dabfd97dc9@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-08-07T06:00:00Z",
+      "end": "2026-08-07T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
     },
     {
       "uid": "ee330a81-caba-48c1-bedc-87af7fbddc3e@sg-tourism-calendar",
@@ -1443,12 +1659,76 @@
       "source": "scc"
     },
     {
+      "uid": "0f8a7bcc-e615-4ce2-a363-6013b22f92a4@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-08-09T21:30:00Z",
+      "end": "2026-08-10T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "1f6666b3-2c27-4ce4-99a6-b2e90a0f5303@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-08-10T06:00:00Z",
+      "end": "2026-08-10T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
       "uid": "ee7977bf-83e9-4a15-8cd3-b76828e4bd9f@sg-tourism-calendar",
       "summary": "Cruise: AEGEAN PARADISE NEW CENTURY TOURS at Singapore Cruise Centre",
       "start": "2026-08-11T23:30:00Z",
       "end": "2026-08-12T04:00:00Z",
       "location": "Singapore Cruise Centre",
       "source": "scc"
+    },
+    {
+      "uid": "813e5e77-10fa-43fa-b457-256d2fd99872@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-08-12T21:30:00Z",
+      "end": "2026-08-13T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "63813274-c2b9-4351-b380-4fb2b67d7750@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-08-14T06:00:00Z",
+      "end": "2026-08-14T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "29c42d60-ac19-4677-847d-7604a0d2c169@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-08-16T06:00:00Z",
+      "end": "2026-08-16T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "96c20505-4567-4782-9efb-d8851c67ab62@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-08-16T21:30:00Z",
+      "end": "2026-08-17T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "8663999e-887d-43bf-b6d0-1b7667efc894@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-08-17T23:00:00Z",
+      "end": "2026-08-18T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "f8e96156-043f-45fb-b512-785eb8b2f0fa@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-08-19T21:30:00Z",
+      "end": "2026-08-20T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
     },
     {
       "uid": "fa4f5a1f-4915-4e9c-86a5-ac80cb524d7b@sg-tourism-calendar",
@@ -1459,12 +1739,108 @@
       "source": "scc"
     },
     {
+      "uid": "2a2dcf04-2b83-4e97-9b90-ee7dc0f267d5@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-08-21T06:00:00Z",
+      "end": "2026-08-21T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "5a869ff3-9057-45f7-a37e-9fd90482055b@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-08-23T06:00:00Z",
+      "end": "2026-08-23T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "7d548e52-db49-4349-b3a7-f00d9e2c76b2@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-08-23T21:30:00Z",
+      "end": "2026-08-24T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "462cdaf0-6556-421e-af44-994821cc4fda@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-08-24T23:00:00Z",
+      "end": "2026-08-25T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "f1ab7e2b-50b2-4656-b3f3-5a6ffb320efe@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-08-26T21:30:00Z",
+      "end": "2026-08-27T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "3b83366c-1ab4-46af-98d0-8a7fc8cf65a3@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-08-28T06:00:00Z",
+      "end": "2026-08-28T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
       "uid": "4147249f-77db-4ebd-a353-d93aa3702d76@sg-tourism-calendar",
       "summary": "Cruise: PACIFIC WORLD JAPAN GRACE CO.,LTD. at Singapore Cruise Centre",
       "start": "2026-08-29T11:00:00Z",
       "end": "2026-08-30T10:00:00Z",
       "location": "Singapore Cruise Centre",
       "source": "scc"
+    },
+    {
+      "uid": "6cd74169-f0f1-4c20-a241-0e605c8404b1@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-08-30T06:00:00Z",
+      "end": "2026-08-30T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "24d3c140-7a32-4525-962f-7bb6a1260ec5@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-08-30T21:30:00Z",
+      "end": "2026-08-31T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "fdae1135-7f77-401e-b921-6c07f668499a@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-08-31T23:00:00Z",
+      "end": "2026-09-01T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "390974d4-2aca-4f42-bb96-7076226cfd2a@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-09-02T21:30:00Z",
+      "end": "2026-09-03T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "6e8add63-c86d-4638-b28d-44b2a1b55747@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-09-04T06:00:00Z",
+      "end": "2026-09-04T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "2777e490-8b5b-4411-9e5d-5621ae50f2c8@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-09-06T03:30:00Z",
+      "end": "2026-09-06T07:30:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
     },
     {
       "uid": "674e6e71-c11c-4200-bfa8-65d5e634ea79@sg-tourism-calendar",
@@ -1475,12 +1851,28 @@
       "source": "scc"
     },
     {
+      "uid": "fe90a193-f14b-4a6f-bff0-246e10509c40@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-09-06T21:30:00Z",
+      "end": "2026-09-07T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
       "uid": "0d88b575-7ed3-4ecd-adc0-61fc2ba1f2a7@sg-tourism-calendar",
       "summary": "Cruise: STAR VOYAGER STAR CRUISES at Singapore Cruise Centre",
       "start": "2026-09-07T23:00:00Z",
       "end": "2026-09-08T04:00:00Z",
       "location": "Singapore Cruise Centre",
       "source": "scc"
+    },
+    {
+      "uid": "ea18ba08-87dd-4da4-82e5-51f4115d6136@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-09-09T21:30:00Z",
+      "end": "2026-09-10T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
     },
     {
       "uid": "542d637e-f558-4a95-a71f-371463698da4@sg-tourism-calendar",
@@ -1499,12 +1891,28 @@
       "source": "scc"
     },
     {
+      "uid": "a9b93c13-c0aa-4c44-a79a-11dc6c0c5e3c@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-09-13T21:30:00Z",
+      "end": "2026-09-14T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
       "uid": "e24e2f0d-b454-44f2-a1e8-2851c95d6fb1@sg-tourism-calendar",
       "summary": "Cruise: STAR VOYAGER STAR CRUISES at Singapore Cruise Centre",
       "start": "2026-09-14T23:00:00Z",
       "end": "2026-09-15T04:00:00Z",
       "location": "Singapore Cruise Centre",
       "source": "scc"
+    },
+    {
+      "uid": "95a382fe-10c8-413d-9469-1d90c5a3b4f6@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-09-16T21:30:00Z",
+      "end": "2026-09-17T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
     },
     {
       "uid": "e6a09336-444e-4e37-9540-c0cd428e2e53@sg-tourism-calendar",
@@ -1531,6 +1939,14 @@
       "source": "scc"
     },
     {
+      "uid": "1a05b25d-6eb7-4ebd-acf3-13aa42f27cfd@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-09-20T21:30:00Z",
+      "end": "2026-09-21T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
       "uid": "1bcb0aac-ecdc-41b0-b58a-54576d0d3c7c@sg-tourism-calendar",
       "summary": "Cruise: HERITAGE ADVENTURER CMI LEISURE at Singapore Cruise Centre",
       "start": "2026-09-21T05:00:00Z",
@@ -1547,6 +1963,14 @@
       "source": "scc"
     },
     {
+      "uid": "f49032b2-48e3-4b97-8543-0c616d0248e0@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-09-23T21:30:00Z",
+      "end": "2026-09-24T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
       "uid": "4a9e5c86-e9f3-4b7d-9221-c84e55824d91@sg-tourism-calendar",
       "summary": "Cruise: STAR VOYAGER STAR CRUISES at Singapore Cruise Centre",
       "start": "2026-09-25T06:00:00Z",
@@ -1555,22 +1979,274 @@
       "source": "scc"
     },
     {
+      "uid": "98dd86b8-1a3b-4e5f-86a0-48001a211ad8@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-09-25T06:00:00Z",
+      "end": "2026-09-25T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "78ebdcbd-eb57-4b41-8a84-08fea92563df@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-09-27T06:00:00Z",
+      "end": "2026-09-27T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "43bda9d6-6e57-4c1f-b7b1-aaefec184096@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-09-27T21:30:00Z",
+      "end": "2026-09-28T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
       "uid": "51b9c643-7554-46d1-8eea-6f687c3529e7@sg-tourism-calendar",
       "summary": "Cruise: HERITAGE ADVENTURER CMI LEISURE at Singapore Cruise Centre",
       "start": "2026-09-28T00:00:00Z",
       "end": "2026-09-29T08:00:00Z",
       "location": "Singapore Cruise Centre",
       "source": "scc"
+    },
+    {
+      "uid": "58c9c0fc-1982-47e7-a316-c3ec11850c3d@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-09-28T23:00:00Z",
+      "end": "2026-09-29T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "c2ab928b-9cea-4aa1-93c5-400bb65ea137@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-09-30T21:30:00Z",
+      "end": "2026-10-01T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "506cb9e2-8847-4885-a5f1-5755a48cd49d@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-10-02T06:00:00Z",
+      "end": "2026-10-02T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "e460cd82-969f-4c26-b43c-8805eaed3716@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-10-04T06:00:00Z",
+      "end": "2026-10-04T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "883c23ca-361f-4769-9ace-a4bf58cb0cef@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-10-04T21:30:00Z",
+      "end": "2026-10-05T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "0c1b1838-e338-4f3f-92c7-53b78fb2f961@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-10-05T23:00:00Z",
+      "end": "2026-10-06T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "bf010db4-b4a6-47e9-b1f1-aa18d9a9fa4c@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-10-07T21:30:00Z",
+      "end": "2026-10-08T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "999c12ab-7f25-49fd-96af-2feb437f7dff@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-10-09T06:00:00Z",
+      "end": "2026-10-09T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "87ceb089-5b99-4add-b741-8fc5248e9f13@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-10-11T06:00:00Z",
+      "end": "2026-10-11T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "3141e28c-4ce9-4dd1-a11e-8c2bee22dd3b@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-10-11T21:30:00Z",
+      "end": "2026-10-12T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "d3cd5a05-e346-4777-84f2-8e843a3dad26@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-10-12T23:00:00Z",
+      "end": "2026-10-13T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "a4bb6ea8-39f1-4c8e-a69f-e5ef0c4b4f9d@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-10-14T21:30:00Z",
+      "end": "2026-10-15T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "75996ad7-1544-4f75-a292-1200e28b6c17@sg-tourism-calendar",
+      "summary": "Cruise: Royal Princess at MBCCS",
+      "start": "2026-10-15T21:00:00Z",
+      "end": "2026-10-16T08:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "d0a0f251-1ee0-4742-9f3d-7eac1a132d68@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-10-16T06:00:00Z",
+      "end": "2026-10-16T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "c6626d16-f6ef-4c8b-9b60-fff16bb02805@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-10-18T06:00:00Z",
+      "end": "2026-10-18T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "46ab640c-c882-4e50-ad15-d1138ce294df@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-10-18T21:30:00Z",
+      "end": "2026-10-19T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "6869cd0c-413d-4777-a1ea-4ca6f73d3fd5@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-10-19T23:00:00Z",
+      "end": "2026-10-20T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "b40be196-7687-45e2-91b2-651060588761@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-10-21T21:30:00Z",
+      "end": "2026-10-22T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "5f75ab68-9036-49d2-858c-5c4205f9b477@sg-tourism-calendar",
+      "summary": "Cruise: Carnival Luminosa at MBCCS",
+      "start": "2026-10-22T23:00:00Z",
+      "end": "2026-10-23T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "9d8f4169-e252-4a17-af80-d8302417c68e@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-10-23T06:00:00Z",
+      "end": "2026-10-23T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "25d591f5-2e56-4fd8-8313-5b9912338840@sg-tourism-calendar",
+      "summary": "Cruise: Dream at MBCCS",
+      "start": "2026-10-25T03:00:00Z",
+      "end": "2026-10-25T13:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "2ceb8350-1e21-41ef-b17f-be330ad907c0@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-10-25T06:00:00Z",
+      "end": "2026-10-25T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "7a635d53-651b-4955-9057-7d745df4ea82@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-10-25T21:30:00Z",
+      "end": "2026-10-26T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "dbf50190-eee2-42aa-b483-fcea79ee8316@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-10-26T23:00:00Z",
+      "end": "2026-10-27T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "f8f76bcb-7f4e-4d25-912d-8e81c633c4cf@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-10-28T21:30:00Z",
+      "end": "2026-10-29T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "66f2a02c-d943-45e5-86ac-8aa49392c97a@sg-tourism-calendar",
+      "summary": "Cruise: Navigator of the Seas at MBCCS",
+      "start": "2026-10-28T23:00:00Z",
+      "end": "2026-10-29T08:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "4aa8684f-79d5-4e01-8693-5acdef17e63b@sg-tourism-calendar",
+      "summary": "Cruise: Royal Princess at MBCCS",
+      "start": "2026-10-29T14:00:00Z",
+      "end": "2026-10-30T08:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "b9c71fe0-edb6-41ce-ab3f-1a2214d41a88@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-10-30T06:00:00Z",
+      "end": "2026-10-30T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
     }
   ],
   "sources": [
     {
+      "source": "mbccs",
+      "lastConfirmed": "2026-07-23T02:05:17Z"
+    },
+    {
       "source": "scc",
-      "lastConfirmed": "2026-07-20T20:51:02Z"
+      "lastConfirmed": "2026-07-23T02:05:17Z"
     },
     {
       "source": "suntec",
-      "lastConfirmed": "2026-07-20T20:51:02Z"
+      "lastConfirmed": "2026-07-23T02:05:17Z"
     }
   ]
 }
