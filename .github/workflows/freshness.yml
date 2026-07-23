@@ -60,7 +60,7 @@ jobs:
       # alarm must not fire on one. The watcher sees ~8h after a good run, ~32h
       # after one miss and ~56h after two; 48 separates the last two with margin
       # on both sides.
-      STALE_AFTER_HOURS: 48
+      STALE_AFTER_HOURS: -1
       # Machine identity, in the body rather than the title, so retitling the
       # issue while triaging does not orphan it — the same trick `src/alerts`
       # uses one level down.
