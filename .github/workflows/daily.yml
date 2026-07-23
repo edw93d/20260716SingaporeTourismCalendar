@@ -103,6 +103,17 @@ jobs:
 
           git commit -m "Daily run: refresh the store and the feeds"
 
+          # **This push works only because `main` has no required status check;
+          # see ADR-0012.** The commit is pushed directly to a protected branch
+          # by `github-actions[bot]`, carrying no status of its own — so a
+          # required check declines it outright, whatever it is, and the retry
+          # below cannot recover (a missing status is not a stale ref). That is
+          # not a hypothetical: #45 made `check` required and this step failed
+          # for three days until #60 removed the requirement. Branch protection
+          # is out-of-band state no test here can hold, which is why the reason
+          # this line is allowed to succeed is written down rather than left to
+          # be rediscovered from the failure.
+          #
           # One retry, and only one. The concurrency group above means this
           # workflow is the sole writer of these paths, so a rejected push can
           # only mean a human commit landed during the run — which our commit
