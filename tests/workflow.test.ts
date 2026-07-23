@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -232,21 +233,86 @@ describe("the freshness watcher", () => {
     expect(freshnessSteps.some((step) => step.uses?.startsWith("actions/setup-node"))).toBe(false);
   });
 
-  it("recognises its own alarm by a marker that ends the body, not one anywhere in it", () => {
+  describe("recognising its own open alarm", () => {
     // **Observed, not theorised: the first live dispatch of this workflow closed
-    // #64** — the ticket asking for that dispatch, which quotes the marker in its
-    // checklist. `contains` cannot tell a machine identity from a discussion of
-    // one, so writing about the alarm made you the alarm, and the alarm closed
+    // #64** — the ticket asking for that dispatch, which quotes the marker in
+    // its checklist. The lookup matched the marker anywhere in any open body, so
+    // writing about the alarm made you the alarm, and a healthy calendar closed
     // you as recovered.
     //
-    // The marker is written as the body's last line, so the end is the identity.
-    // This is a text scan rather than a behavioural test on purpose: ADR-0013
-    // accepts that this policy has no unit tests, because a watcher that shares
-    // the build's toolchain shares its failure modes. A grep costs none of that
-    // independence, and locks the one shape the live run proved was wrong.
+    // **This runs the real jq program rather than grepping for its spelling.**
+    // A text scan for `endswith(` would pass on a rewrite that keeps the word
+    // and breaks the behaviour, and fail on a correct rewrite that spells it
+    // another way — it locks a string, not a property. The program is lifted out
+    // of the YAML and executed against bodies of each shape that matters.
+    //
+    // ADR-0013 accepts that this policy has no unit tests, because a watcher
+    // sharing the build's toolchain shares its failure modes. That is untouched:
+    // this shells out to `jq`, which the runner has and the pipeline does not
+    // supply, and it runs in the test suite rather than inside the watcher.
     const script = freshnessSteps.map((step) => step.run ?? "").join("\n");
-    expect(script).toMatch(/endswith\(\$marker\)/);
-    expect(script).not.toMatch(/contains\(\$marker\)/);
+
+    const program = script.match(/jq -r --arg marker "\$MARKER" \\\n\s*'([^']*)'/)?.[1];
+
+    const MARKER = String(freshnessJobs[0]?.env?.["MARKER"]);
+
+    /** The workflow's own selector, run over a `gh issue list --json` payload. */
+    const select = (issues: unknown[]): string =>
+      execFileSync("jq", ["-r", "--arg", "marker", MARKER, program!], {
+        input: JSON.stringify(issues),
+        encoding: "utf8",
+      }).trim();
+
+    const bot = (number: number, body: string) => ({ number, body, author: { is_bot: true } });
+    const human = (number: number, body: string) => ({ number, body, author: { is_bot: false } });
+
+    it("lifts the selector out of the workflow", () => {
+      // Guards the guard: a reformat that this regex stops matching would make
+      // every assertion below silently vacuous.
+      expect(program).toBeTruthy();
+      expect(MARKER).toMatch(/^<!--.*-->$/);
+    });
+
+    it("asks for the author field it filters on", () => {
+      // The filter is only as good as the listing: `gh` omits `author` unless it
+      // is requested, and every issue would then read as not-a-bot — no alarm
+      // ever recognised, a duplicate opened every single day.
+      expect(script).toMatch(/gh issue list [^\n]*--json number,body,author/);
+    });
+
+    it("adopts its own open alarm", () => {
+      expect(select([bot(65, `stale\n\n${MARKER}\n`)])).toBe("65");
+    });
+
+    it("ignores a human issue that merely quotes the marker", () => {
+      // #64's exact shape, and the reason this ticket exists.
+      expect(select([human(64, `verify the body ends with \`${MARKER}\``)])).toBe("");
+    });
+
+    it("ignores a human issue that ends with the marker", () => {
+      // Anchoring the marker to the end of the body would also have fixed #64,
+      // but only for markers quoted mid-body. Authorship does not care where.
+      expect(select([human(64, `see ${MARKER}`)])).toBe("");
+    });
+
+    it("still recognises its alarm after a triager appends to the body", () => {
+      // **The property the marker exists for** (see its `env:` comment): it sits
+      // in the body so retitling cannot orphan it. Identifying the alarm by
+      // *where* the marker sits would give that back — one appended triage note
+      // and the alarm opens a duplicate daily and never auto-closes. Editing an
+      // issue does not change its author.
+      expect(select([bot(65, `stale\n\n${MARKER}\n\ntriage: pages deploy, see #70`)])).toBe("65");
+    });
+
+    it("picks the lowest number when duplicates somehow exist", () => {
+      // Which one is adopted must not depend on the order the API listed them,
+      // or a recovery run closes an arbitrary one of the pair.
+      expect(select([bot(88, MARKER), bot(65, MARKER)])).toBe("65");
+    });
+
+    it("survives a null body and a missing author", () => {
+      expect(select([{ number: 9, body: null, author: null }, { number: 10 }])).toBe("");
+    });
   });
 
   it("tolerates exactly one missed daily run, and alarms on the second", () => {

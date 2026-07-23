@@ -160,7 +160,7 @@ jobs:
           # false recovery.
           listed=""
           for attempt in 1 2 3; do
-            if listed=$(gh issue list --state open --limit 200 --json number,body); then
+            if listed=$(gh issue list --state open --limit 200 --json number,body,author); then
               break
             fi
             echo "Attempt $attempt could not list issues"
@@ -173,17 +173,30 @@ jobs:
             exit 0
           fi
 
-          # **Anchored to the end of the body, not merely contained in it.** The
-          # alarm writes the marker as the last line and nothing else does, so
-          # that is the identity. A plain `contains` also matches any issue that
-          # *talks about* the marker — a ticket about this workflow, a triage
-          # note quoting it — and the first such issue was #64, which this alarm
-          # promptly closed as if it were its own. Discussing the alarm must not
-          # make you the alarm.
+          # **The identity is who wrote it, and only then what it says.** The
+          # marker alone is text, and text can be quoted: #64 — the ticket asking
+          # for this workflow's first live dispatch — quoted the marker in its
+          # checklist, and the first run promptly closed it as a recovered alarm.
+          # Discussing the alarm must not make you the alarm.
+          #
+          # **Authorship rather than an anchored marker, because authorship
+          # survives triage.** Requiring the marker to *end* the body also fixes
+          # #64, but it breaks the property the marker exists for: it lives in the
+          # body so that triaging does not orphan it, and appending one note to
+          # the body would then orphan it permanently — a duplicate every day and
+          # an alarm that never auto-closes. Editing an issue does not change its
+          # author, so this survives any amount of triage.
+          #
+          # `is_bot` rather than a login string: `app/github-actions` is `gh`'s
+          # spelling of it today, and the flag is the stabler of the two. Another
+          # bot writing this exact marker is not a thing that happens.
+          #
+          # `min_by` rather than `.[0]`: if a duplicate ever does exist, which one
+          # is adopted should not depend on the order the API happened to list.
           existing=$(printf '%s' "$listed" \
             | jq -r --arg marker "$MARKER" \
-                'map(select((.body // "") | sub("\\s+$"; "") | endswith($marker)))
-                 | .[0].number // empty')
+                'map(select(.author.is_bot == true and ((.body // "") | contains($marker))))
+                 | if length == 0 then empty else min_by(.number).number end')
 
           if [ -n "$reason" ]; then
             if [ -n "$existing" ]; then

@@ -34,7 +34,13 @@ export const runGh: Gh = async (args) => {
   return stdout;
 };
 
-type ListedIssue = { number: number; body: string | null };
+type ListedIssue = {
+  number: number;
+  body: string | null;
+  /** Absent on issues listed before `--json author` was requested; treated as
+   * "not this alerter's", which is the safe reading. */
+  author?: { is_bot?: boolean } | null;
+};
 
 /**
  * An {@link IssueGateway} backed by `gh`. Finds a source's open issue by scanning
@@ -48,10 +54,24 @@ export const createGhGateway = (gh: Gh = runGh): IssueGateway => ({
     // A body-marker scan rather than a label filter: labels would have to be
     // provisioned before an issue could carry one, and `gh issue create` errors
     // on a label that does not yet exist. The marker needs nothing set up first.
-    const stdout = await gh(["issue", "list", "--state", "open", "--limit", "200", "--json", "number,body"]);
+    //
+    // **Authored by a bot, and only then carrying the marker.** The marker is
+    // text, and text can be quoted: a ticket *about* this alerter that quotes
+    // `<!-- scraper-health:… -->` would otherwise be adopted as the source's
+    // health issue — suppressing the real alarm while unhealthy, and closed with
+    // a recovery comment when healthy. That is not hypothetical; the freshness
+    // alarm one level up did exactly this to #64 on its first live run.
+    //
+    // Authorship rather than requiring the marker to end the body, because
+    // editing an issue does not change its author: a triager can annotate the
+    // body freely and the identity holds. That is the whole reason the marker
+    // lives in the body rather than the title.
+    const stdout = await gh(["issue", "list", "--state", "open", "--limit", "200", "--json", "number,body,author"]);
     const issues = JSON.parse(stdout) as ListedIssue[];
     const marker = markerFor(source);
-    const hit = issues.find((issue) => (issue.body ?? "").includes(marker));
+    const hit = issues.find(
+      (issue) => issue.author?.is_bot === true && (issue.body ?? "").includes(marker),
+    );
     return hit ? { number: hit.number } : null;
   },
 
