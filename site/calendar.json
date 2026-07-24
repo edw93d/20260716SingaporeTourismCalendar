@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-23T20:39:46Z",
+  "generatedAt": "2026-07-24T20:49:21Z",
   "venueEvents": [
     {
       "uid": "b84c6c47-5f4e-468b-9bcd-f2a6a3a69a9e@sg-tourism-calendar",
@@ -458,6 +458,14 @@
       "source": "suntec"
     },
     {
+      "uid": "279bf9be-74cf-48f6-a761-095bf2b59130@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-07-25T09:30:00Z",
+      "end": "2026-07-25T11:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
       "uid": "8943fcc4-a510-49fb-ae75-1752a1ef2a9d@sg-tourism-calendar",
       "summary": "FCBC Weekly Service (July 2026)",
       "start": "2026-07-26T00:00:00Z",
@@ -478,6 +486,14 @@
       "summary": "Faith Church Singapore (July 2026)",
       "start": "2026-07-26T01:00:00Z",
       "end": "2026-07-26T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "2ebe5264-f4b0-4bd9-b715-f605e959e361@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-07-26T02:00:00Z",
+      "end": "2026-07-26T04:00:00Z",
       "location": "Suntec Convention Centre",
       "source": "suntec"
     },
@@ -570,6 +586,14 @@
       "source": "suntec"
     },
     {
+      "uid": "f568ce7f-2725-458a-a51e-037aa15a24b7@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-08-01T09:00:00Z",
+      "end": "2026-08-01T11:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
       "uid": "86fee381-9b21-4879-b6f3-f180b09b9de8@sg-tourism-calendar",
       "summary": "Covenant East Sunday Service (August 2026)",
       "start": "2026-08-01T23:00:00Z",
@@ -598,6 +622,14 @@
       "summary": "Faith Church Singapore (Aug 2026)",
       "start": "2026-08-02T01:00:00Z",
       "end": "2026-08-02T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "a14098bf-961b-4f38-b6f1-f4cfe5d04e21@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-08-02T02:00:00Z",
+      "end": "2026-08-02T04:00:00Z",
       "location": "Suntec Convention Centre",
       "source": "suntec"
     },
@@ -658,6 +690,14 @@
       "source": "suntec"
     },
     {
+      "uid": "b04fb840-d1a1-4b52-afb2-1addc7af285f@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-08-08T09:00:00Z",
+      "end": "2026-08-08T11:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
       "uid": "fc952486-0990-4521-a188-510d3a3d520a@sg-tourism-calendar",
       "summary": "Covenant East Sunday Service (August 2026)",
       "start": "2026-08-08T23:00:00Z",
@@ -686,6 +726,14 @@
       "summary": "Faith Church Singapore (Aug 2026)",
       "start": "2026-08-09T01:00:00Z",
       "end": "2026-08-09T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "6e92fcd7-78c4-4eb9-8581-aab879dea5f2@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-08-09T02:00:00Z",
+      "end": "2026-08-09T04:00:00Z",
       "location": "Suntec Convention Centre",
       "source": "suntec"
     },
@@ -754,6 +802,14 @@
       "source": "suntec"
     },
     {
+      "uid": "b12a1f36-5080-4c19-a839-30c15ee9b574@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-08-15T09:00:00Z",
+      "end": "2026-08-15T11:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
       "uid": "c0e39992-3d19-4360-854b-1183f9ce84a7@sg-tourism-calendar",
       "summary": "Covenant East Sunday Service (August 2026)",
       "start": "2026-08-15T23:00:00Z",
@@ -774,6 +830,14 @@
       "summary": "Faith Church Singapore (Aug 2026)",
       "start": "2026-08-16T01:00:00Z",
       "end": "2026-08-16T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "44c29746-1d02-423e-a669-b00034ff9d38@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-08-16T02:00:00Z",
+      "end": "2026-08-16T04:00:00Z",
       "location": "Suntec Convention Centre",
       "source": "suntec"
     },
@@ -826,6 +890,14 @@
       "source": "suntec"
     },
     {
+      "uid": "bf3dfa97-5d70-441b-a2ab-a8e24a8b83d6@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-08-22T09:00:00Z",
+      "end": "2026-08-22T11:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
       "uid": "a5954a2c-9ec9-41b4-8e2f-034fe092ada8@sg-tourism-calendar",
       "summary": "Covenant East Sunday Service (August 2026)",
       "start": "2026-08-22T23:00:00Z",
@@ -862,6 +934,14 @@
       "summary": "Faith Church Singapore (Aug 2026)",
       "start": "2026-08-23T01:00:00Z",
       "end": "2026-08-23T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "dfa01c0c-b801-4cdc-a8b2-6f767241ef13@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-08-23T02:00:00Z",
+      "end": "2026-08-23T04:00:00Z",
       "location": "Suntec Convention Centre",
       "source": "suntec"
     },
@@ -922,6 +1002,14 @@
       "source": "suntec"
     },
     {
+      "uid": "45e152be-491d-4c6e-bed9-0042d67baed0@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-08-29T09:00:00Z",
+      "end": "2026-08-29T11:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
       "uid": "a1bfb008-b12e-4a7e-8144-08775dc16bcb@sg-tourism-calendar",
       "summary": "Covenant East Sunday Service (August 2026)",
       "start": "2026-08-29T23:00:00Z",
@@ -950,6 +1038,14 @@
       "summary": "Faith Church Singapore (Aug 2026)",
       "start": "2026-08-30T01:00:00Z",
       "end": "2026-08-30T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "da98305c-dda8-4deb-a344-5419909a3d58@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-08-30T02:00:00Z",
+      "end": "2026-08-30T04:00:00Z",
       "location": "Suntec Convention Centre",
       "source": "suntec"
     },
@@ -994,6 +1090,14 @@
       "source": "suntec"
     },
     {
+      "uid": "7b74dda1-7600-47ff-9cea-659fabdf429e@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-09-05T09:00:00Z",
+      "end": "2026-09-05T11:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
       "uid": "71b8e449-624c-4e5c-9f55-a0fac15fb457@sg-tourism-calendar",
       "summary": "FCBC Weekly Service (Sep 2026)",
       "start": "2026-09-06T00:00:00Z",
@@ -1034,6 +1138,14 @@
       "source": "suntec"
     },
     {
+      "uid": "4317fab6-e056-4292-82b8-83bb065dceda@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-09-06T02:00:00Z",
+      "end": "2026-09-06T04:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
       "uid": "1369b5f1-de69-443e-b2b6-9a2e910d84cf@sg-tourism-calendar",
       "summary": "BNI-Vision(8/9/2026)",
       "start": "2026-09-07T23:30:00Z",
@@ -1054,6 +1166,14 @@
       "summary": "FCBC Weekly Service (Sep 2026)",
       "start": "2026-09-12T07:00:00Z",
       "end": "2026-09-12T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "2f25972d-58a8-4ad9-9849-7f26a1896d73@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-09-12T09:00:00Z",
+      "end": "2026-09-12T11:00:00Z",
       "location": "Suntec Convention Centre",
       "source": "suntec"
     },
@@ -1086,6 +1206,14 @@
       "summary": "Faith Church Singapore (Sept 2026)",
       "start": "2026-09-13T01:00:00Z",
       "end": "2026-09-13T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "473d2b5a-9e0a-4aa4-b7c3-76bbf89da0f2@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-09-13T02:00:00Z",
+      "end": "2026-09-13T04:00:00Z",
       "location": "Suntec Convention Centre",
       "source": "suntec"
     },
@@ -1146,6 +1274,14 @@
       "source": "suntec"
     },
     {
+      "uid": "d06beba9-34b8-4520-bd73-4139271c0455@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-09-19T09:00:00Z",
+      "end": "2026-09-19T11:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
       "uid": "03e3b835-c6a9-4942-a984-33c50f060eba@sg-tourism-calendar",
       "summary": "Covenant East Sunday Service (September 2026)",
       "start": "2026-09-19T23:00:00Z",
@@ -1178,6 +1314,14 @@
       "source": "suntec"
     },
     {
+      "uid": "01a4d9c2-1ed5-4a89-965f-2944b90b0f87@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-09-20T02:00:00Z",
+      "end": "2026-09-20T04:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
       "uid": "2c63b8ca-b906-4eac-ae52-55abe4b84652@sg-tourism-calendar",
       "summary": "BNI-Vision(22/9/2026)",
       "start": "2026-09-21T23:30:00Z",
@@ -1194,6 +1338,14 @@
       "source": "suntec"
     },
     {
+      "uid": "21e2c25a-c9df-444b-8a88-989d2f35f1fc@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-09-26T09:00:00Z",
+      "end": "2026-09-26T11:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
       "uid": "2e159ffc-8f35-454d-9f16-98029d2241be@sg-tourism-calendar",
       "summary": "Backstage Siblings Concert( Engage Theatre) - 26 September 2026",
       "start": "2026-09-26T09:00:00Z",
@@ -1206,6 +1358,14 @@
       "summary": "Human Proteome Organisation World Congress (HUPO) 2026 - Conference",
       "start": "2026-09-27T00:00:00Z",
       "end": "2026-09-29T10:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "e93212ad-c013-40a4-8af6-b27219a42a29@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-09-27T02:00:00Z",
+      "end": "2026-09-27T04:00:00Z",
       "location": "Suntec Convention Centre",
       "source": "suntec"
     },
@@ -1238,6 +1398,14 @@
       "summary": "FCBC Weekly Service (Oct 2026)",
       "start": "2026-10-03T07:00:00Z",
       "end": "2026-10-03T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "76ca6ab6-5bc5-4131-b02c-137f8f510218@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-10-03T09:00:00Z",
+      "end": "2026-10-03T11:00:00Z",
       "location": "Suntec Convention Centre",
       "source": "suntec"
     },
@@ -1278,6 +1446,14 @@
       "summary": "Faith Church Singapore (Oct 2026)",
       "start": "2026-10-04T01:00:00Z",
       "end": "2026-10-04T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "39b2e2c8-1836-45ea-ae57-e6e0ab8ec8ca@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-10-04T02:00:00Z",
+      "end": "2026-10-04T04:00:00Z",
       "location": "Suntec Convention Centre",
       "source": "suntec"
     },
@@ -1330,6 +1506,14 @@
       "source": "suntec"
     },
     {
+      "uid": "0eee463d-302c-4781-841d-142f9572f223@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-10-10T09:00:00Z",
+      "end": "2026-10-10T11:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
       "uid": "8fd43367-36d7-48c9-a31c-e589d2f70325@sg-tourism-calendar",
       "summary": "Covenant East Sunday Service (October 2026)",
       "start": "2026-10-10T23:00:00Z",
@@ -1358,6 +1542,14 @@
       "summary": "Faith Church Singapore (Oct 2026)",
       "start": "2026-10-11T01:00:00Z",
       "end": "2026-10-11T06:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "41d066e5-012a-46d0-b50b-099d52e3d0c6@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-10-11T02:00:00Z",
+      "end": "2026-10-11T04:00:00Z",
       "location": "Suntec Convention Centre",
       "source": "suntec"
     },
@@ -1422,6 +1614,38 @@
       "summary": "FCBC Weekly Service (Oct 2026)",
       "start": "2026-10-17T07:00:00Z",
       "end": "2026-10-17T14:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "a9ec50e4-13c5-4671-8b19-cd192e729da9@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-10-17T09:00:00Z",
+      "end": "2026-10-17T11:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "56f50a78-e9ef-491d-b400-d9269723c93d@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-10-18T02:00:00Z",
+      "end": "2026-10-18T04:00:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "5cc76b8f-2f2a-4848-9e40-998aba8d50e1@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-10-24T09:00:00Z",
+      "end": "2026-10-24T11:30:00Z",
+      "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "aee2ce15-a9f6-4fad-abcd-5fa32c6a5708@sg-tourism-calendar",
+      "summary": "CHC Weekend Services",
+      "start": "2026-10-25T02:00:00Z",
+      "end": "2026-10-25T04:00:00Z",
       "location": "Suntec Convention Centre",
       "source": "suntec"
     }
@@ -2239,15 +2463,15 @@
   "sources": [
     {
       "source": "mbccs",
-      "lastConfirmed": "2026-07-23T20:39:46Z"
+      "lastConfirmed": "2026-07-24T20:49:21Z"
     },
     {
       "source": "scc",
-      "lastConfirmed": "2026-07-23T20:39:46Z"
+      "lastConfirmed": "2026-07-24T20:49:21Z"
     },
     {
       "source": "suntec",
-      "lastConfirmed": "2026-07-23T20:39:46Z"
+      "lastConfirmed": "2026-07-24T20:49:21Z"
     }
   ]
 }
