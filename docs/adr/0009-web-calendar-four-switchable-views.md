@@ -6,6 +6,8 @@
 - **Primary source:** prototype on branch
   [`prototype/calendar-ui-12`](https://github.com/edw93d/20260716SingaporeTourismCalendar/tree/prototype/calendar-ui-12/prototype/calendar-ui) —
   four views over one deliberately adversarial dataset. Throwaway; not merged to `main`.
+- **Amended:** 2026-07-24 (ADR-0014) — the month grid's `+N more` overflow drills to
+  Agenda, and the implementation's "no collapse" deviation is corrected. See Amendment 1.
 
 ## Context
 
@@ -125,3 +127,24 @@ impact-score, no attendance/pax field, is introduced. This upholds the standing
   not publish attendance or passenger counts, the manual Excel never carried it, and
   inventing it is unsupported by fact and beyond the destination. Deferred with an
   explicit reopen trigger (see Consequences).
+
+## Amendments
+
+### Amendment 1 (2026-07-24, ADR-0014): Month `+N more` drills to Agenda; the "no collapse" implementation is corrected
+
+The UI/UX prototype round (`prototype/calendar-uiux-round-1`) settled two things about
+Month's overflow that this ADR left open or that the implementation got wrong:
+
+- **`+N more` drills through to that day in Agenda.** This ADR's Consequences endorsed
+  the month grid shipping "with `+N more` overflow … bounded by its orientation-only
+  role" but never named a **target**. The round settles it: overflow past the cap
+  lands the reader on the **Agenda reading surface**, so `+N more` is a hand-off, not a
+  dead-end popover — which is why it does not re-trigger #5's objection (§2 keeps Month
+  as navigator; §5 keeps the density-inversion mitigated by Date-spine and Agenda).
+- **The implementation deviated and is corrected.** `site/calendar.js` (`renderMonth`)
+  renders *every* entry with **no overflow collapse**, citing #5 against this ADR's own
+  Consequences. The round restores the ADR's intent: Month is **fixed to one screen**
+  with **capped one-line chips** plus the `+N more`-to-Agenda control.
+
+See **ADR-0014 §1** for the full rationale and the `site/calendar.js` implementation
+debt. No production code is changed by this amendment.
