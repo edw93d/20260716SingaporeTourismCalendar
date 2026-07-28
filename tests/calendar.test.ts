@@ -1566,3 +1566,283 @@ describe("per-source freshness disclosure (#40)", () => {
     expect(at("2026-07-22T00:00:00Z").stale).toBe(true);
   });
 });
+
+/**
+ * The entry-detail bubble (#75). Its **content** is a pure function of the entry
+ * — which is what these tests drive, through a real `dblclick` on a real node in
+ * each of the four views, exactly as a reader opens it.
+ *
+ * Its **geometry** is deliberately outside this seam. `positionBubble` reads
+ * `getBoundingClientRect` and `offsetWidth` and compares them against the
+ * viewport; jsdom has no layout engine, so every one of those is zero and the
+ * flip, the clamp and the tail offset cannot be exercised here at all. What is
+ * asserted instead is that the position was *applied* — the bubble is anchored
+ * in viewport coordinates with a tail offset published — and that the rules the
+ * geometry depends on exist in the shell's stylesheet. The numbers themselves
+ * are checked by eye against the prototype, as the round-1 items before it were.
+ */
+describe("the entry-detail bubble (#75)", () => {
+  const sources = [
+    { source: "suntec", lastConfirmed: "2026-07-21T00:00:00Z" },
+    { source: "scc", lastConfirmed: "2026-07-19T00:00:00Z" },
+  ];
+
+  /** How a reader opens it: a double-click on the entry's own node. */
+  const dblclick = (node: Element | null | undefined) => {
+    expect(node).not.toBeNull();
+    node?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+  };
+  const bubble = () => document.body.querySelector(".calendar__bubble");
+  const bubbles = () => document.body.querySelectorAll(".calendar__bubble");
+  const titleOf = () => bubble()?.querySelector(".calendar__bubble-title")?.textContent;
+  const chipOf = () => bubble()?.querySelector(".calendar__bubble-chip")?.textContent;
+  const footOf = () => bubble()?.querySelector(".calendar__bubble-foot")?.textContent;
+  /** The data-record grid, read back as the label/value pairs it draws. */
+  const fields = () => {
+    const grid = bubble()?.querySelector(".calendar__bubble-grid");
+    const terms = Array.from(grid?.querySelectorAll("dt") ?? []).map((n) => n.textContent);
+    const values = Array.from(grid?.querySelectorAll("dd") ?? []).map((n) => n.textContent);
+    return Object.fromEntries(terms.map((term, index) => [term, values[index]]));
+  };
+
+  it("opens on a double-click on a Month chip, showing the fields the chip hides", () => {
+    mount(payloadOf({ portCalls: [], sources }));
+    expect(bubble()).toBeNull();
+
+    dblclick(chipsIn("2026-07-18")[0]);
+    expect(titleOf()).toBe("Global MICE Congress");
+    expect(chipOf()).toBe("Venue event");
+    expect(bubble()?.getAttribute("data-type")).toBe("VenueEvent");
+    // The multi-day congress: a date range, its two clock times joined by an
+    // arrow rather than a dash, its hall in full, and its span.
+    expect(fields()).toEqual({
+      When: "Fri 17 Jul – Sun 19 Jul 2026",
+      Time: "10:00 → 16:00 SGT",
+      Where: "Suntec Convention Centre, Level 4, Hall 404",
+      Length: "2.3 days",
+    });
+  });
+
+  it("names a single day once, with its clock times either side of a dash", () => {
+    mount(payloadOf({ venueEvents: [], sources }));
+    dblclick(chipsIn("2026-07-18")[0]);
+    expect(fields()["When"]).toBe("Sat 18 Jul 2026");
+    expect(fields()["Time"]).toBe("08:00 – 16:00 SGT");
+    expect(fields()["Length"]).toBe("8 hr");
+  });
+
+  it("strips a port call's `Cruise: ` prefix and names its type in the reader's words", () => {
+    mount(payloadOf({ venueEvents: [], sources }));
+    dblclick(chipsIn("2026-07-18")[0]);
+    expect(titleOf()).toBe("ODYSSEY / VILLA VIE RESIDENCES at Singapore Cruise Centre");
+    expect(chipOf()).toBe("Cruise arrival");
+    expect(bubble()?.getAttribute("data-type")).toBe("PortCall");
+  });
+
+  it("reuses the Date-spine's span text for Length rather than measuring again", () => {
+    // The same 2.25-day congress the spine labels "2.3 days" — one rounding rule
+    // for both surfaces, so a bar and its bubble can never disagree.
+    mount(payloadOf({ portCalls: [], sources }));
+    switchView("spine");
+    const bar = root.querySelector(".spine__bar");
+    expect(bar?.textContent).toContain("2.3 days");
+    dblclick(bar);
+    expect(fields()["Length"]).toBe("2.3 days");
+  });
+
+  it("footers the entry's own source and how long ago that source was confirmed", () => {
+    // Per source, from the same `payload.sources` and injected clock the page's
+    // freshness disclosure reads — the congress and the cruise come from two
+    // sources confirmed two days apart, and each bubble says its own.
+    mount(payloadOf({ sources }), new Date("2026-07-21T02:00:00Z"));
+    dblclick(chipsIn("2026-07-17")[0]);
+    expect(footOf()).toBe("suntec · confirmed 2 hours ago");
+
+    dblclick(chipsIn("2026-07-18").at(-1));
+    expect(footOf()).toBe("scc · confirmed 2 days ago");
+  });
+
+  it("names the source alone when the payload discloses no instant for it", () => {
+    // A payload with no `sources` at all — the attribution is still honest; only
+    // the "how long ago" it cannot compute is missing.
+    mount(payloadOf({ portCalls: [] }));
+    dblclick(chipsIn("2026-07-17")[0]);
+    expect(footOf()).toBe("suntec");
+  });
+
+  it("opens from Week's all-day band, Week's timed entry, Agenda and Date-spine", () => {
+    mount(
+      payloadOf({
+        venueEvents: [congress()], // 17–19 July: Week draws it on the all-day band
+        portCalls: [cruise({ start: "2026-07-21T00:00:00Z", end: "2026-07-21T08:00:00Z" })],
+        sources,
+      }),
+    );
+
+    switchView("week");
+    dblclick(root.querySelector(".week__event")); // the timed cruise, in today's column
+    expect(chipOf()).toBe("Cruise arrival");
+
+    click("prev"); // back to the week holding 17–19 July
+    dblclick(root.querySelector(".week__band:not(.week__band--more)"));
+    expect(titleOf()).toBe("Global MICE Congress");
+
+    switchView("agenda");
+    dblclick(root.querySelector(".agenda .calendar__entry"));
+    expect(titleOf()).toBe("Global MICE Congress");
+
+    switchView("spine");
+    dblclick(root.querySelector(".spine__bar"));
+    expect(titleOf()).toBe("Global MICE Congress");
+  });
+
+  it("leaves the `+N more` doors alone — they navigate, they do not describe", () => {
+    const busy = payloadOf({
+      venueEvents: Array.from({ length: 6 }, (_, index) =>
+        congress({
+          uid: `m${index}@x`,
+          summary: `Fair ${index}`,
+          start: "2026-07-21T02:00:00Z",
+          end: "2026-07-23T08:00:00Z",
+        }),
+      ),
+      portCalls: [],
+      sources,
+    });
+
+    mount(busy);
+    dblclick(moreIn("2026-07-21"));
+    expect(bubble()).toBeNull();
+
+    switchView("week");
+    dblclick(root.querySelector(".week__band--more"));
+    expect(bubble()).toBeNull();
+  });
+
+  it("keeps one bubble open at a time, whichever entry is opened next", () => {
+    mount(payloadOf({ sources }));
+    dblclick(chipsIn("2026-07-17")[0]);
+    dblclick(chipsIn("2026-07-18").at(-1));
+    expect(bubbles()).toHaveLength(1);
+    expect(chipOf()).toBe("Cruise arrival");
+  });
+
+  it("anchors in viewport coordinates and reveals the bubble only once placed", () => {
+    // The geometry itself is outside this seam (see the block comment): what is
+    // asserted is that the placement ran — a tail offset published, a vertical
+    // side chosen, and the bubble revealed after rather than before it.
+    mount(payloadOf({ sources }));
+    dblclick(chipsIn("2026-07-17")[0]);
+    const node = bubble() as HTMLElement;
+    expect(node.style.left).not.toBe("");
+    expect(node.style.top).not.toBe("");
+    expect(node.style.getPropertyValue("--tail-x")).not.toBe("");
+    expect(node.classList.contains("calendar__bubble--below")).toBe(true);
+    expect(node.style.visibility).toBe("");
+    // It hangs off the body, not inside a scrolling surface that would clip it.
+    expect(node.parentElement).toBe(document.body);
+  });
+
+  it("dismisses on a click outside it, and stays open on a click inside", () => {
+    mount(payloadOf({ sources }));
+    dblclick(chipsIn("2026-07-17")[0]);
+    bubble()?.querySelector(".calendar__bubble-title")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(bubble()).not.toBeNull();
+
+    document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(bubble()).toBeNull();
+  });
+
+  it("dismisses on Escape, and on no other key", () => {
+    mount(payloadOf({ sources }));
+    dblclick(chipsIn("2026-07-17")[0]);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+    expect(bubble()).not.toBeNull();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(bubble()).toBeNull();
+  });
+
+  it("dismisses on any scroll, including one inside a surface's own scroller", () => {
+    // The bubble is positioned in viewport coordinates, so a scroll detaches it
+    // from the entry it points at. Week's hour grid scrolls inside the page and
+    // its scroll event does not bubble — only a capture-phase listener sees it.
+    mount(
+      payloadOf({
+        venueEvents: [congress({ start: "2026-07-21T02:00:00Z", end: "2026-07-21T08:00:00Z" })],
+        portCalls: [],
+        sources,
+      }),
+    );
+    switchView("week");
+    dblclick(root.querySelector(".week__event"));
+    expect(bubble()).not.toBeNull();
+    root.querySelector(".week")?.dispatchEvent(new Event("scroll")); // does not bubble
+    expect(bubble()).toBeNull();
+
+    dblclick(root.querySelector(".week__event"));
+    window.dispatchEvent(new Event("scroll"));
+    expect(bubble()).toBeNull();
+  });
+
+  it("closes on a resize rather than leaving a tail pointing at nothing", () => {
+    mount(payloadOf({ sources }));
+    dblclick(chipsIn("2026-07-17")[0]);
+    window.dispatchEvent(new Event("resize"));
+    expect(bubble()).toBeNull();
+  });
+
+  it("retires a replaced mount's dismissal listeners instead of accumulating them", () => {
+    // The listeners live on the document and the window, which outlive a mount —
+    // the same self-eviction the topbar's resize handler does (#84). A remount
+    // must not leave the old mount's handlers firing for the life of the page.
+    const removed: string[] = [];
+    const realRemove = document.removeEventListener.bind(document);
+    document.removeEventListener = ((type: string, ...rest: unknown[]) => {
+      removed.push(type);
+      return realRemove(type, ...(rest as [EventListenerOrEventListenerObject]));
+    }) as typeof document.removeEventListener;
+
+    try {
+      mount(payloadOf({ sources })); // the mount that is about to be replaced
+      document.body.textContent = ""; // …and its root leaves the page
+      topbar = document.createElement("header");
+      topbar.className = "topbar";
+      root = document.createElement("div");
+      document.body.append(topbar, root);
+      mount(payloadOf({ sources }));
+
+      dblclick(chipsIn("2026-07-17")[0]);
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    } finally {
+      document.removeEventListener = realRemove;
+    }
+
+    // The stale handler retired itself on the one firing it saw…
+    expect(removed).toContain("keydown");
+    // …and the live one did its job on the same firing.
+    expect(bubble()).toBeNull();
+  });
+
+  it("carries the prototype's visual identity — accent band, record grid, tail", () => {
+    // jsdom applies no stylesheet, so the bubble's look is asserted against the
+    // shell's CSS: the variant-E identity settled in `prototype/event-bubble`.
+    // The type accent, in the entry's own colour.
+    expect(ruleFor(".calendar__bubble-accent")).toMatch(/height:\s*4px/);
+    expect(ruleFor(".calendar__bubble-accent")).toMatch(/background:\s*#2563eb/);
+    expect(shell).toMatch(
+      /\.calendar__bubble\[data-type="PortCall"\]\s+\.calendar__bubble-accent\s*\{[^}]*#0d9488/,
+    );
+    // The data-record grid: uppercase labels beside their values.
+    expect(ruleFor(".calendar__bubble-grid")).toMatch(/grid-template-columns:\s*auto 1fr/);
+    expect(ruleFor(".calendar__bubble-grid dt")).toMatch(/text-transform:\s*uppercase/);
+    // Anchored in viewport coordinates, above the surfaces, with a tail that
+    // flips with the bubble and follows `--tail-x` when it is clamped.
+    expect(ruleFor(".calendar__bubble")).toMatch(/position:\s*fixed/);
+    expect(ruleFor(".calendar__bubble")).toMatch(/border-radius:\s*0\.6rem/);
+    expect(shell).toMatch(/\.calendar__bubble--below::before[^{]*\{[^}]*var\(--tail-x\)/);
+    expect(shell).toMatch(/\.calendar__bubble--above::before[^{]*\{[^}]*var\(--tail-x\)/);
+    // And the entries advertise that they are worth double-clicking.
+    expect(shell).toMatch(/cursor:\s*pointer/);
+  });
+});
