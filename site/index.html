@@ -573,13 +573,22 @@
         border-top: 1px solid color-mix(in srgb, currentColor 32%, transparent);
       }
       /* No `min-height` here: the geometry carries the floor. `renderSpine`
-         spans whole day rows, so the shortest bar there is is one `--spine-row`
-         — and a floor in the stylesheet would only paint a bar taller than the
-         days it claims, which is what used to make same-day neighbours overlap. */
+         spans whole day rows, so the shortest bar is one `--spine-row` — and a
+         floor in the stylesheet would only paint a bar taller than the days it
+         claims, which is what used to make same-day neighbours overlap.
+
+         `--spine-bar-top` / `--spine-bar-height` are the row geometry the
+         renderer publishes, as percentages of the month. The hairline inset is
+         applied here rather than folded into those numbers, so the percentages
+         stay readable as what they are — whole rows — and the separation stays
+         a presentation decision. Without it, two bars on consecutive days in
+         one lane paint flush and read as one continuous band. */
       .spine__bar {
         position: absolute;
         overflow: hidden;
         gap: 0;
+        top: calc(var(--spine-bar-top) + 1px);
+        height: calc(var(--spine-bar-height) - 2px);
       }
 
       /* --- The entry-detail bubble (#75) ---------------------------------

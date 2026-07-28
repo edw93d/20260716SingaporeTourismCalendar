@@ -1275,8 +1275,8 @@ export const mountCalendar = (root, payload, now, options) => {
     // painted height. ADR-0009 §3 still reads true at day resolution — one row
     // against a congress's five is a sliver — and what the floor costs, telling
     // a 3 hr fair from a 20 hr port call, is already the recorded
-    // cruise-magnitude hole (§94). The **label** keeps the clock: the bar says
-    // which days, `spanText` says how long.
+    // cruise-magnitude hole (ADR-0009 Consequences). The **label** keeps the
+    // clock: the bar says which days, `spanText` says how long.
     const track = el("div", "spine__track");
 
     // The **week-boundary line** (#74): a rule at the top of each Monday's row,
@@ -1305,12 +1305,19 @@ export const mountCalendar = (root, payload, now, options) => {
     // the 22nd must not inherit its lane).
     const inMonth = visible.filter((e) => e.endIndex >= monthStart && e.startIndex < monthEnd);
     for (const { item, lane, lanes } of assignLanes(inMonth, (e) => e.startIndex, (e) => e.endIndex + 1)) {
+      // Clamped to the month the spine is showing, and **inclusive** at both
+      // ends: an entry running 29 June – 2 July draws the 1st and the 2nd, and
+      // nothing above them. `end` is the last day drawn, not one past it, which
+      // is why the height counts `end - start + 1` rows.
       const start = Math.max(item.startIndex, monthStart);
-      const end = Math.min(item.endIndex, monthEnd - 1); // inclusive, clamped to the month
+      const end = Math.min(item.endIndex, monthEnd - 1);
       const node = renderEntry(item, spanText(item.endValue - item.startValue));
       node.classList.add("spine__bar");
-      node.style.top = topOf(start);
-      node.style.height = `${((end - start + 1) / span) * 100}%`;
+      // The row geometry is published as percentages and the stylesheet insets
+      // it by a hairline, so two bars on consecutive days in one lane stay two
+      // bars instead of painting flush into a single band.
+      node.style.setProperty("--spine-bar-top", topOf(start));
+      node.style.setProperty("--spine-bar-height", `${((end - start + 1) / span) * 100}%`);
       node.style.left = `${(lane / lanes) * 100}%`;
       node.style.width = `${(1 / lanes) * 100}%`;
       track.appendChild(node);
@@ -1421,7 +1428,9 @@ export const mountCalendar = (root, payload, now, options) => {
 
   /**
    * A human duration for Date-spine's label — hours under a day, else days to
-   * one decimal. The number the eye reads off the bar's height, spelled out.
+   * one decimal. The number the bar's height *cannot* carry: the spine draws
+   * whole day rows, so an 8 hr call and a 20 hr one are the same one row, and
+   * this label is where the clock survives.
    * @param {number} days @returns {string}
    */
   const spanText = (days) => {

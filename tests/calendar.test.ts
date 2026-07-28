@@ -604,6 +604,20 @@ describe("Month: the weekend wash and the month-boundary label (#72)", () => {
 describe("four switchable reading surfaces", () => {
   const parsePct = (value: string) => Number.parseFloat(value.replace("%", ""));
 
+  /**
+   * One Date-spine row as a percentage of a July track, and the three readers
+   * the spine's geometry assertions share. The renderer publishes whole-row
+   * percentages as custom properties and the stylesheet insets them by a
+   * hairline, so `style.top` is a `calc()` no assertion can parse — these read
+   * the geometry where it is stated, in rows.
+   */
+  const SPINE_ROW = 100 / 31;
+  const barByType = (type: string) =>
+    root.querySelector(`.spine__bar[data-type="${type}"]`) as HTMLElement;
+  const barTop = (bar: HTMLElement) => parsePct(bar.style.getPropertyValue("--spine-bar-top"));
+  const barHeight = (bar: HTMLElement) =>
+    parsePct(bar.style.getPropertyValue("--spine-bar-height"));
+
   it("offers all four views as tabs, any reachable from any other in one click", () => {
     mount(payloadOf());
     const tabs = Array.from(document.body.querySelectorAll("[data-view]")).map((n) =>
@@ -684,25 +698,63 @@ describe("four switchable reading surfaces", () => {
     // 18 July 08:00–16:00 SGT (one date, a third of a day).
     mount(payloadOf());
     switchView("spine");
-    const bars = Array.from(root.querySelectorAll(".spine__bar")) as HTMLElement[];
-    const byType = (type: string) =>
-      bars.find((b) => b.dataset["type"] === type) as HTMLElement;
-    const row = 100 / 31; // July, as a percentage of the track
-
     // The spine's unit is the **date**: three dates is exactly three rows, one
     // date exactly one — never the fraction of a row the clock would give, which
     // is unreadable and collides with whatever shares the lane.
-    expect(parsePct(byType("VenueEvent").style.height)).toBeCloseTo(row * 3, 4);
-    expect(parsePct(byType("PortCall").style.height)).toBeCloseTo(row, 4);
+    expect(barHeight(barByType("VenueEvent"))).toBeCloseTo(SPINE_ROW * 3, 4);
+    expect(barHeight(barByType("PortCall"))).toBeCloseTo(SPINE_ROW, 4);
 
     // And a bar begins at its day's row edge, so it lines up with the date on
     // the axis beside it rather than starting part-way down at 08:00.
-    expect(parsePct(byType("VenueEvent").style.top)).toBeCloseTo(row * 16, 4);
-    expect(parsePct(byType("PortCall").style.top)).toBeCloseTo(row * 17, 4);
+    expect(barTop(barByType("VenueEvent"))).toBeCloseTo(SPINE_ROW * 16, 4);
+    expect(barTop(barByType("PortCall"))).toBeCloseTo(SPINE_ROW * 17, 4);
 
     // The label keeps the clock the geometry rounded off.
-    expect(byType("VenueEvent").textContent).toContain("2.3 days");
-    expect(byType("PortCall").textContent).toContain("8 hr");
+    expect(barByType("VenueEvent").textContent).toContain("2.3 days");
+    expect(barByType("PortCall").textContent).toContain("8 hr");
+  });
+
+  it("Date-spine draws only the days inside the month it is showing", () => {
+    // Neither entry starts and ends inside July, and both must draw the part
+    // that does: the congress reaches back into June, the call forward into
+    // August. The clamp is inclusive at both ends — `end` is the last day drawn,
+    // not one past it — so an off-by-one here shows up as a whole extra row.
+    mount(
+      payloadOf({
+        venueEvents: [congress({ start: "2026-06-29T02:00:00Z", end: "2026-07-02T08:00:00Z" })],
+        portCalls: [cruise({ start: "2026-07-30T02:00:00Z", end: "2026-08-02T08:00:00Z" })],
+      }),
+    );
+    switchView("spine");
+
+    // 29 June – 2 July: July draws the 1st and the 2nd, flush to the top.
+    expect(barTop(barByType("VenueEvent"))).toBeCloseTo(0, 4);
+    expect(barHeight(barByType("VenueEvent"))).toBeCloseTo(SPINE_ROW * 2, 4);
+
+    // 30 July – 2 August: July draws the 30th and the 31st, and stops at the
+    // foot of the track rather than running past it.
+    expect(barTop(barByType("PortCall"))).toBeCloseTo(SPINE_ROW * 29, 4);
+    expect(barHeight(barByType("PortCall"))).toBeCloseTo(SPINE_ROW * 2, 4);
+
+    // The label still measures the whole entry, not the part this month shows.
+    expect(barByType("VenueEvent").textContent).toContain("3.3 days");
+    expect(barByType("PortCall").textContent).toContain("3.3 days");
+  });
+
+  it("Date-spine insets its bars, so consecutive days in one lane stay two bars", () => {
+    // The renderer publishes whole-row percentages; the hairline that keeps two
+    // bars apart is the stylesheet's, applied to those percentages. Both halves
+    // have to hold or the bars paint flush and read as one continuous band.
+    mount(payloadOf());
+    switchView("spine");
+    const bar = root.querySelector(".spine__bar") as HTMLElement;
+    expect(bar.style.getPropertyValue("--spine-bar-top")).toMatch(/%$/);
+    expect(bar.style.getPropertyValue("--spine-bar-height")).toMatch(/%$/);
+    const rule = ruleFor(".spine__bar");
+    expect(rule).toMatch(/top:\s*calc\(var\(--spine-bar-top\)\s*\+\s*1px\)/);
+    expect(rule).toMatch(/height:\s*calc\(var\(--spine-bar-height\)\s*-\s*2px\)/);
+    // And no floor in the stylesheet — the geometry carries it.
+    expect(rule).not.toMatch(/min-height/);
   });
 
   it("Date-spine gives an entry its own lane when it shares a date with one that ends that day", () => {
