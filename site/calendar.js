@@ -39,6 +39,11 @@
  * @typedef {"month" | "week" | "agenda" | "spine"} View
  * @typedef {SiteEntry & { type: RecordType, startKey: number, endKey: number, startIndex: number, endIndex: number, startValue: number, endValue: number }} DayEntry
  * @typedef {{ topbar: Element, freshness: Element }} MountOptions
+ *
+ * One thing here is **not** the calendar: {@link wireFeedCopy}, at the foot of
+ * the file, which adds copying to the subscription block's static markup (#76).
+ * It shares this module because it shares the seam — a page-supplied host, an
+ * injected capability, no global reached for — not because it renders a view.
  */
 
 /**
@@ -1707,4 +1712,57 @@ export const mountCalendar = (root, payload, now, options) => {
   // day it jumps to is only known outside — from the `+N more` that was clicked
   // (#80, #81), or from a test. `index.html` ignores this.
   return { drillToAgendaDay };
+};
+
+/**
+ * The confirmation the Copy button wears after a successful write, and how long
+ * it wears it (#76) — long enough to be read, short enough that the button is
+ * back to naming its action before a reader reaches for it again.
+ */
+const COPIED_MS = 1200;
+
+/**
+ * Wire the subscription block's Copy buttons (#76). The two feed rows are
+ * **static markup** — the shell owns them, because a `.ics` URL is not a
+ * property of the payload and a reader whose JS never runs must still be able to
+ * read and select one. All this adds is the copying.
+ *
+ * The clipboard is **injected, never reached for** — the same rule the document
+ * and the clock follow at the top of this file, and here it is what makes the
+ * degradation testable: `navigator.clipboard` is absent on an insecure origin
+ * and refuses inside a sandboxed frame, and in neither case may the button claim
+ * a copy that did not happen. So a failure is silent: the label stays "Copy" and
+ * the absolute URL beside it is still there to select by hand.
+ *
+ * The **scheduler** is derived from the host rather than injected, like the
+ * resize and scroll listeners above and unlike the clock — but the confirmation
+ * is a *timed* label, so a page with no window to time it on gets no
+ * confirmation rather than a "Copied" that sticks forever. The same reasoning
+ * cancels a button's pending revert before starting a new one: a second press
+ * must not be ended by the first press's timer.
+ *
+ * @param {Element} host the `.feeds` block, or any ancestor of the buttons
+ * @param {{ writeText: (text: string) => Promise<void> } | undefined} clipboard `navigator.clipboard`, which the page may not have
+ * @returns {void}
+ */
+export const wireFeedCopy = (host, clipboard) => {
+  const scheduler = host.ownerDocument?.defaultView;
+  for (const button of Array.from(host.querySelectorAll(".feed__copy"))) {
+    /** The pending revert for *this* button, so a re-press restarts it. */
+    let reverting = 0;
+    button.addEventListener("click", async () => {
+      const url = button.getAttribute("data-url");
+      if (!clipboard || !url || !scheduler) return;
+      try {
+        await clipboard.writeText(url);
+      } catch {
+        return; // Refused — say nothing. The URL stays selectable.
+      }
+      button.textContent = "Copied";
+      scheduler.clearTimeout(reverting);
+      reverting = scheduler.setTimeout(() => {
+        button.textContent = "Copy";
+      }, COPIED_MS);
+    });
+  }
 };

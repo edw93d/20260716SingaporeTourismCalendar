@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   WEEK_BAND_LANES,
   assignLanes,
@@ -16,6 +16,7 @@ import {
   sgtMinutesOfDay,
   sgtMonthOf,
   weekDaysOf,
+  wireFeedCopy,
 } from "../site/calendar.js";
 
 /**
@@ -1940,5 +1941,162 @@ describe("the entry-detail bubble (#75)", () => {
     expect(ruleFor(".calendar__bubble")).toMatch(/box-shadow:\s*0 6px 22px[^;]*16%/);
     expect(shell).toMatch(/\.calendar__bubble--below::before[^{]*\{[^}]*var\(--tail-x\)/);
     expect(shell).toMatch(/\.calendar__bubble--above::before[^{]*\{[^}]*var\(--tail-x\)/);
+  });
+});
+
+/**
+ * The subscription block (#76), quietened to what a reader actually needs: a
+ * heading, the two feeds split by type (ADR-0008), and a Copy button each. The
+ * intro line, the per-app "how to add it" steps and the subscribe-not-import
+ * caveat are gone — the product owner's edit.
+ *
+ * The markup is **static shell**, not module output, so it is asserted against
+ * the file's text like the rest of the shell above; only the copying is
+ * behaviour, and it gets its own block below.
+ */
+describe("the ICS Calendar Subscription block (#76)", () => {
+  /** The block's markup, from its heading to the end of the feed rows. */
+  const feeds = shell.match(/<h2>ICS Calendar Subscription<\/h2>([\s\S]*?)<\/div>\s*<\/div>/)?.[0] ?? "";
+  const rows = Array.from(feeds.matchAll(/<div class="feed">([\s\S]*?)<\/div>/g), (m) => m[1] ?? "");
+
+  it("heads exactly two feed rows, one per type", () => {
+    expect(feeds).not.toBe("");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toContain("SG Venue Events");
+    expect(rows[1]).toContain("SG Cruise Arrivals");
+  });
+
+  it("shows an absolute .ics URL and a Copy button carrying the same URL", () => {
+    // Absolute, not relative: a relative URL cannot be subscribed to in a
+    // calendar app, and what is copied has to be what is shown.
+    const feedUrl = (slug: string) =>
+      `https://edw93d.github.io/20260716SingaporeTourismCalendar/feeds/${slug}.ics`;
+    for (const [row, slug] of [
+      [rows[0] ?? "", "venue-events"],
+      [rows[1] ?? "", "port-calls"],
+    ] as const) {
+      expect(row).toContain(`<code class="feed__url">${feedUrl(slug)}</code>`);
+      expect(row).toMatch(
+        new RegExp(`<button class="feed__copy" data-url="${feedUrl(slug)}">Copy</button>`),
+      );
+    }
+  });
+
+  it("drops the intro line, the per-app steps and the subscribe-not-import caveat", () => {
+    expect(shell).not.toMatch(/<h2>Subscribe<\/h2>/);
+    expect(shell).not.toContain("not an import");
+    // The relative-link list the block replaces — see the URL assertion above
+    // for why a relative feed URL was never subscribable in the first place.
+    expect(shell).not.toMatch(/<a href="feeds\//);
+  });
+
+  it("sits below the methodology notes", () => {
+    expect(shell.indexOf("<h2>ICS Calendar Subscription</h2>")).toBeGreaterThan(
+      shell.indexOf('<section class="methodology">'),
+    );
+  });
+
+  it("draws the rows at the prototype's spacing, type scale and radius", () => {
+    expect(ruleFor(".feeds")).toMatch(/gap:\s*0\.5rem/);
+    expect(ruleFor(".feed")).toMatch(/border:\s*1px solid var\(--line\)/);
+    expect(ruleFor(".feed")).toMatch(/border-radius:\s*0\.5rem/);
+    expect(ruleFor(".feed")).toMatch(/padding:\s*0\.5rem 0\.7rem/);
+    expect(ruleFor(".feed__name")).toMatch(/font-size:\s*0\.9rem/);
+    expect(ruleFor(".feed__url")).toMatch(/font-size:\s*0\.78rem/);
+    expect(ruleFor(".feed__url")).toMatch(/color:\s*var\(--dim\)/);
+    // Everything `.feed__copy` is declared, wherever it is said — so the button
+    // wearing the page's one chrome-button look (the grouped rule it joins) is
+    // as much a fact here as its own smaller size, and neither can quietly
+    // become a second look.
+    expect(ruleFor(".feed__copy")).toMatch(/font-size:\s*0\.75rem/);
+    expect(ruleFor(".feed__copy")).toMatch(/border-radius:\s*0\.5rem/);
+    expect(ruleFor(".feed__copy")).toMatch(/border:\s*1px solid var\(--line\)/);
+  });
+});
+
+describe("copying a feed URL (#76)", () => {
+  /** The shell's two feed rows, rebuilt in jsdom — the DOM `wireFeedCopy` meets. */
+  const feedRows = () => {
+    const host = document.createElement("div");
+    host.className = "feeds";
+    for (const url of ["https://x.test/feeds/venue-events.ics", "https://x.test/feeds/port-calls.ics"]) {
+      const row = document.createElement("div");
+      row.className = "feed";
+      const button = document.createElement("button");
+      button.className = "feed__copy";
+      button.dataset["url"] = url;
+      button.textContent = "Copy";
+      row.appendChild(button);
+      host.appendChild(row);
+    }
+    document.body.appendChild(host);
+    return host;
+  };
+
+  const buttons = (host: Element) =>
+    Array.from(host.querySelectorAll(".feed__copy")) as HTMLButtonElement[];
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("writes the row's own absolute URL and confirms, reverting after ~1.2s", async () => {
+    const written: string[] = [];
+    const host = feedRows();
+    wireFeedCopy(host, { writeText: async (text: string) => void written.push(text) });
+
+    const [venue, port] = buttons(host);
+    venue?.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(written).toEqual(["https://x.test/feeds/venue-events.ics"]);
+    expect(venue?.textContent).toBe("Copied");
+
+    // Only the pressed button confirms — the other row is untouched.
+    expect(port?.textContent).toBe("Copy");
+
+    await vi.advanceTimersByTimeAsync(1200);
+    expect(venue?.textContent).toBe("Copy");
+  });
+
+  it("restarts the confirmation on a second press rather than letting the first end it", async () => {
+    // Two presses 1s apart: the first press's timer must not fire under the
+    // second's confirmation and revert a label that is 200ms old.
+    const host = feedRows();
+    wireFeedCopy(host, { writeText: async () => {} });
+
+    const [venue] = buttons(host);
+    venue?.click();
+    await vi.advanceTimersByTimeAsync(1000);
+    venue?.click();
+    await vi.advanceTimersByTimeAsync(400); // 1.2s past the first press
+    expect(venue?.textContent).toBe("Copied");
+    await vi.advanceTimersByTimeAsync(800); // 1.2s past the second
+    expect(venue?.textContent).toBe("Copy");
+  });
+
+  it("degrades silently when the clipboard is unavailable", async () => {
+    // A sandboxed frame or an insecure origin has no clipboard at all. Nothing
+    // is claimed that did not happen: the label stays "Copy" and the URL beside
+    // it is still there to select by hand.
+    const host = feedRows();
+    wireFeedCopy(host, undefined);
+
+    const [venue] = buttons(host);
+    venue?.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(venue?.textContent).toBe("Copy");
+  });
+
+  it("degrades silently when the write is refused", async () => {
+    const host = feedRows();
+    wireFeedCopy(host, {
+      writeText: async () => {
+        throw new Error("denied");
+      },
+    });
+
+    const [venue] = buttons(host);
+    venue?.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(venue?.textContent).toBe("Copy");
   });
 });

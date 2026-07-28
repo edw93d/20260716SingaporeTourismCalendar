@@ -103,6 +103,20 @@ ticketed events, #13) folds into `venue-events` and adds no feed. `CATEGORIES` c
 carry the split in-feed (ADR-0001, #6), which is why the split is baked into distinct
 URLs at generation time. See ADR-0008.
 
+The **subscription surface** — how a reader gets one of those two URLs — is a block on
+the **Web calendar**, below the methodology notes: the heading, one row per feed, and a
+Copy. Its URLs are **absolute**, on the page and on the button alike. The site's own
+links can be relative because a browser resolves them against the page, but a calendar
+app is handed the string alone and has nothing to resolve it against — so a relative
+feed URL is one that cannot be subscribed to, which is the block's entire job. Nothing
+around it explains how to add a subscription in any particular app: the product owner's
+edit, #76.
+
+Its heading reads **"ICS Calendar Subscription"** — a reader's words, not this glossary's
+"iCal". The two name the same format; the heading takes the spelling a reader is most
+likely to have met on the calendar app they are about to paste into. Prose here still
+says iCal.
+
 ### Web calendar
 
 The *everything* view #11 made load-bearing (there is no `all` feed). It carries the

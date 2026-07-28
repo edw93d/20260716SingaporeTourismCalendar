@@ -102,9 +102,13 @@
       .calendar__views { display: flex; flex-wrap: wrap; gap: 0.25rem; }
       .calendar__nav { display: flex; flex-wrap: wrap; gap: 0.25rem; }
       .calendar__title { font-weight: 600; font-size: 1.25rem; }
+      /* The page's one chrome-button look — the prototype scopes this to the bare
+         `button` element; here it is named, and the subscription block's Copy
+         (#76) joins the group rather than growing a second look for itself. */
       .calendar__filter,
       .calendar__viewbtn,
-      .calendar__navbtn {
+      .calendar__navbtn,
+      .feed__copy {
         font: inherit;
         padding: 0.35rem 0.7rem;
         border: 1px solid var(--line);
@@ -115,7 +119,8 @@
       }
       .calendar__navbtn:hover,
       .calendar__viewbtn:hover,
-      .calendar__filter:hover { border-color: var(--dim); }
+      .calendar__filter:hover,
+      .feed__copy:hover { border-color: var(--dim); }
       .calendar__viewbtn--active {
         background: color-mix(in srgb, canvastext 10%, transparent);
         border-color: var(--dim);
@@ -665,6 +670,33 @@
         color: var(--dim);
       }
       #calendar-status { color: var(--dim); font-size: 0.9rem; padding: 1rem 0; }
+
+      /* The subscription block (#76): two bordered rows, one per feed, each a
+         name, its absolute URL and a Copy. The URL takes the page's monospace
+         and the dim it shares with every other secondary line, and it is allowed
+         to break anywhere — it is one long unbreakable token, and a row that
+         overflowed its border would be the one thing on the page a reader cannot
+         select cleanly. `flex: 1 1 18rem` is what lets the button drop below the
+         URL on a narrow screen rather than squeezing it. */
+      .feeds { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.6rem 0 1rem; }
+      .feed {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        padding: 0.5rem 0.7rem;
+        border: 1px solid var(--line);
+        border-radius: 0.5rem;
+      }
+      .feed__name { font-weight: 600; font-size: 0.9rem; min-width: 9.5rem; }
+      .feed__url {
+        font-family: ui-monospace, monospace;
+        font-size: 0.78rem;
+        color: var(--dim);
+        overflow-wrap: anywhere;
+        flex: 1 1 18rem;
+      }
+      .feed__copy { font-size: 0.75rem; padding: 0.2rem 0.6rem; flex: 0 0 auto; }
     </style>
   </head>
   <body>
@@ -706,17 +738,32 @@
       </p>
     </section>
 
-    <h2>Subscribe</h2>
-    <ul>
-      <li><a href="feeds/venue-events.ics">SG Venue Events</a> — <code>feeds/venue-events.ics</code></li>
-      <li><a href="feeds/port-calls.ics">SG Cruise Arrivals</a> — <code>feeds/port-calls.ics</code></li>
-    </ul>
-    <p class="note">
-      Add the link to your calendar as a <em>subscription</em>, not an import, so it
-      keeps refreshing. Take either or both — they are split by what lands, not by
-      where it was read from. The calendar above is the everything-view: both feeds
-      together, filtered here for free.
-    </p>
+    <!--
+      The subscription block (#76), below the methodology notes. Two feeds, split
+      by type (ADR-0008) — never a firehose, never per source. The prose that used
+      to surround this (the intro line, the per-app "how to add it" steps, and the
+      subscribe-not-import caveat) is gone: a reader who knows what a `.ics` URL is
+      needs the URL, and one who does not is not taught it here.
+
+      The URLs are **absolute**, both to the eye and on the button. A relative
+      `feeds/venue-events.ics` resolves against this page in a browser, but a
+      calendar app is given the string alone and has nothing to resolve it
+      against — so a relative URL is one that cannot be subscribed to, and
+      showing one while copying another would be worse still.
+    -->
+    <h2>ICS Calendar Subscription</h2>
+    <div class="feeds">
+      <div class="feed">
+        <span class="feed__name">SG Venue Events</span>
+        <code class="feed__url">https://edw93d.github.io/20260716SingaporeTourismCalendar/feeds/venue-events.ics</code>
+        <button class="feed__copy" data-url="https://edw93d.github.io/20260716SingaporeTourismCalendar/feeds/venue-events.ics">Copy</button>
+      </div>
+      <div class="feed">
+        <span class="feed__name">SG Cruise Arrivals</span>
+        <code class="feed__url">https://edw93d.github.io/20260716SingaporeTourismCalendar/feeds/port-calls.ics</code>
+        <button class="feed__copy" data-url="https://edw93d.github.io/20260716SingaporeTourismCalendar/feeds/port-calls.ics">Copy</button>
+      </div>
+    </div>
 
     <!--
       What the coverage and facts-only caveats left behind: the licence line
@@ -729,12 +776,12 @@
 
     <!--
       The bootstrap — the untested wiring seam 3 keeps out of `calendar.js`: it
-      supplies the two things the module refuses to reach for itself, the live
-      clock (`new Date()`) and the fetched payload. Everything it hands off to is
-      covered against jsdom with time frozen.
+      supplies the three things the module refuses to reach for itself: the live
+      clock (`new Date()`), the fetched payload, and the clipboard (#76).
+      Everything it hands off to is covered against jsdom with time frozen.
     -->
     <script type="module">
-      import { mountCalendar } from "./calendar.js";
+      import { mountCalendar, wireFeedCopy } from "./calendar.js";
 
       const root = document.getElementById("calendar");
       const topbar = document.querySelector(".topbar");
@@ -745,9 +792,15 @@
         mountCalendar(root, await response.json(), new Date(), { topbar, freshness });
       } catch (error) {
         root.innerHTML =
-          '<p id="calendar-status">The calendar could not be loaded. The feeds above still work.</p>';
+          '<p id="calendar-status">The calendar could not be loaded. The feeds below still work.</p>';
         console.error(error);
       }
+
+      // After the calendar, and outside its `try`, in both directions: the
+      // subscription block is static markup with no dependency on the payload,
+      // so a calendar that failed to load must not take the Copy buttons down —
+      // and wiring them last means they cannot take the calendar down either.
+      wireFeedCopy(document.querySelector(".feeds"), navigator.clipboard);
     </script>
   </body>
 </html>
