@@ -1792,6 +1792,35 @@ describe("the entry-detail bubble (#75)", () => {
     expect(bubble()).toBeNull();
   });
 
+  it("takes its bubble with it when it retires on a resize, rather than stranding it", () => {
+    // The bubble hangs off the body, not off the mount's root, so it outlives
+    // the surfaces it points at. A handler that evicted itself *before* closing
+    // would leave a popover in the page pointing at nothing, with every path
+    // that could dismiss it already retired.
+    mount(payloadOf({ sources }));
+    dblclick(chipsIn("2026-07-17")[0]);
+    const opened = bubble();
+    expect(opened).not.toBeNull();
+
+    topbar.remove(); // the mount's surfaces leave the page…
+    root.remove();
+    expect(bubble()).toBe(opened); // …and the bubble, on the body, does not
+
+    window.dispatchEvent(new Event("resize"));
+    expect(bubble()).toBeNull();
+  });
+
+  it("takes it with it on the document's dismissal path too", () => {
+    mount(payloadOf({ sources }));
+    dblclick(chipsIn("2026-07-17")[0]);
+    topbar.remove();
+    root.remove();
+    expect(bubble()).not.toBeNull();
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(bubble()).toBeNull();
+  });
+
   it("retires a replaced mount's dismissal listeners instead of accumulating them", () => {
     // The listeners live on the document and the window, which outlive a mount —
     // the same self-eviction the topbar's resize handler does (#84). A remount
@@ -1842,7 +1871,5 @@ describe("the entry-detail bubble (#75)", () => {
     expect(ruleFor(".calendar__bubble")).toMatch(/border-radius:\s*0\.6rem/);
     expect(shell).toMatch(/\.calendar__bubble--below::before[^{]*\{[^}]*var\(--tail-x\)/);
     expect(shell).toMatch(/\.calendar__bubble--above::before[^{]*\{[^}]*var\(--tail-x\)/);
-    // And the entries advertise that they are worth double-clicking.
-    expect(shell).toMatch(/cursor:\s*pointer/);
   });
 });

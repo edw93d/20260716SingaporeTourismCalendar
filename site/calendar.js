@@ -865,11 +865,15 @@ export const mountCalendar = (root, payload, now, options) => {
    * evicted.
    */
   const onResize = () => {
+    // The bubble closes before the staleness check, not after it. A bubble hangs
+    // off the document body, not off the mount's root, so a retired mount's
+    // bubble outlives the surface it points at — and a handler that returned
+    // early would leave it stranded in the page with nothing left to dismiss it.
+    closeBubble();
     if (!topbar.isConnected) {
       doc.defaultView?.removeEventListener("resize", onResize);
       return;
     }
-    closeBubble();
     publishTopbarHeight();
   };
 
@@ -1625,6 +1629,11 @@ export const mountCalendar = (root, payload, now, options) => {
    * *superseded*, with the same caveat #84 records — a remount into the very
    * same root leaves both live, closing the same bubble twice over, harmlessly.
    *
+   * Retiring, it takes the bubble with it. The bubble hangs off the document
+   * body rather than the root, so it survives its mount's removal; a listener
+   * that evicted itself without closing would leave a popover in the page
+   * pointing at a surface that has gone, and no path left to dismiss it.
+   *
    * @param {EventTarget | null | undefined} target @param {string} type
    * @param {(fired: any) => void} handler @param {boolean} [capture]
    */
@@ -1632,6 +1641,7 @@ export const mountCalendar = (root, payload, now, options) => {
     /** @param {any} fired */
     const listener = (fired) => {
       if (!root.isConnected) {
+        closeBubble();
         target?.removeEventListener(type, listener, capture);
         return;
       }
