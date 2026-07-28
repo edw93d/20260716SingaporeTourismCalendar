@@ -1455,7 +1455,7 @@ export const mountCalendar = (root, payload, now, options) => {
    * is (#40), never a baked relative string.
    * @param {DayEntry} entry @returns {string}
    */
-  const sourceText = (entry) => {
+  const bubbleFootText = (entry) => {
     const lastConfirmed = lastConfirmedBySource.get(entry.source);
     return lastConfirmed ? `${entry.source} · confirmed ${freshness(lastConfirmed, now).text}` : entry.source;
   };
@@ -1504,7 +1504,7 @@ export const mountCalendar = (root, payload, now, options) => {
     pad.appendChild(grid);
     node.appendChild(pad);
 
-    node.appendChild(el("div", "calendar__bubble-foot", sourceText(entry)));
+    node.appendChild(el("div", "calendar__bubble-foot", bubbleFootText(entry)));
     return node;
   };
 
@@ -1623,8 +1623,8 @@ export const mountCalendar = (root, payload, now, options) => {
   };
 
   /**
-   * A dismissal listener on a target that **outlives the mount** — the document,
-   * the window. Each retires itself the first time it fires after its mount's
+   * Binds one dismissal listener to a target that **outlives the mount** — the
+   * document, the window. Each retires itself the first time it fires after its mount's
    * root has left the page, the same self-eviction the topbar's resize handler
    * does (#84): a remount would otherwise leave every previous mount's handlers
    * firing for the life of the page. Stale here means *detached*, not
@@ -1639,7 +1639,7 @@ export const mountCalendar = (root, payload, now, options) => {
    * @param {EventTarget | null | undefined} target @param {string} type
    * @param {(fired: any) => void} handler @param {boolean} [capture]
    */
-  const onDismiss = (target, type, handler, capture = false) => {
+  const bindDismissal = (target, type, handler, capture = false) => {
     /** @param {any} fired */
     const listener = (fired) => {
       if (!root.isConnected) {
@@ -1653,11 +1653,11 @@ export const mountCalendar = (root, payload, now, options) => {
   };
 
   // A click anywhere but inside the bubble dismisses it…
-  onDismiss(doc, "click", (clicked) => {
+  bindDismissal(doc, "click", (clicked) => {
     if (openBubble && !openBubble.contains(clicked.target)) closeBubble();
   });
   // …as does Esc, which is how a keyboard reader gets out of it.
-  onDismiss(doc, "keydown", (pressed) => {
+  bindDismissal(doc, "keydown", (pressed) => {
     if (pressed.key === "Escape") closeBubble();
   });
   // Any scroll, in **capture** phase: a scroll event does not bubble, so a
@@ -1665,7 +1665,7 @@ export const mountCalendar = (root, payload, now, options) => {
   // and Month's own scroller would slide out from under a bubble that stayed
   // fixed where it was. Accepted for this round (#75): the bubble closes on a
   // scroll rather than following its node.
-  onDismiss(doc.defaultView, "scroll", closeBubble, true);
+  bindDismissal(doc.defaultView, "scroll", closeBubble, true);
   // A resize dismisses it too — through {@link onResize}, which is the mount's
   // one resize listener rather than a second one racing it.
 
