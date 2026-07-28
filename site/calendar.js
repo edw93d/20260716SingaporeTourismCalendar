@@ -110,6 +110,15 @@ const MONTHS_SHORT = [
 /** Monday-first: business planning reads the working week as a unit. */
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+/**
+ * How many chip-sized **rows** a Month cell holds (ADR-0014 §1) — four is what
+ * fits at the cell height that keeps the month on one screen. It is a row budget,
+ * not a chip count, which is the whole of the cap rule in {@link renderMonth}:
+ * four chips when four is all there is, otherwise three plus a `+N more`, because
+ * the control spends a row like a chip does.
+ */
+const MONTH_CELL_ROWS = 4;
+
 /** The number of days in a civil month. @param {number} year @param {number} month @returns {number} */
 const monthLength = (year, month) => new Date(Date.UTC(year, month, 0)).getUTCDate();
 
@@ -838,7 +847,7 @@ export const mountCalendar = (root, payload, now, options) => {
     applyScrollTarget();
   };
 
-  // --- Month: the navigator (unchanged from #38) -------------------------
+  // --- Month: the navigator ----------------------------------------------
   /** @param {DayEntry[]} visible @returns {HTMLElement} */
   const renderMonth = (visible) => {
     const { year, month } = civilOf(state.anchor);
@@ -858,11 +867,29 @@ export const mountCalendar = (root, payload, now, options) => {
 
       dayNode.appendChild(dayNumberNode(cell.day, cell.isToday, "calendar__daynum"));
 
-      // Every entry on the day, in full. No overflow collapse: Month is the
-      // navigator, and hiding entries behind a `+N more` count is the density
-      // inversion #5 disqualified the grid for.
-      for (const entry of entriesOnDay(visible, cell.key)) {
-        dayNode.appendChild(renderEntry(entry));
+      // Month is fixed to one screen (ADR-0014 §1): chips are one line and capped
+      // per day, and the overflow past the cap collapses to a `+N more` that
+      // drills into that day in Agenda. The control spends one of the cell's
+      // {@link MONTH_CELL_ROWS} rows, so an overflowing day shows one chip fewer —
+      // it is never taller than a day that simply fills the cell.
+      //
+      // This is not the density inversion #5 disqualified. #5 ruled out `+N more`
+      // as a **dead-end popover** on a grid asked to *read* magnitude; here the
+      // grid is the navigator (ADR-0009 §2), the inversion stays mitigated
+      // structurally by Date-spine and Agenda (ADR-0009 §5), and the overflow
+      // hands the reader to a reading surface at the day they were looking at
+      // rather than hiding entries behind a count.
+      const onDay = entriesOnDay(visible, cell.key);
+      const cap = onDay.length > MONTH_CELL_ROWS ? MONTH_CELL_ROWS - 1 : MONTH_CELL_ROWS;
+      for (const entry of onDay.slice(0, cap)) dayNode.appendChild(renderChip(entry));
+
+      const hidden = onDay.length - cap;
+      if (hidden > 0) {
+        const more = el("button", "calendar__more", `+${hidden} more →`);
+        more.setAttribute("type", "button");
+        const index = dayIndexOf(cell.year, cell.month, cell.day);
+        more.addEventListener("click", () => drillToAgendaDay(index));
+        dayNode.appendChild(more);
       }
       body.appendChild(dayNode);
     }
@@ -1026,9 +1053,36 @@ export const mountCalendar = (root, payload, now, options) => {
   };
 
   /**
-   * One entry, rendered the same in every view: type, an optional time/duration
-   * label, the name, where, and the source that produced it. `timeText` is the
-   * one thing that differs — Month omits it, the reading surfaces supply it.
+   * Month's **chip**: one entry, one line, truncated with an ellipsis where the
+   * cell is too narrow (#80). It carries the summary and nothing else — a chip
+   * that stacked a location and a source line under it would be the full entry
+   * again, and the cell height the cap buys would go straight back.
+   *
+   * What the line drops is on its `title`: the location, and — unlike every
+   * reading surface — the source label #38 puts on an entry. Month is the
+   * navigator; the attribution is one click away, on the surface `+N more` and
+   * (later, #75) the chip itself hand the reader to.
+   * The label drops a port call's `Cruise: ` prefix, as the prototype does. On a
+   * chip roughly sixteen characters wide it is eight characters of constant, and
+   * what it truncates is the vessel — the one thing that distinguishes one call
+   * from another. ADR-0001 keeps that prose in `summary` because an iCal client
+   * has nothing else to carry the category; the chip does — its type colour — and
+   * the full summary survives on the `title` and on every reading surface.
+   * @param {DayEntry} entry @returns {HTMLElement}
+   */
+  const renderChip = (entry) => {
+    const node = el("div", "calendar__chip", entry.summary.replace(/^Cruise: /, ""));
+    node.dataset["type"] = entry.type;
+    node.title = entry.location ? `${entry.summary} — ${entry.location}` : entry.summary;
+    return node;
+  };
+
+  /**
+   * One entry, rendered the same on every **reading** surface: type, an optional
+   * time/duration label, the name, where, and the source that produced it.
+   * `timeText` is the one thing that differs — the Week band omits it, the rest
+   * supply it. Month draws {@link renderChip} instead, which is the whole
+   * navigator/reading-surface split made visible.
    * @param {DayEntry} entry @param {string} [timeText]
    */
   const renderEntry = (entry, timeText) => {
