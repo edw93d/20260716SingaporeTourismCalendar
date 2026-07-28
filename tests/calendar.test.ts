@@ -108,6 +108,35 @@ const setFilter = (value: string) => {
   select.dispatchEvent(new Event("change"));
 };
 
+/**
+ * jsdom has no layout, so `scrollIntoView` does not exist on it at all — the
+ * page's own guard is what keeps the call safe there. Stubbing it is how much of
+ * the behaviour jsdom can expose: not that the viewport moved, but that the page
+ * asked the **right element** to come to the top of it. Called from a `describe`
+ * body; it installs its own hooks and hands back the record.
+ */
+const trackScrollTargets = () => {
+  const scrolled: Element[] = [];
+
+  beforeEach(() => {
+    scrolled.length = 0;
+    (Element.prototype as unknown as { scrollIntoView: () => void }).scrollIntoView =
+      function scrollIntoView(this: Element) {
+        scrolled.push(this);
+      };
+  });
+
+  afterEach(() => {
+    delete (Element.prototype as unknown as { scrollIntoView?: () => void }).scrollIntoView;
+  });
+
+  return {
+    scrolled,
+    /** The `data-day` of the element the page last brought to the top. */
+    landedOn: () => (scrolled.at(-1) as HTMLElement | undefined)?.dataset["day"],
+  };
+};
+
 describe("the model, in Singapore time", () => {
   it("buckets an instant into its Singapore calendar day, not the viewer's", () => {
     // 2026-07-18T20:00Z is already 2026-07-19 04:00 in Singapore.
@@ -462,28 +491,7 @@ describe("four switchable reading surfaces", () => {
 });
 
 describe("sticky header and today-to-top navigation (#73)", () => {
-  /**
-   * jsdom has no layout, so `scrollIntoView` does not exist on it at all — the
-   * page's own guard is what keeps the call safe there. Stubbing it is how much
-   * of the behaviour jsdom can expose: not that the viewport moved, but that the
-   * page asked the **right element** to come to the top of it.
-   */
-  let scrolled: Element[];
-
-  beforeEach(() => {
-    scrolled = [];
-    (Element.prototype as unknown as { scrollIntoView: () => void }).scrollIntoView =
-      function scrollIntoView(this: Element) {
-        scrolled.push(this);
-      };
-  });
-
-  afterEach(() => {
-    delete (Element.prototype as unknown as { scrollIntoView?: () => void }).scrollIntoView;
-  });
-
-  /** The `data-day` of the element the page last brought to the top. */
-  const landedOn = () => (scrolled.at(-1) as HTMLElement | undefined)?.dataset["day"];
+  const { scrolled, landedOn } = trackScrollTargets();
 
   /** Today (21 July) needs an entry for the reading surfaces to render its row. */
   const withToday = () =>
@@ -591,6 +599,174 @@ describe("sticky header and today-to-top navigation (#73)", () => {
     switchView("agenda");
     expect(landedOn()).toBeUndefined();
     expect(scrolled.at(-1)).toBe(root.querySelector(".calendar__surface"));
+  });
+});
+
+describe("Agenda day-stepping navigation (#77)", () => {
+  const { landedOn } = trackScrollTargets();
+
+  /** A single-day venue event on a given Singapore date — 10:00–18:00 SGT. */
+  const on = (date: string): Entry =>
+    congress({ uid: `${date}@x`, summary: `Entry ${date}`, start: `${date}T02:00:00Z`, end: `${date}T10:00:00Z` });
+
+  /**
+   * Event-days either side of the frozen 21 July, plus one in August. July's are
+   * 10, 21 (today) and 24; August's are 3 and 28 — enough for a step inside the
+   * month, a roll forward off the last one, and a roll back off the first.
+   */
+  const spread = () =>
+    payloadOf({
+      venueEvents: ["2026-07-10", "2026-07-21", "2026-07-24", "2026-08-03", "2026-08-28"].map(on),
+      portCalls: [],
+    });
+
+  it("steps to the next entry-day, not the next month", () => {
+    mount(spread());
+    switchView("agenda"); // the cursor is seeded from today, 21 July
+    click("next");
+    expect(landedOn()).toBe("2026-07-24");
+    expect(title()).toBe("July 2026");
+    // The day is on the surface, and the empty days between were skipped.
+    expect(root.querySelector('.agenda__day[data-day="2026-07-24"]')).not.toBeNull();
+  });
+
+  it("steps to the previous entry-day, skipping the empty days between", () => {
+    mount(spread());
+    switchView("agenda");
+    click("prev");
+    expect(landedOn()).toBe("2026-07-10");
+    expect(title()).toBe("July 2026");
+  });
+
+  it("rolls into the adjacent month's nearest entry-day at either edge", () => {
+    mount(spread());
+    switchView("agenda");
+    click("next"); // 24 July — July's last entry-day
+    click("next"); // over the boundary, onto August's first
+    expect(landedOn()).toBe("2026-08-03");
+    expect(title()).toBe("August 2026");
+    click("prev"); // back over the boundary, onto July's last
+    expect(landedOn()).toBe("2026-07-24");
+    expect(title()).toBe("July 2026");
+  });
+
+  it("keeps stepping by the entry-day across several months in a row", () => {
+    mount(spread());
+    switchView("agenda");
+    for (const day of ["2026-07-24", "2026-08-03", "2026-08-28"]) {
+      click("next");
+      expect(landedOn()).toBe(day);
+    }
+  });
+
+  it("falls back to a plain month step when there is no entry-day that way", () => {
+    // July only, so Next off the last entry-day has nowhere to land. It must
+    // still move — a nav control that does nothing reads as broken.
+    mount(payloadOf({ venueEvents: [on("2026-07-24")], portCalls: [] }));
+    switchView("agenda");
+    click("next");
+    expect(title()).toBe("July 2026"); // 21 July → 24 July, the one entry-day
+    click("next");
+    expect(title()).toBe("August 2026");
+    click("next");
+    expect(title()).toBe("September 2026");
+  });
+
+  it("carries the cursor with a fallback month step, so the next press moves on from there", () => {
+    // The venue event is July's last; the port call is hidden by the filter, so
+    // Next off it has nowhere to land and falls back to an August with nothing
+    // in it. Widening the filter there must step back to 10 August — the nearest
+    // day behind *where the reader now is*, not behind where they last landed.
+    mount(
+      payloadOf({
+        venueEvents: [on("2026-07-24")],
+        portCalls: [cruise({ start: "2026-08-10T00:00:00Z", end: "2026-08-10T08:00:00Z" })],
+      }),
+    );
+    switchView("agenda");
+    setFilter("VenueEvent");
+    click("next"); // 24 July
+    click("next"); // nothing ahead — the month step to August
+    expect(title()).toBe("August 2026");
+    setFilter("all");
+    click("prev");
+    expect(landedOn()).toBe("2026-08-10");
+  });
+
+  it("bounds the cross-month scan rather than sweeping the whole dataset", () => {
+    // The next entry-day is 30 months out — past the 24-month scan — so Next
+    // takes the month step instead of leaping years ahead of the reader.
+    mount(payloadOf({ venueEvents: [on("2026-07-24"), on("2029-01-05")], portCalls: [] }));
+    switchView("agenda");
+    click("next"); // 24 July
+    click("next");
+    expect(title()).toBe("August 2026");
+  });
+
+  it("steps by the entry-days the current filter leaves showing", () => {
+    mount(
+      payloadOf({
+        venueEvents: [on("2026-07-24")],
+        portCalls: [cruise({ start: "2026-07-22T00:00:00Z", end: "2026-07-22T08:00:00Z" })],
+      }),
+    );
+    switchView("agenda");
+    setFilter("VenueEvent"); // 22 July is filtered out, so Next skips it
+    click("next");
+    expect(landedOn()).toBe("2026-07-24");
+  });
+
+  it("leaves Month, Week and Date-spine paging by their own unit", () => {
+    mount(spread());
+    for (const view of ["month", "spine"]) {
+      switchView(view);
+      click("next");
+      expect(title()).toBe("August 2026");
+      click("prev");
+      expect(title()).toBe("July 2026");
+    }
+    switchView("week");
+    click("next");
+    expect(title()).toBe("27 Jul – 2 Aug 2026");
+  });
+
+  it("drills to a day in Agenda from anywhere, seeding the cursor there", () => {
+    const calendar = mount(spread());
+    // The drill-through Month's and Week's `+N more` controls will consume
+    // (#80, #81): switch surface, seed the cursor, bring the day to the top.
+    calendar.drillToAgendaDay(sgtDayIndex(new Date("2026-08-03T02:00:00Z")));
+    expect((find('[data-view="agenda"]') as HTMLElement).getAttribute("aria-selected")).toBe("true");
+    expect(title()).toBe("August 2026");
+    expect(landedOn()).toBe("2026-08-03");
+    // Seeded, not merely scrolled: the next step continues from the drilled day.
+    click("next");
+    expect(landedOn()).toBe("2026-08-28");
+  });
+
+  it("re-seeds the cursor on today when a view switch re-opens Agenda", () => {
+    // A view switch already opens on the present (#73) while keeping the month
+    // the reader had reached (§6), and the cursor comes home with the scroll: the
+    // first step after arriving reads forward from today, landing on the showing
+    // month's first entry-day rather than resuming the old wander at 28 August.
+    mount(spread());
+    switchView("agenda");
+    click("next"); // 24 July
+    click("next"); // 3 August — the anchor is now August
+    switchView("month");
+    switchView("agenda");
+    click("next");
+    expect(landedOn()).toBe("2026-08-03");
+  });
+
+  it("resumes from today after Today is pressed, whatever the cursor was", () => {
+    mount(spread());
+    switchView("agenda");
+    click("next"); // 24 July
+    click("next"); // 3 August
+    click("today");
+    expect(landedOn()).toBe("2026-07-21");
+    click("next");
+    expect(landedOn()).toBe("2026-07-24");
   });
 });
 
