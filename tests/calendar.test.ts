@@ -1009,6 +1009,111 @@ describe("Week: legibility marks, header alignment and the weekend wash (#78)", 
   });
 });
 
+describe("Date-spine: week-boundary lines (#74)", () => {
+  const parsePct = (value: string) => Number.parseFloat(value.replace("%", ""));
+  const weekLines = () => Array.from(root.querySelectorAll(".spine__week")) as HTMLElement[];
+  const spine = () => root.querySelector(".spine") as HTMLElement;
+
+  const openSpine = () => {
+    mount(payloadOf());
+    switchView("spine");
+  };
+
+  it("draws a boundary line at the top of each Monday, and on no other day", () => {
+    openSpine();
+    // July 2026 opens on a Wednesday, so its Mondays are the 6th, 13th, 20th and 27th.
+    expect(weekLines().map((line) => line.dataset["day"])).toEqual([
+      "2026-07-06",
+      "2026-07-13",
+      "2026-07-20",
+      "2026-07-27",
+    ]);
+  });
+
+  it("re-reads the Mondays from the month it is showing, never a fixed stride", () => {
+    openSpine();
+    click("next"); // August 2026 opens on a Saturday — a different offset entirely
+    expect(weekLines().map((line) => line.dataset["day"])).toEqual([
+      "2026-08-03",
+      "2026-08-10",
+      "2026-08-17",
+      "2026-08-24",
+      "2026-08-31",
+    ]);
+  });
+
+  it("lands each line on the top edge of its Monday's row, not somewhere inside it", () => {
+    openSpine();
+    // The track measures the same 31 days the axis lists, so the fraction of the
+    // month a Monday opens at *is* the top of its row on the axis beside it.
+    expect(weekLines()).toHaveLength(4);
+    for (const line of weekLines()) {
+      const day = Number((line.dataset["day"] ?? "").slice(-2));
+      expect(parsePct(line.style.top)).toBeCloseTo(((day - 1) / 31) * 100, 4);
+    }
+  });
+
+  it("holds the axis and the track to one row unit, so a percentage means the same on both", () => {
+    // The track used to be a flat `min-height`, which agreed with the axis only
+    // in a 31-day month; in a 30-day one every bar — and now every week line —
+    // sat a row's worth low by the foot of the month.
+    expect(ruleFor(".spine__axis")).toMatch(/grid-auto-rows:\s*var\(--spine-row\)/);
+    expect(ruleFor(".spine__track")).toMatch(
+      /height:\s*calc\(var\(--spine-days\)\s*\*\s*var\(--spine-row\)\)/,
+    );
+    openSpine();
+    expect(spine().style.getPropertyValue("--spine-days")).toBe("31");
+  });
+
+  it("measures a 30-day month by its own length, not a 31-day one's", () => {
+    // The case the flat minimum height got wrong. September 2026 has 30 days and
+    // opens on a Tuesday, so its last Monday — the 28th — is 27/30 of the way
+    // down a track that has to be 30 rows tall, not 31.
+    openSpine();
+    click("next"); // August
+    click("next"); // September
+    expect(spine().style.getPropertyValue("--spine-days")).toBe("30");
+    const lines = weekLines();
+    expect(lines.map((line) => line.dataset["day"])).toEqual([
+      "2026-09-07",
+      "2026-09-14",
+      "2026-09-21",
+      "2026-09-28",
+    ]);
+    expect(parsePct((lines.at(-1) as HTMLElement).style.top)).toBeCloseTo((27 / 30) * 100, 4);
+  });
+
+  it("reaches back across the gap and the axis, so the line spans the whole spine", () => {
+    // One source for the two widths it has to undo — the line cannot drift off
+    // the axis the next time the spine's columns are resized.
+    expect(ruleFor(".spine")).toMatch(/grid-template-columns:\s*var\(--spine-axis\) 1fr/);
+    expect(ruleFor(".spine")).toMatch(/gap:\s*var\(--spine-gap\)/);
+    const rule = ruleFor(".spine__week");
+    expect(rule).toMatch(/left:\s*calc\(-1 \* \(var\(--spine-axis\) \+ var\(--spine-gap\)\)\)/);
+    expect(rule).toMatch(/right:\s*0/);
+  });
+
+  it("draws the week stronger than the day, and behind the bars it bands", () => {
+    // The daily hairline is --line (18%); the week boundary is 32%, so weeks
+    // stand out from days rather than joining them.
+    expect(ruleFor(".spine__date")).toMatch(/border-top:\s*1px solid var\(--line\)/);
+    expect(ruleFor(".spine__week")).toMatch(
+      /border-top:\s*1px solid color-mix\(in srgb, currentColor 32%, transparent\)/,
+    );
+    // Behind, and inert: appended before the bars, and no target for a pointer.
+    expect(ruleFor(".spine__week")).toMatch(/pointer-events:\s*none/);
+    openSpine();
+    const track = root.querySelector(".spine__track") as HTMLElement;
+    expect(Array.from(track.children, (node) => node.className).slice(0, 4)).toEqual([
+      "spine__week",
+      "spine__week",
+      "spine__week",
+      "spine__week",
+    ]);
+    expect(track.querySelector(".spine__bar")).not.toBeNull();
+  });
+});
+
 describe("sticky header and today-to-top navigation (#73)", () => {
   const { scrolled, landedOn } = trackScrollTargets();
 

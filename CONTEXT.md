@@ -201,6 +201,24 @@ its 24:00 line the hour grid's own. The day is quartered *once*, across the grid
 columns paint no rule of their own, because two griddings of one axis are two competing
 readings of it. #78.
 
+### Week-boundary line
+
+The rule **Date-spine** draws at the top of each Monday, across the date axis *and* the
+bar track, so a column of floating bars reads as one week at a time rather than as one
+undifferentiated run of durations. It is stronger than the daily hairline the axis
+already carries (32% against 18%), because a week has to stand out from a day, and it
+sits *behind* the bars: an entry paints over the line, never the line across the entry.
+
+Monday is read from the same single fact the week views' geometry and their Monday-first
+weekday labels read from, so **Date-spine** and **Week** can never disagree about where a
+week starts.
+
+It also fixes the axis and the track to **one row unit**: the track is exactly as tall as
+the month is long, so one percentage names the same row on both. The flat minimum height
+it replaces agreed with the axis only in a 31-day month — in a 30-day one every bar sat
+progressively low, which the line made visible the moment it had to land on a row's edge.
+#74 — a net-new round-1 item, so it is spec'd on its issue rather than in ADR-0014.
+
 ### Weekend wash
 
 The light grey (4%) **Month** and **Week** carry on Saturday and Sunday — one grey,

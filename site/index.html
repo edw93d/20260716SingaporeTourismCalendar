@@ -510,8 +510,20 @@
       .agenda__empty { color: var(--dim); padding: 1rem 0; }
 
       /* --- Date-spine: duration as literal vertical span (ADR-0009 §3) --- */
-      .spine { display: grid; grid-template-columns: 3.5rem 1fr; gap: 0.5rem; }
-      .spine__axis { display: grid; grid-auto-rows: 1.4rem; }
+      /* One row unit, one axis width, one gap — declared once and read by the
+         axis, the track and the week line, so a percentage inside the track means
+         the same row it does on the axis beside it (#74). `--spine-days` is set
+         on the element by the renderer: the track is exactly as tall as the month
+         is long, which a flat `min-height` only was in a 31-day month. */
+      .spine {
+        --spine-row: 1.4rem;
+        --spine-axis: 3.5rem;
+        --spine-gap: 0.5rem;
+        display: grid;
+        grid-template-columns: var(--spine-axis) 1fr;
+        gap: var(--spine-gap);
+      }
+      .spine__axis { display: grid; grid-auto-rows: var(--spine-row); }
       .spine__date {
         display: flex;
         justify-content: space-between;
@@ -524,7 +536,20 @@
         font-variant-numeric: tabular-nums;
       }
       .spine__datenum { font-weight: 600; color: inherit; }
-      .spine__track { position: relative; min-height: 43rem; }
+      .spine__track { position: relative; height: calc(var(--spine-days) * var(--spine-row)); }
+      /* The week-boundary line at the top of each Monday, so the floating bars
+         read as week bands rather than one undifferentiated column of durations
+         (#74). It reaches back across the gap and the axis to span the whole
+         spine, and it is stronger than the daily hairline (--line, 18%) so weeks
+         stand out from days. It sits behind the bars and takes no pointer. */
+      .spine__week {
+        position: absolute;
+        left: calc(-1 * (var(--spine-axis) + var(--spine-gap)));
+        right: 0;
+        height: 0;
+        pointer-events: none;
+        border-top: 1px solid color-mix(in srgb, currentColor 32%, transparent);
+      }
       .spine__bar {
         position: absolute;
         overflow: hidden;

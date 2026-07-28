@@ -1195,8 +1195,18 @@ export const mountCalendar = (root, payload, now, options) => {
     const monthStart = dayIndexOf(year, month, 1);
     const monthEnd = monthStart + daysInMonth; // exclusive
     const span = daysInMonth;
+    /**
+     * Where a day index sits down the track, as a percentage of the month. The
+     * bars and the week-boundary lines share it, so a line cannot land on a
+     * row's edge that the bars measure from somewhere else.
+     * @param {number} value @returns {string}
+     */
+    const topOf = (value) => `${((value - monthStart) / span) * 100}%`;
 
     const wrap = el("div", "spine");
+    // The month's length, handed to the stylesheet: the track is exactly as tall
+    // as the axis is long, so one percentage names one row on both (#74).
+    wrap.style.setProperty("--spine-days", String(daysInMonth));
 
     const axis = el("div", "spine__axis");
     for (let day = 1; day <= daysInMonth; day += 1) {
@@ -1214,13 +1224,31 @@ export const mountCalendar = (root, payload, now, options) => {
     // in for magnitude is the whole point of this view (ADR-0009 §3/§5) — it is
     // still not a score: nothing is ranked, only measured against the clock.
     const track = el("div", "spine__track");
+
+    // The **week-boundary line** (#74): a rule at the top of each Monday's row,
+    // spanning the axis as well as the track (the stylesheet reaches it back
+    // across both widths), so a column of floating bars reads one week at a time
+    // rather than as one undifferentiated run of durations. Drawn before the bars,
+    // so an entry paints over the line rather than the line across the entry.
+    // Monday is `mondayOf(index) === index` — the same single fact Week's
+    // geometry and every weekday label read from, so Date-spine and Week can
+    // never disagree about where a week starts.
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const index = dayIndexOf(year, month, day);
+      if (mondayOf(index) !== index) continue;
+      const line = el("div", "spine__week");
+      line.dataset["day"] = dayAttrOf({ year, month, day });
+      line.style.top = topOf(index);
+      track.appendChild(line);
+    }
+
     const inMonth = visible.filter((e) => e.endValue > monthStart && e.startValue < monthEnd);
     for (const { item, lane, lanes } of assignLanes(inMonth, (e) => e.startValue, (e) => e.endValue)) {
       const start = Math.max(item.startValue, monthStart);
       const end = Math.min(item.endValue, monthEnd);
       const node = renderEntry(item, spanText(item.endValue - item.startValue));
       node.classList.add("spine__bar");
-      node.style.top = `${((start - monthStart) / span) * 100}%`;
+      node.style.top = topOf(start);
       node.style.height = `${Math.max(((end - start) / span) * 100, 0.8)}%`;
       node.style.left = `${(lane / lanes) * 100}%`;
       node.style.width = `${(1 / lanes) * 100}%`;
