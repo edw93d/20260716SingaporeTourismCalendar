@@ -572,11 +572,14 @@
         pointer-events: none;
         border-top: 1px solid color-mix(in srgb, currentColor 32%, transparent);
       }
+      /* No `min-height` here: the geometry carries the floor. `renderSpine`
+         spans whole day rows, so the shortest bar there is is one `--spine-row`
+         — and a floor in the stylesheet would only paint a bar taller than the
+         days it claims, which is what used to make same-day neighbours overlap. */
       .spine__bar {
         position: absolute;
         overflow: hidden;
         gap: 0;
-        min-height: 1rem;
       }
 
       /* --- The entry-detail bubble (#75) ---------------------------------

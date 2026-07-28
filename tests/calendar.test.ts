@@ -679,18 +679,50 @@ describe("four switchable reading surfaces", () => {
     expect(day18?.querySelector(".calendar__entry-where")?.textContent).toContain("Hall 404");
   });
 
-  it("Date-spine renders duration as a proportional span — long dominates short", () => {
-    mount(payloadOf()); // congress ~2.25 days, cruise ~0.33 day
+  it("Date-spine spans whole day rows — one row is the floor, and a bar starts on its row's edge", () => {
+    // Congress 17–19 July SGT (three dates, ~2.25 days on the clock); cruise
+    // 18 July 08:00–16:00 SGT (one date, a third of a day).
+    mount(payloadOf());
     switchView("spine");
     const bars = Array.from(root.querySelectorAll(".spine__bar")) as HTMLElement[];
     const byType = (type: string) =>
       bars.find((b) => b.dataset["type"] === type) as HTMLElement;
-    const congressH = parsePct(byType("VenueEvent").style.height);
-    const cruiseH = parsePct(byType("PortCall").style.height);
-    // The multi-day band is several times taller than the few-hour call — span
-    // stands in for magnitude, across the data's wide duration range.
-    expect(congressH).toBeGreaterThan(cruiseH * 3);
+    const row = 100 / 31; // July, as a percentage of the track
+
+    // The spine's unit is the **date**: three dates is exactly three rows, one
+    // date exactly one — never the fraction of a row the clock would give, which
+    // is unreadable and collides with whatever shares the lane.
+    expect(parsePct(byType("VenueEvent").style.height)).toBeCloseTo(row * 3, 4);
+    expect(parsePct(byType("PortCall").style.height)).toBeCloseTo(row, 4);
+
+    // And a bar begins at its day's row edge, so it lines up with the date on
+    // the axis beside it rather than starting part-way down at 08:00.
+    expect(parsePct(byType("VenueEvent").style.top)).toBeCloseTo(row * 16, 4);
+    expect(parsePct(byType("PortCall").style.top)).toBeCloseTo(row * 17, 4);
+
+    // The label keeps the clock the geometry rounded off.
     expect(byType("VenueEvent").textContent).toContain("2.3 days");
+    expect(byType("PortCall").textContent).toContain("8 hr");
+  });
+
+  it("Date-spine gives an entry its own lane when it shares a date with one that ends that day", () => {
+    // The congress runs 20–22 July SGT and the call is the evening of the 22nd.
+    // On the clock they do not overlap — the congress closes at 16:00, the call
+    // opens at 18:00 — but they occupy the same *date*, and a spine drawn in
+    // whole day rows would stack one on top of the other in a shared lane. The
+    // packer is half-open, so the renderer hands it `endIndex + 1`.
+    mount(
+      payloadOf({
+        venueEvents: [congress({ start: "2026-07-20T02:00:00Z", end: "2026-07-22T08:00:00Z" })],
+        portCalls: [cruise({ start: "2026-07-22T10:00:00Z", end: "2026-07-22T14:00:00Z" })],
+      }),
+    );
+    switchView("spine");
+    const bars = Array.from(root.querySelectorAll(".spine__bar")) as HTMLElement[];
+    expect(bars).toHaveLength(2);
+    // Two lanes: each bar takes half the track, and they sit at different offsets.
+    for (const bar of bars) expect(parsePct(bar.style.width)).toBeCloseTo(50, 4);
+    expect(new Set(bars.map((bar) => bar.style.left)).size).toBe(2);
   });
 
   it("applies the type filter once and keeps it across every view switch", () => {

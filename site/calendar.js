@@ -1264,6 +1264,19 @@ export const mountCalendar = (root, payload, now, options) => {
     // multi-day congress physically dominates a three-hour fair. Span standing
     // in for magnitude is the whole point of this view (ADR-0009 §3/§5) — it is
     // still not a score: nothing is ranked, only measured against the clock.
+    //
+    // The spine's **unit is the date, not the clock**: a bar spans the whole day
+    // rows it occupies, and one row is the floor. Measuring the fractional
+    // `startValue`/`endValue` instead — which this did — is more literal and
+    // unreadable: a 6 hr entry becomes a quarter-row sliver with no room for its
+    // own title, it starts part-way down its row so it lines up with nothing on
+    // the axis beside it, and two entries that share a lane honestly (one ends
+    // before the other starts, same day) collide once anything floors their
+    // painted height. ADR-0009 §3 still reads true at day resolution — one row
+    // against a congress's five is a sliver — and what the floor costs, telling
+    // a 3 hr fair from a 20 hr port call, is already the recorded
+    // cruise-magnitude hole (§94). The **label** keeps the clock: the bar says
+    // which days, `spanText` says how long.
     const track = el("div", "spine__track");
 
     // The **week-boundary line** (#74): a rule at the top of each Monday's row,
@@ -1283,14 +1296,21 @@ export const mountCalendar = (root, payload, now, options) => {
       track.appendChild(line);
     }
 
-    const inMonth = visible.filter((e) => e.endValue > monthStart && e.startValue < monthEnd);
-    for (const { item, lane, lanes } of assignLanes(inMonth, (e) => e.startValue, (e) => e.endValue)) {
-      const start = Math.max(item.startValue, monthStart);
-      const end = Math.min(item.endValue, monthEnd);
+    // `startIndex`/`endIndex` are the days an entry occupies — the same pair
+    // Week's all-day band draws from, so the two views can never disagree about
+    // which dates a congress covers. They are **inclusive**, and `assignLanes`
+    // is half-open by contract, so the packer is handed `endIndex + 1`: the
+    // identical conversion {@link packAllDayBand} makes, for the identical
+    // reason (an entry running 20–22 July occupies the 22nd, so one starting on
+    // the 22nd must not inherit its lane).
+    const inMonth = visible.filter((e) => e.endIndex >= monthStart && e.startIndex < monthEnd);
+    for (const { item, lane, lanes } of assignLanes(inMonth, (e) => e.startIndex, (e) => e.endIndex + 1)) {
+      const start = Math.max(item.startIndex, monthStart);
+      const end = Math.min(item.endIndex, monthEnd - 1); // inclusive, clamped to the month
       const node = renderEntry(item, spanText(item.endValue - item.startValue));
       node.classList.add("spine__bar");
       node.style.top = topOf(start);
-      node.style.height = `${Math.max(((end - start) / span) * 100, 0.8)}%`;
+      node.style.height = `${((end - start + 1) / span) * 100}%`;
       node.style.left = `${(lane / lanes) * 100}%`;
       node.style.width = `${(1 / lanes) * 100}%`;
       track.appendChild(node);
