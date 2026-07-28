@@ -32,6 +32,7 @@
  * @typedef {"all" | RecordType} Filter
  * @typedef {"month" | "week" | "agenda" | "spine"} View
  * @typedef {SiteEntry & { type: RecordType, startKey: number, endKey: number, startIndex: number, endIndex: number, startValue: number, endValue: number }} DayEntry
+ * @typedef {{ topbar?: Element }} MountOptions
  */
 
 /**
@@ -359,11 +360,18 @@ const pad2 = (value) => String(value).padStart(2, "0");
  * the page is driven entirely through the controls it renders (filter, prev,
  * today, next), which is what a test drives too.
  *
+ * Two hosts, because the header is **pinned** (#73): the controls render into
+ * `options.topbar` — the page's sticky `<header>`, which already holds the
+ * static h1 — and everything that scrolls under it renders into `root`. Without
+ * a topbar the module makes its own inside `root`, so a bare `mountCalendar`
+ * still produces a whole calendar.
+ *
  * @param {Element} root
  * @param {SitePayload} payload
  * @param {Date} now
+ * @param {MountOptions} [options]
  */
-export const mountCalendar = (root, payload, now) => {
+export const mountCalendar = (root, payload, now, options = {}) => {
   const doc = root.ownerDocument;
   if (!doc) throw new Error("mountCalendar needs a root attached to a document.");
 
@@ -401,10 +409,38 @@ export const mountCalendar = (root, payload, now) => {
       ? el("span", small ? "disc disc--sm" : "disc", String(day))
       : el("span", baseClass ?? undefined, String(day));
 
+  // --- The two hosts: the pinned header, and what scrolls under it --------
+  root.textContent = "";
+  root.className = "calendar";
+
+  const topbar = options.topbar ?? el("header", "topbar");
+  // A second mount into the same shell replaces the controls rather than
+  // stacking a second set beside them — `root` is cleared above, but a
+  // page-supplied topbar outlives the mount.
+  for (const stale of Array.from(topbar.querySelectorAll(".calendar__controls"))) stale.remove();
+  /** The controls, rebuilt each render: they carry the current view and title. */
+  const controls = el("div", "calendar__controls");
+  topbar.appendChild(controls);
+  if (!options.topbar) root.appendChild(topbar);
+
+  /** The showing view. Everything here scrolls under the pinned header. */
+  const surface = el("div", "calendar__surface");
+
+  /**
+   * The day to bring to the **top of the viewport** after the next render, or
+   * `null` to leave the scroll where the reader put it. Seeded with today, so
+   * first load lands on the present the same way the Today control does (#73) —
+   * the rule is applied after every render, not special-cased into one button.
+   * @type {number | null}
+   */
+  let scrollTarget = todayIndex;
+
   /**
    * Page by the current view's unit: Week moves the anchor a whole week, every
    * other view a whole month (keeping the day-of-month where the target month is
-   * long enough). @param {number} delta
+   * long enough). Paging deliberately leaves `scrollTarget` alone: the reader
+   * just moved on purpose, and yanking them back to today would undo it.
+   * @param {number} delta
    */
   const step = (delta) => {
     if (state.view === "week") {
@@ -464,12 +500,55 @@ export const mountCalendar = (root, payload, now) => {
     return list;
   };
 
-  const render = () => {
-    root.textContent = "";
-    root.className = "calendar";
+  /**
+   * The day's `data-day` attribute value — the handle every view labels its own
+   * row, cell or column with, and so the one selector "bring this day to the
+   * top" needs, whichever view is showing.
+   * @param {number} index @returns {string}
+   */
+  const dayAttr = (index) => {
+    const { year, month, day } = civilOf(index);
+    return `${year}-${pad2(month)}-${pad2(day)}`;
+  };
 
+  /**
+   * Bring the pending `scrollTarget` day to the **top of the viewport** (#73).
+   * The pinned header would otherwise cover it, so the shell's
+   * `scroll-padding-top: var(--topbar-h)` pushes the landing below the header —
+   * which is why {@link publishTopbarHeight} runs first, every render.
+   *
+   * A day the showing view does not render (today, while the reader is two
+   * months back) falls back to the top of the surface rather than leaving them
+   * stranded mid-scroll. `scrollIntoView` is absent in jsdom, which has no
+   * layout at all, so the call is guarded and a test asserts only which element
+   * was asked to come up.
+   */
+  const applyScrollTarget = () => {
+    if (scrollTarget === null) return;
+    const target = surface.querySelector(`[data-day="${dayAttr(scrollTarget)}"]`) ?? surface;
+    scrollTarget = null;
+    if (typeof target.scrollIntoView === "function") target.scrollIntoView({ block: "start" });
+  };
+
+  /**
+   * Publish the pinned header's **measured** height as `--topbar-h`, which the
+   * shell's `scroll-padding-top` consumes. Measured rather than declared because
+   * the header wraps to two, three or four lines depending on the viewport, and
+   * a stale constant would land a jumped-to row behind it (#73).
+   */
+  const publishTopbarHeight = () => {
+    if (typeof topbar.getBoundingClientRect !== "function") return;
+    const { height } = topbar.getBoundingClientRect();
+    doc.documentElement.style.setProperty("--topbar-h", `${height}px`);
+  };
+
+  const render = () => {
     // --- Controls: view switcher, type filter, navigation ----------------
-    const controls = el("div", "calendar__controls");
+    // Two lines in the pinned header: the period and its stepper above, the
+    // view tabs and the type filter below.
+    controls.textContent = "";
+    const periodBar = el("div", "calendar__bar");
+    const viewBar = el("div", "calendar__bar");
 
     // Every view is present as a tab, so any one is reachable from any other in
     // a single click — the switching *is* the feature, not a fallback (§1).
@@ -490,6 +569,10 @@ export const mountCalendar = (root, payload, now) => {
       if (active) button.classList.add("calendar__viewbtn--active");
       button.addEventListener("click", () => {
         state.view = value;
+        // A view switch behaves exactly like pressing Today: whichever surface
+        // the reader lands on opens on the present, not wherever the last one
+        // happened to be scrolled to (#73).
+        scrollTarget = todayIndex;
         render();
       });
       views.appendChild(button);
@@ -525,32 +608,38 @@ export const mountCalendar = (root, payload, now) => {
 
     nav.appendChild(navButton("prev", "‹ Prev", () => step(-1)));
     // Today returns to the present from anywhere — and the anchor is *reset*, not
-    // stepped, so it lands home regardless of how far the reader wandered.
+    // stepped, so it lands home regardless of how far the reader wandered. It
+    // also brings today's row to the top, which is the same rule every render
+    // applies, not a behaviour special to this button.
     nav.appendChild(navButton("today", "Today", () => {
       state.anchor = todayIndex;
+      scrollTarget = todayIndex;
       render();
     }));
     nav.appendChild(navButton("next", "Next ›", () => step(1)));
-    nav.appendChild(title);
 
-    controls.appendChild(views);
-    controls.appendChild(filter);
-    controls.appendChild(nav);
-    root.appendChild(controls);
-
-    // The freshness disclosure sits above every view's surface — it is not a
-    // property of the month or the week, but of the data behind all of them.
-    const fresh = renderFreshness();
-    if (fresh) root.appendChild(fresh);
+    periodBar.appendChild(title);
+    periodBar.appendChild(nav);
+    viewBar.appendChild(views);
+    viewBar.appendChild(filter);
+    controls.appendChild(periodBar);
+    controls.appendChild(viewBar);
 
     // The one place the filter is applied — every view reads this same list (§4).
     const visible = filterEntries(entries, state.filter);
-    const surface =
+    surface.textContent = "";
+    surface.appendChild(
       state.view === "week" ? renderWeek(visible)
       : state.view === "agenda" ? renderAgenda(visible)
       : state.view === "spine" ? renderSpine(visible)
-      : renderMonth(visible);
-    root.appendChild(surface);
+      : renderMonth(visible),
+    );
+
+    // The header is pinned, so its height has to be republished before anything
+    // scrolls to a row under it — the controls just changed, and on a narrow
+    // viewport that changes how many lines they wrap to.
+    publishTopbarHeight();
+    applyScrollTarget();
   };
 
   // --- Month: the navigator (unchanged from #38) -------------------------
@@ -780,6 +869,13 @@ export const mountCalendar = (root, payload, now) => {
     const rounded = Math.round(days * 10) / 10;
     return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)} days`;
   };
+
+  // The freshness disclosure sits above every view's surface — it is not a
+  // property of the month or the week, but of the data behind all of them, so it
+  // is rendered once here rather than rebuilt by every render.
+  const fresh = renderFreshness();
+  if (fresh) root.appendChild(fresh);
+  root.appendChild(surface);
 
   render();
 };

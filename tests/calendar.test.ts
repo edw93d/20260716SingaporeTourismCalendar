@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   assignLanes,
   entriesOnDay,
@@ -70,26 +71,39 @@ const payloadOf = (overrides: Partial<Payload> = {}): Payload => ({
 const JULY_21 = new Date("2026-07-21T02:00:00Z");
 
 let root: HTMLElement;
+let topbar: HTMLElement;
 
+/**
+ * The page shell `site/index.html` supplies: a pinned `<header class="topbar">`
+ * holding the static h1, into which the controls render (#73), and the mount
+ * root below it holding the scrolling surface. The tests build the same shell so
+ * the DOM under test is the DOM the page ships.
+ */
 beforeEach(() => {
+  document.body.textContent = "";
+  document.documentElement.removeAttribute("style");
+  topbar = document.createElement("header");
+  topbar.className = "topbar";
+  topbar.appendChild(document.createElement("h1"));
   root = document.createElement("div");
-  document.body.appendChild(root);
+  document.body.append(topbar, root);
 });
 
-const mount = (payload: Payload, now: Date = JULY_21) => mountCalendar(root, payload, now);
+const mount = (payload: Payload, now: Date = JULY_21) =>
+  mountCalendar(root, payload, now, { topbar });
 
-const title = () => root.querySelector(".calendar__title")?.textContent;
+/** Controls live in the topbar, the surface in the root — query the page. */
+const find = (selector: string) => document.body.querySelector(selector);
+const title = () => find(".calendar__title")?.textContent;
 const cell = (day: string) => root.querySelector(`.calendar__day[data-day="${day}"]`);
 const entriesIn = (day: string) =>
   Array.from(cell(day)?.querySelectorAll(".calendar__entry") ?? []);
 const summariesIn = (day: string) =>
   entriesIn(day).map((node) => node.querySelector(".calendar__entry-title")?.textContent);
-const click = (which: string) =>
-  (root.querySelector(`[data-nav="${which}"]`) as HTMLButtonElement).click();
-const switchView = (view: string) =>
-  (root.querySelector(`[data-view="${view}"]`) as HTMLButtonElement).click();
+const click = (which: string) => (find(`[data-nav="${which}"]`) as HTMLButtonElement).click();
+const switchView = (view: string) => (find(`[data-view="${view}"]`) as HTMLButtonElement).click();
 const setFilter = (value: string) => {
-  const select = root.querySelector(".calendar__filter") as HTMLSelectElement;
+  const select = find(".calendar__filter") as HTMLSelectElement;
   select.value = value;
   select.dispatchEvent(new Event("change"));
 };
@@ -309,7 +323,7 @@ describe("four switchable reading surfaces", () => {
 
   it("offers all four views as tabs, any reachable from any other in one click", () => {
     mount(payloadOf());
-    const tabs = Array.from(root.querySelectorAll("[data-view]")).map((n) =>
+    const tabs = Array.from(document.body.querySelectorAll("[data-view]")).map((n) =>
       (n as HTMLElement).dataset["view"],
     );
     expect(tabs).toEqual(["month", "week", "agenda", "spine"]);
@@ -408,7 +422,7 @@ describe("four switchable reading surfaces", () => {
     setFilter("PortCall");
     for (const view of ["week", "agenda", "spine", "month"]) {
       switchView(view);
-      expect((root.querySelector(".calendar__filter") as HTMLSelectElement).value).toBe("PortCall");
+      expect((find(".calendar__filter") as HTMLSelectElement).value).toBe("PortCall");
       expect(root.querySelectorAll('.calendar__entry[data-type="VenueEvent"]').length).toBe(0);
       expect(root.querySelectorAll('.calendar__entry[data-type="PortCall"]').length).toBeGreaterThan(0);
     }
@@ -444,6 +458,144 @@ describe("four switchable reading surfaces", () => {
       switchView(view);
       expect(root.textContent ?? "").not.toMatch(/\+\s*\d+\s*more/i);
     }
+  });
+});
+
+describe("sticky header and today-to-top navigation (#73)", () => {
+  /**
+   * jsdom has no layout, so `scrollIntoView` does not exist on it at all — the
+   * page's own guard is what keeps the call safe there. Stubbing it is how much
+   * of the behaviour jsdom can expose: not that the viewport moved, but that the
+   * page asked the **right element** to come to the top of it.
+   */
+  let scrolled: Element[];
+
+  beforeEach(() => {
+    scrolled = [];
+    (Element.prototype as unknown as { scrollIntoView: () => void }).scrollIntoView =
+      function scrollIntoView(this: Element) {
+        scrolled.push(this);
+      };
+  });
+
+  afterEach(() => {
+    delete (Element.prototype as unknown as { scrollIntoView?: () => void }).scrollIntoView;
+  });
+
+  /** The `data-day` of the element the page last brought to the top. */
+  const landedOn = () => (scrolled.at(-1) as HTMLElement | undefined)?.dataset["day"];
+
+  /** Today (21 July) needs an entry for the reading surfaces to render its row. */
+  const withToday = () =>
+    payloadOf({
+      venueEvents: [
+        congress(),
+        congress({
+          uid: "today@x",
+          summary: "Today Event",
+          start: "2026-07-21T02:00:00Z",
+          end: "2026-07-21T06:00:00Z",
+        }),
+      ],
+      portCalls: [],
+    });
+
+  it("renders the controls inside the pinned topbar, beside the page heading", () => {
+    mount(payloadOf());
+    // h1 + period nav + view tabs + type filter all pinned together.
+    expect(topbar.querySelector("h1")).not.toBeNull();
+    expect(topbar.querySelector(".calendar__title")).not.toBeNull();
+    expect(topbar.querySelector('[data-nav="today"]')).not.toBeNull();
+    expect(topbar.querySelector('[data-view="agenda"]')).not.toBeNull();
+    expect(topbar.querySelector(".calendar__filter")).not.toBeNull();
+    // The scrolling surface stays in the root, below the pinned header.
+    expect(root.querySelector(".calendar__controls")).toBeNull();
+    expect(root.querySelector(".calendar__grid")).not.toBeNull();
+  });
+
+  it("publishes the topbar's measured height as --topbar-h", () => {
+    mount(payloadOf());
+    // jsdom measures every box as zero, so the value under test is that one is
+    // published in px at all — `scroll-padding-top` in the shell consumes it.
+    expect(document.documentElement.style.getPropertyValue("--topbar-h")).toMatch(/^[\d.]+px$/);
+  });
+
+  it("brings today's row to the top of the viewport on first load", () => {
+    mount(withToday());
+    expect(landedOn()).toBe("2026-07-21");
+  });
+
+  it("brings today's row to the top on every view switch", () => {
+    mount(withToday());
+    for (const view of ["agenda", "spine", "week", "month"]) {
+      switchView(view);
+      expect(landedOn()).toBe("2026-07-21");
+    }
+    // The row landed on is the day's own row in the showing view, not the grid.
+    switchView("agenda");
+    expect(scrolled.at(-1)).toBe(root.querySelector('.agenda__day[data-day="2026-07-21"]'));
+    switchView("spine");
+    expect(scrolled.at(-1)).toBe(root.querySelector('.spine__date[data-day="2026-07-21"]'));
+  });
+
+  it("brings today's row to the top when Today is pressed from anywhere", () => {
+    mount(withToday());
+    click("prev");
+    click("prev");
+    const before = scrolled.length;
+    click("today");
+    expect(scrolled.length).toBeGreaterThan(before);
+    expect(landedOn()).toBe("2026-07-21");
+  });
+
+  it("leaves the scroll alone when paging with Prev and Next", () => {
+    // Paging is the reader moving deliberately — yanking them back to today's
+    // row would undo the step they just took.
+    mount(withToday());
+    const before = scrolled.length;
+    click("prev");
+    click("next");
+    expect(scrolled).toHaveLength(before);
+  });
+
+  it("keeps past days rendered — the reader scrolls up past them", () => {
+    // The congress ran 17–19 July, all before the frozen 21 July "now". History
+    // is not removed to make room for the present.
+    mount(withToday());
+    switchView("agenda");
+    const days = Array.from(root.querySelectorAll(".agenda__day")).map(
+      (n) => (n as HTMLElement).dataset["day"],
+    );
+    expect(days).toEqual(["2026-07-17", "2026-07-18", "2026-07-19", "2026-07-21"]);
+    expect(summariesIn("2026-07-17")).toEqual([]); // (month grid is not showing)
+    switchView("month");
+    expect(summariesIn("2026-07-17")).toEqual(["Global MICE Congress"]);
+  });
+
+  it("falls back to the top of the surface when today is not on it", () => {
+    // Two months back, today's row does not exist — the page still lands
+    // somewhere sane rather than leaving the reader mid-scroll.
+    mount(withToday());
+    click("prev");
+    click("prev");
+    switchView("agenda");
+    expect(landedOn()).toBeUndefined();
+    expect(scrolled.at(-1)).toBe(root.querySelector(".calendar__surface"));
+  });
+});
+
+describe("the static shell (#73)", () => {
+  // Read from the project root: this file runs in the jsdom environment, where
+  // `import.meta.url` is an http URL rather than a file one.
+  const shell = readFileSync("site/index.html", "utf8");
+
+  it("pins the topbar and clears a jumped-to row of it with --topbar-h", () => {
+    expect(shell).toMatch(/\.topbar\s*\{[^}]*position:\s*sticky/);
+    expect(shell).toMatch(/scroll-padding-top:\s*var\(--topbar-h/);
+  });
+
+  it("keeps the h1 in the static markup, inside the pinned topbar", () => {
+    expect(shell).toMatch(/<header class="topbar">[\s\S]*?<h1>[\s\S]*?<\/header>/);
   });
 });
 
