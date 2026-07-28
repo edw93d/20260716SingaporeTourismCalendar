@@ -158,12 +158,11 @@
         .calendar__weeks {
           grid-template-columns: repeat(7, minmax(4.5rem, 1fr));
         }
-        .calendar__day { min-height: 4.5rem; }
         .calendar__entry { font-size: 0.72rem; }
       }
       .calendar__weekday {
-        padding: 0.35rem 0.5rem;
-        font-size: 0.8rem;
+        padding: 0.2rem 0.4rem;
+        font-size: 0.75rem;
         font-weight: 600;
         color: var(--dim);
         border-bottom: 1px solid var(--line);
@@ -173,19 +172,35 @@
          every view already labels its day nodes with — so a new view inherits it
          rather than needing another selector here. */
       [data-day] { scroll-margin-top: 0.75rem; }
+      /* A cell holds at most four chip rows (#80), and 6.75rem is exactly what a
+         full one measures: the 1.55rem date row, four 1.1rem chips, the four
+         0.1rem gaps between them and 0.4rem of padding. Sizing the floor to the
+         ceiling is what makes every week the same height whether its days are
+         empty, full, or overflowing — a bounded grid rather than a ragged column
+         of tall days is the whole of Month's one-screen claim (ADR-0014 §1). */
       .calendar__day {
-        min-height: 6rem;
-        padding: 0.3rem;
+        min-height: 6.75rem;
+        padding: 0.2rem 0.25rem;
         border-right: 1px solid var(--line);
         border-bottom: 1px solid var(--line);
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
+        gap: 0.1rem;
+        min-width: 0;
+        overflow: hidden;
       }
       .calendar__day:nth-child(7n) { border-right: none; }
       .calendar__day--outside { background: color-mix(in srgb, canvastext 3%, transparent); }
       .calendar__day--outside .calendar__daynum { color: var(--dim); }
-      .calendar__daynum { font-size: 0.85rem; }
+      /* The date row is the disc's height whether or not the day is today (#71),
+         so the week today falls in is not a row taller than the others. */
+      .calendar__daynum {
+        font-size: 0.8rem;
+        line-height: 1.3;
+        height: 1.55rem;
+        display: flex;
+        align-items: center;
+      }
 
       /* Today (#71): one signal, every view — a solid red disc with a white
          numeral, on the date number itself. It replaces the old grey cell wash,
@@ -207,6 +222,39 @@
       .calendar__day .disc { align-self: flex-start; }
       .week__day .disc { align-self: center; }
 
+      /* --- Month chips: one line each, capped per day (#80, ADR-0014 §1) ---
+         The chip is a leaf, not a stack: one line, ellipsised where the column is
+         too narrow for the name, with the type carried by colour rather than by
+         a second line of text. Its `title` holds what the line drops. */
+      .calendar__chip {
+        font-size: 0.72rem;
+        line-height: 1.25;
+        padding: 0.1rem 0.3rem;
+        border-radius: 0.25rem;
+        border-left: 3px solid var(--dim);
+        background: color-mix(in srgb, canvastext 5%, transparent);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 0 0 auto;
+      }
+      /* The overflow door. It occupies a chip's row rather than adding one, so a
+         day that overflows is exactly as tall as a day that fills the cap — and
+         it reads as a link, because it goes somewhere (Agenda, that day). */
+      .calendar__more {
+        border: none;
+        background: none;
+        padding: 0.05rem 0.3rem;
+        font: inherit;
+        font-size: 0.7rem;
+        color: var(--dim);
+        text-align: left;
+        text-decoration: underline;
+        cursor: pointer;
+        flex: 0 0 auto;
+      }
+      .calendar__more:hover { color: inherit; }
+
       .calendar__entry {
         font-size: 0.8rem;
         line-height: 1.3;
@@ -218,11 +266,15 @@
         flex-direction: column;
         gap: 0.1rem;
       }
-      .calendar__entry[data-type="VenueEvent"] {
+      /* The type is one colour wherever it renders — the Month chip and the
+         reading surfaces' entry read as the same thing seen at two zooms. */
+      .calendar__entry[data-type="VenueEvent"],
+      .calendar__chip[data-type="VenueEvent"] {
         background: var(--venue);
         border-left-color: #2563eb;
       }
-      .calendar__entry[data-type="PortCall"] {
+      .calendar__entry[data-type="PortCall"],
+      .calendar__chip[data-type="PortCall"] {
         background: var(--port);
         border-left-color: #0d9488;
       }

@@ -96,10 +96,18 @@ const mount = (payload: Payload, now: Date = JULY_21) =>
 const find = (selector: string) => document.body.querySelector(selector);
 const title = () => find(".calendar__title")?.textContent;
 const cell = (day: string) => root.querySelector(`.calendar__day[data-day="${day}"]`);
-const entriesIn = (day: string) =>
-  Array.from(cell(day)?.querySelectorAll(".calendar__entry") ?? []);
-const summariesIn = (day: string) =>
-  entriesIn(day).map((node) => node.querySelector(".calendar__entry-title")?.textContent);
+/**
+ * Month renders **chips**, not entries (#80): one line each, capped per day, the
+ * overflow collapsed behind a `+N more`. The reading surfaces render the full
+ * `.calendar__entry`; only Month has chips, so these two helpers are what tell a
+ * Month assertion from a reading-surface one.
+ */
+const chipsIn = (day: string) => Array.from(cell(day)?.querySelectorAll(".calendar__chip") ?? []);
+const summariesIn = (day: string) => chipsIn(day).map((node) => node.textContent);
+const moreIn = (day: string) => cell(day)?.querySelector(".calendar__more") as HTMLButtonElement | null;
+/** The entries Agenda draws for a day — the surface a chip's overflow drills to. */
+const agendaEntriesOn = (day: string) =>
+  Array.from(root.querySelectorAll(`.agenda__day[data-day="${day}"] .calendar__entry`));
 const click = (which: string) => (find(`[data-nav="${which}"]`) as HTMLButtonElement).click();
 const switchView = (view: string) => (find(`[data-view="${view}"]`) as HTMLButtonElement).click();
 const setFilter = (value: string) => {
@@ -257,7 +265,11 @@ describe("the rendered page", () => {
   });
 
   it("labels every entry with the source that produced it", () => {
+    // On the reading surfaces, where an entry renders in full. Month's chips are
+    // one line (#80) and have no room for the label — the drill-through to
+    // Agenda is what carries a Month reader to the attribution.
     mount(payloadOf());
+    switchView("agenda");
     const sources = Array.from(root.querySelectorAll(".calendar__source")).map((n) => n.textContent);
     expect(sources).toContain("suntec");
     expect(sources).toContain("scc");
@@ -273,7 +285,11 @@ describe("the rendered page", () => {
         portCalls: [],
       }),
     );
-    const entries = entriesIn("2026-07-18");
+    // Two chips on the day in Month — the duplicate is not merged into one — and
+    // both sources still named on the reading surface the chips drill to.
+    expect(chipsIn("2026-07-18")).toHaveLength(2);
+    switchView("agenda");
+    const entries = agendaEntriesOn("2026-07-18");
     expect(entries).toHaveLength(2);
     expect(entries.map((n) => n.querySelector(".calendar__source")?.textContent).sort()).toEqual([
       "otherlist",
@@ -283,25 +299,31 @@ describe("the rendered page", () => {
 
   it("names a port call's vessel and terminal, and a venue event's hall", () => {
     mount(payloadOf());
-    const cruiseEntry = cell("2026-07-18")?.querySelector('.calendar__entry[data-type="PortCall"]');
-    expect(cruiseEntry?.textContent).toContain("ODYSSEY / VILLA VIE RESIDENCES");
-    expect(cruiseEntry?.textContent).toContain("Singapore Cruise Centre");
+    // The Month chip is one line, so it carries the summary and hands the rest to
+    // its tooltip; the reading surfaces print the location as its own line.
+    const cruiseChip = cell("2026-07-18")?.querySelector('.calendar__chip[data-type="PortCall"]');
+    // The `Cruise: ` prefix is dropped: on a chip this narrow it is eight
+    // characters of constant crowding out the vessel, and the colour already
+    // says what type it is. The full summary is still on the tooltip.
+    expect(cruiseChip?.textContent).toBe("ODYSSEY / VILLA VIE RESIDENCES at Singapore Cruise Centre");
+    expect(cruiseChip?.getAttribute("title")).toContain("Cruise: ODYSSEY / VILLA VIE RESIDENCES");
+    expect(cruiseChip?.getAttribute("title")).toContain("Singapore Cruise Centre");
 
-    const venueEntry = cell("2026-07-17")?.querySelector('.calendar__entry[data-type="VenueEvent"]');
-    expect(venueEntry?.textContent).toContain("Level 4, Hall 404");
+    const venueChip = cell("2026-07-17")?.querySelector('.calendar__chip[data-type="VenueEvent"]');
+    expect(venueChip?.getAttribute("title")).toContain("Level 4, Hall 404");
   });
 
   it("filters to one type and back, defaulting to All", () => {
     mount(payloadOf());
-    expect(root.querySelectorAll('.calendar__entry[data-type="VenueEvent"]').length).toBeGreaterThan(0);
-    expect(root.querySelectorAll('.calendar__entry[data-type="PortCall"]').length).toBeGreaterThan(0);
+    expect(root.querySelectorAll('.calendar__chip[data-type="VenueEvent"]').length).toBeGreaterThan(0);
+    expect(root.querySelectorAll('.calendar__chip[data-type="PortCall"]').length).toBeGreaterThan(0);
 
     setFilter("PortCall");
-    expect(root.querySelectorAll('.calendar__entry[data-type="VenueEvent"]').length).toBe(0);
-    expect(root.querySelectorAll('.calendar__entry[data-type="PortCall"]').length).toBeGreaterThan(0);
+    expect(root.querySelectorAll('.calendar__chip[data-type="VenueEvent"]').length).toBe(0);
+    expect(root.querySelectorAll('.calendar__chip[data-type="PortCall"]').length).toBeGreaterThan(0);
 
     setFilter("all");
-    expect(root.querySelectorAll('.calendar__entry[data-type="VenueEvent"]').length).toBeGreaterThan(0);
+    expect(root.querySelectorAll('.calendar__chip[data-type="VenueEvent"]').length).toBeGreaterThan(0);
   });
 
   it("returns to the present from anywhere via the Today control", () => {
@@ -330,9 +352,12 @@ describe("the rendered page", () => {
     expect(summariesIn("2026-06-10")).toEqual(["Past Expo"]);
   });
 
-  it("shows no magnitude — a busy day stacks every entry, with no count or overflow", () => {
-    // #38 and ADR-0009 §5: no impact score, no density ranking, no `+N more`.
-    const many = Array.from({ length: 5 }, (_, index) =>
+  it("shows no magnitude — a busy day is a stack of chips, never a count or a rank", () => {
+    // #38 and ADR-0009 §5: no impact score, no density ranking. The `+N more`
+    // past the cap (#80) is an overflow **door**, not a magnitude reading — it
+    // only ever appears once a day exceeds the cap, and it names a destination.
+    // Exactly at the cap, which is where a count would first be tempting.
+    const many = Array.from({ length: 4 }, (_, index) =>
       congress({
         uid: `m${index}@x`,
         summary: `Fair ${index}`,
@@ -342,8 +367,93 @@ describe("the rendered page", () => {
       }),
     );
     mount(payloadOf({ venueEvents: many, portCalls: [] }));
-    expect(entriesIn("2026-07-15")).toHaveLength(5);
+    expect(chipsIn("2026-07-15")).toHaveLength(4);
     expect(root.textContent ?? "").not.toMatch(/\+\s*\d+\s*more/i);
+  });
+});
+
+describe("Month: capped one-line chips, overflow to Agenda (#80)", () => {
+  const { landedOn } = trackScrollTargets();
+
+  /** `count` entries all landing on 15 July 2026, inside the default month. */
+  const busyDay = (count: number) =>
+    payloadOf({
+      venueEvents: Array.from({ length: count }, (_, index) =>
+        congress({
+          uid: `m${index}@x`,
+          summary: `Fair ${index}`,
+          source: `src${index}`,
+          start: "2026-07-15T02:00:00Z",
+          end: "2026-07-15T08:00:00Z",
+        }),
+      ),
+      portCalls: [],
+    });
+
+  it("renders a chip as one line: the summary, and nothing stacked under it", () => {
+    mount(payloadOf({ portCalls: [] }));
+    const [chip] = chipsIn("2026-07-17");
+    expect(chip?.textContent).toBe("Global MICE Congress");
+    // No entry sub-structure: a chip is a leaf, which is what keeps it one line.
+    expect(chip?.querySelector(".calendar__entry-where, .calendar__source")).toBeNull();
+    expect(cell("2026-07-17")?.querySelector(".calendar__entry")).toBeNull();
+  });
+
+  it("shows four chips when four is all there is — the cap is not a truncation", () => {
+    mount(busyDay(4));
+    expect(summariesIn("2026-07-15")).toEqual(["Fair 0", "Fair 1", "Fair 2", "Fair 3"]);
+    expect(moreIn("2026-07-15")).toBeNull();
+  });
+
+  it("spends the fourth row on `+N more` once there is overflow, never a fifth row", () => {
+    mount(busyDay(6));
+    // Three chips, not four: the control costs the slot it occupies, so the cell
+    // stays exactly as tall as a four-chip day.
+    expect(summariesIn("2026-07-15")).toEqual(["Fair 0", "Fair 1", "Fair 2"]);
+    expect(moreIn("2026-07-15")?.textContent).toMatch(/\+3 more/);
+  });
+
+  it("counts the overflow against the three chips actually shown", () => {
+    mount(busyDay(5));
+    expect(chipsIn("2026-07-15")).toHaveLength(3);
+    expect(moreIn("2026-07-15")?.textContent).toMatch(/\+2 more/);
+  });
+
+  it("hands `+N more` to Agenda on that day, rather than dead-ending in a count", () => {
+    mount(busyDay(6));
+    moreIn("2026-07-15")?.click();
+    // Agenda is showing, anchored on the day that overflowed — and every entry
+    // the cap hid is there in full.
+    expect(root.querySelector(".agenda")).not.toBeNull();
+    expect(root.querySelector(".calendar__grid")).toBeNull();
+    expect(agendaEntriesOn("2026-07-15")).toHaveLength(6);
+    expect(root.querySelector('.agenda__day[data-day="2026-07-15"]')?.textContent).toContain("Fair 5");
+    // And the day is brought to the top of the viewport, not left mid-surface.
+    expect(landedOn()).toBe("2026-07-15");
+  });
+
+  it("steps Agenda from the drilled-to day, not from the month it was reached in", () => {
+    // The drill seeds Agenda's entry-day cursor (#77), so the next step moves off
+    // the overflowed day — the reader carries on from where they landed.
+    mount(
+      payloadOf({
+        venueEvents: [
+          ...Array.from({ length: 6 }, (_, index) =>
+            congress({
+              uid: `m${index}@x`,
+              summary: `Fair ${index}`,
+              start: "2026-07-15T02:00:00Z",
+              end: "2026-07-15T08:00:00Z",
+            }),
+          ),
+          congress({ uid: "later@x", summary: "Later Expo", start: "2026-07-23T02:00:00Z", end: "2026-07-23T08:00:00Z" }),
+        ],
+        portCalls: [],
+      }),
+    );
+    moreIn("2026-07-15")?.click();
+    click("next");
+    expect(landedOn()).toBe("2026-07-23");
   });
 });
 
@@ -452,8 +562,12 @@ describe("four switchable reading surfaces", () => {
     for (const view of ["week", "agenda", "spine", "month"]) {
       switchView(view);
       expect((find(".calendar__filter") as HTMLSelectElement).value).toBe("PortCall");
-      expect(root.querySelectorAll('.calendar__entry[data-type="VenueEvent"]').length).toBe(0);
-      expect(root.querySelectorAll('.calendar__entry[data-type="PortCall"]').length).toBeGreaterThan(0);
+      // Month draws chips, the reading surfaces draw entries — the filter is one
+      // rule over both, so the assertion has to cover whichever the view renders.
+      const shown = (type: string) =>
+        root.querySelectorAll(`.calendar__entry[data-type="${type}"], .calendar__chip[data-type="${type}"]`).length;
+      expect(shown("VenueEvent")).toBe(0);
+      expect(shown("PortCall")).toBeGreaterThan(0);
     }
   });
 
