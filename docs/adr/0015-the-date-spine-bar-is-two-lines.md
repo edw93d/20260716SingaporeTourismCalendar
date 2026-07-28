@@ -1,6 +1,11 @@
 # ADR-0015: The Date-spine bar is two lines — a third narrowing of "every entry is labelled with the source"
 
-- **Status:** Accepted
+- **Status:** Superseded in part by [ADR-0016](./0016-the-date-spine-bar-is-the-name-alone.md)
+  — its **Decision** only. The bar draws the **name alone**, not two lines led by the
+  duration: on a one-date bar there was only ever room for one line, and this gave it to
+  the wrong field. Everything below about the geometry — why the row height cannot grow,
+  why the spine rounds to whole day rows, why both hairline insets are load-bearing —
+  still holds and 0016 rests on it.
 - **Date:** 2026-07-28
 - **Ticket:** [#98](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/98)
 - **Narrows:** #38 ("every entry is labelled with the source"), for the third time — after

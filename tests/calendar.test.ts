@@ -709,9 +709,10 @@ describe("four switchable reading surfaces", () => {
     expect(barTop(barByType("VenueEvent"))).toBeCloseTo(SPINE_ROW * 16, 4);
     expect(barTop(barByType("PortCall"))).toBeCloseTo(SPINE_ROW * 17, 4);
 
-    // The label keeps the clock the geometry rounded off.
-    expect(barByType("VenueEvent").textContent).toContain("2.3 days");
-    expect(barByType("PortCall").textContent).toContain("8 hr");
+    // The clock the geometry rounded off is *not* on the bar — it is the detail
+    // bubble's job since #100, and the bar's whole surface is the name.
+    expect(barByType("VenueEvent").textContent).not.toContain("2.3 days");
+    expect(barByType("PortCall").textContent).not.toContain("8 hr");
   });
 
   it("Date-spine draws only the days inside the month it is showing", () => {
@@ -736,9 +737,12 @@ describe("four switchable reading surfaces", () => {
     expect(barTop(barByType("PortCall"))).toBeCloseTo(SPINE_ROW * 29, 4);
     expect(barHeight(barByType("PortCall"))).toBeCloseTo(SPINE_ROW * 2, 4);
 
-    // The label still measures the whole entry, not the part this month shows.
-    expect(barByType("VenueEvent").textContent).toContain("3.3 days");
-    expect(barByType("PortCall").textContent).toContain("3.3 days");
+    // And the clamp counts the rows actually drawn, not the entry's true span:
+    // both are 3.3 days but only two rows of each are in July, so each gets the
+    // three lines two rows hold. Counting the whole entry would clamp to five
+    // and the name would run past the clip edge with no ellipsis.
+    expect(barByType("VenueEvent").style.getPropertyValue("--spine-bar-lines")).toBe("3");
+    expect(barByType("PortCall").style.getPropertyValue("--spine-bar-lines")).toBe("3");
   });
 
   it("Date-spine insets its bars, so consecutive days in one lane stay two bars", () => {
@@ -785,41 +789,77 @@ describe("four switchable reading surfaces", () => {
     expect(rule).toMatch(/width:\s*calc\(var\(--spine-bar-width\)\s*-\s*2px\)/);
   });
 
-  it("Date-spine's bar is two lines — the duration and the name, and nothing that will not fit", () => {
+  it("Date-spine's bar is the name alone — the only line a one-date bar has goes to it", () => {
     // A one-date bar is one `--spine-row` tall, because its height *is* its
-    // duration (ADR-0009 §3). The four-line reading-surface entry needs more than
-    // twice that, so every single-date entry rendered as a duration label with
-    // its name clipped away. Two lines at the spine's own type scale is what
-    // fits: the location and the source come off, as they do on a Month chip.
+    // duration (ADR-0009 §3): 22.8px of content box, one 13.8px line. #99 spent
+    // that single line on the duration and clipped the name away on most of the
+    // month (#100), so the duration comes off the bar altogether — to the detail
+    // bubble's Length row, the one surface that shows an entry in full.
     mount(payloadOf());
     switchView("spine");
     const bar = barByType("PortCall");
 
-    expect(bar.querySelector(".spine__len")?.textContent).toBe("8 hr");
-    // The name is a node of its own, not text clipped out of view — and a port
-    // call's `Cruise: ` prefix is dropped, so the vessel survives the width.
-    expect(bar.children).toHaveLength(2);
-    expect(bar.children[1]?.textContent).toBe("ODYSSEY / VILLA VIE RESIDENCES at Singapore Cruise Centre");
+    // The name, and only the name — one node, no lead label. The `Cruise: `
+    // prefix is dropped so the vessel survives the width.
+    expect(bar.textContent).toBe("ODYSSEY / VILLA VIE RESIDENCES at Singapore Cruise Centre");
+    expect(bar.children).toHaveLength(1);
+    expect(bar.children[0]?.className).toBe("spine__name");
+    expect(bar.querySelector(".spine__len")).toBeNull();
 
-    // The two fields that do not fit are gone from the bar, not merely hidden —
-    // and both are still one drill away, on the `title` and in the bubble (#75).
+    // The three fields that do not fit are gone from the bar, not merely hidden.
+    // Where and source are one hover away; the duration is a double-click away,
+    // and deliberately *not* added to the title — the tooltip stays the place a
+    // dropped label field lands, and Length belongs to the bubble (#75).
     expect(bar.querySelector(".calendar__entry-where, .calendar__source")).toBeNull();
     expect(bar.title).toContain("Cruise: ODYSSEY / VILLA VIE RESIDENCES");
     expect(bar.title).toContain("Singapore Cruise Centre");
     expect(bar.title).toContain("scc");
+    expect(bar.title).not.toContain("8 hr");
 
-    // The duration is held to one line. In 22.8px of content box a label that
-    // wrapped would push the name out of the clip box — this bug, by the back
-    // door — so the lane can be as narrow as the packer makes it.
-    expect(ruleFor(".spine__len")).toMatch(/white-space:\s*nowrap/);
-
-    // The bar carries its own type scale, not `.calendar__entry`'s: at 0.8rem/1.3
-    // with 0.25rem of padding the second line does not fit in 26px.
+    // The bar carries its own type scale, not `.calendar__entry`'s. It is a
+    // preference now, not a constraint (#100): the smaller face buys characters
+    // per line, and a fifth line on a three-row bar.
     expect(bar.classList.contains("calendar__entry")).toBe(false);
     const rule = ruleFor(".spine__bar");
     expect(rule).toMatch(/font-size:\s*0\.72rem/);
     expect(rule).toMatch(/line-height:\s*1\.2/);
     expect(rule).toMatch(/padding:\s*0\.1rem\s+0\.3rem/);
+  });
+
+  it("Date-spine's name fills every line its bar's height allows, then ellipsises", () => {
+    // The count is a function of the span, so only the renderer can know it: a
+    // one-date bar holds 22.8px / 13.8px = one line, a three-date bar 78.8px =
+    // five. Clipping silently instead leaves a truncated title and a short one
+    // looking identical, which is half of what #100 reports.
+    mount(payloadOf());
+    switchView("spine");
+
+    expect(barByType("PortCall").style.getPropertyValue("--spine-bar-lines")).toBe("1");
+    expect(barByType("VenueEvent").style.getPropertyValue("--spine-bar-lines")).toBe("5");
+
+    // The stylesheet reads that count as its clamp — the ellipsis, not a clip.
+    const name = ruleFor(".spine__name");
+    expect(name).toMatch(/-webkit-line-clamp:\s*var\(--spine-bar-lines\)/);
+    expect(name).toMatch(/-webkit-box-orient:\s*vertical/);
+    expect(name).toMatch(/display:\s*-webkit-box/);
+    // A single long word in a narrow lane breaks rather than vanishing past the
+    // clip edge — the horizontal half of "as much of the name as possible".
+    expect(name).toMatch(/overflow-wrap:\s*anywhere/);
+
+    // And the clamp is on the inner box, *not* the bar. The bar is absolutely
+    // positioned, so it is blockified — `-webkit-box` computes to `flow-root`
+    // there and the clamp is silently ignored. jsdom cannot catch that (it
+    // applies no stylesheet at all), so the guard is that the declaration does
+    // not move back onto the positioned element.
+    const rule = ruleFor(".spine__bar");
+    expect(rule).toMatch(/position:\s*absolute/);
+    expect(rule).not.toMatch(/line-clamp/);
+
+    // `spineBarLines` counts in px the stylesheet owns. Drift does not throw —
+    // it silently clamps to a line count the bar no longer has — so the four
+    // values it assumes are asserted here, at the seam.
+    expect(ruleFor(".spine")).toMatch(/--spine-row:\s*1\.75rem/);
+    expect(rule).toMatch(/height:\s*calc\(var\(--spine-bar-height\)\s*-\s*2px\)/);
   });
 
   it("Date-spine gives an entry its own lane when it shares a date with one that ends that day", () => {
@@ -1862,13 +1902,15 @@ describe("the entry-detail bubble (#75)", () => {
     expect(bubble()?.getAttribute("data-type")).toBe("PortCall");
   });
 
-  it("reuses the Date-spine's span text for Length rather than measuring again", () => {
-    // The same 2.25-day congress the spine labels "2.3 days" — one rounding rule
-    // for both surfaces, so a bar and its bubble can never disagree.
+  it("is the only surface that says how long, now the Date-spine bar has stopped", () => {
+    // Since #100 the bar draws the name alone, and day-row geometry rounds a
+    // 2.25-day congress and a 3-day one to the same three rows. So this is where
+    // the clock survives — the bubble, one double-click from the bar that no
+    // longer carries it (ADR-0016).
     mount(payloadOf({ portCalls: [], sources }));
     switchView("spine");
     const bar = root.querySelector(".spine__bar");
-    expect(bar?.textContent).toContain("2.3 days");
+    expect(bar?.textContent).not.toContain("2.3 days");
     dblclick(bar);
     expect(fields()["Length"]).toBe("2.3 days");
   });
