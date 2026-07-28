@@ -301,13 +301,18 @@
         gap: 0;
       }
 
-      /* --- Agenda: every entry named, with where and when ---------------- */
-      .agenda { display: flex; flex-direction: column; gap: 0.25rem; }
+      /* --- Agenda: every entry named, with where and when ----------------
+         Spacing, type scale and radii here follow the round-1 prototype
+         (`prototype/month-compression-5`, #77): a wider date column so a
+         "Fri 24 Jul" label never wraps, tighter rows, and no gap between them —
+         the hairline is what separates one day from the next, so an extra gap
+         only loosens a list whose job is to be read down. */
+      .agenda { display: flex; flex-direction: column; }
       .agenda__day {
         display: grid;
-        grid-template-columns: 6rem 1fr;
+        grid-template-columns: 7.5rem 1fr;
         gap: 0.5rem;
-        padding: 0.5rem 0;
+        padding: 0.4rem 0;
         border-bottom: 1px solid var(--line);
       }
       .agenda__date {
@@ -322,6 +327,24 @@
         font-variant-numeric: tabular-nums;
       }
       .agenda__items { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+      /* Agenda is the surface that *reads*, so its entries carry the prototype's
+         slightly larger body type and a marginally softer box than the shared
+         chip — scoped here rather than changed on `.calendar__entry`, which the
+         navigator and the two dense surfaces also render. */
+      .agenda .calendar__entry {
+        font-size: 0.85rem;
+        padding: 0.25rem 0.4rem;
+        border-radius: 0.3rem;
+      }
+      /* The phone tightening every other surface gets, restated for Agenda: the
+         rule above matches `.calendar__entry` on specificity and comes later, so
+         it would otherwise swallow it. Same proportion, larger base. Declared
+         here rather than beside the other phone rules for that ordering reason. */
+      @media (max-width: 40rem) {
+        .agenda .calendar__entry { font-size: 0.76rem; }
+      }
+      .agenda .calendar__entry-time { font-size: 0.72rem; }
+      .agenda .calendar__entry-where { font-size: 0.75rem; }
       .agenda__empty { color: var(--dim); padding: 1rem 0; }
 
       /* --- Date-spine: duration as literal vertical span (ADR-0009 §3) --- */

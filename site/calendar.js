@@ -316,6 +316,129 @@ export const weekDaysOf = (anchorIndex, todayIndex) => {
 };
 
 /**
+ * The days of a civil month that **have entries**, as day indices in ascending
+ * order. Agenda renders one row per day in this list *and* steps along it (#77),
+ * so the stepper cannot land on a day the surface does not draw.
+ *
+ * (#77 calls these "event-days". The glossary bans a bare **event** — a row here
+ * may be a PortCall, which nobody attends — so the code says **entry-day**, the
+ * word the rest of this module already uses. CONTEXT.md §Event.)
+ *
+ * @param {DayEntry[]} entries already filtered by type
+ * @param {number} year
+ * @param {number} month 1–12
+ * @returns {number[]}
+ */
+export const entryDaysIn = (entries, year, month) => {
+  const days = [];
+  for (let day = 1; day <= monthLength(year, month); day += 1) {
+    if (entriesOnDay(entries, dayKey(year, month, day)).length) days.push(dayIndexOf(year, month, day));
+  }
+  return days;
+};
+
+/**
+ * How far {@link stepAgendaDay} will scan for an entry-day in the months either
+ * side before giving up. Two years is well past any gap the daily sources
+ * plausibly leave, and it is what stops a sparse dataset — or an empty one —
+ * from sweeping every month there could ever be on one click.
+ */
+const AGENDA_SCAN_MONTHS = 24;
+
+/** The civil month `delta` months from `year`/`month`. @param {number} year @param {number} month @param {number} delta */
+const addMonths = (year, month, delta) => {
+  const zeroBased = month - 1 + delta;
+  return {
+    year: year + Math.floor(zeroBased / 12),
+    month: ((zeroBased % 12) + 12) % 12 + 1,
+  };
+};
+
+/**
+ * The anchor a whole month's page away, keeping the day-of-month where the
+ * target month is long enough to have one. Month, Date-spine and Agenda's
+ * fallback all page by this same unit.
+ * @param {number} anchor @param {number} delta @returns {number}
+ */
+const monthStep = (anchor, delta) => {
+  const { year, month, day } = civilOf(anchor);
+  const next = addMonths(year, month, delta);
+  return dayIndexOf(next.year, next.month, Math.min(day, monthLength(next.year, next.month)));
+};
+
+/**
+ * Months since year 0, so two civil months can be compared as one number.
+ * @param {{ year: number, month: number }} civil
+ * @returns {number}
+ */
+const monthOrdinal = ({ year, month }) => year * 12 + month;
+
+/**
+ * The month the search reads from. Normally the showing month — a reader paging
+ * Agenda steps through what is in front of them. But the anchor and the cursor
+ * can part company: a view switch brings the cursor home to today while the
+ * anchor stays on the month the reader had paged to (#73 §6). Reading *back*
+ * from a month already ahead of the cursor can only land ahead of it — a Prev
+ * that moves the reader forwards — and reading *forward* from a month behind it
+ * is the same fault upside down. So when the anchor sits the wrong side of the
+ * cursor for the direction pressed, the cursor's own month is where the search
+ * honestly starts. The anchor says which month is showing; it never reverses the
+ * direction the reader asked for.
+ *
+ * @param {number} anchor @param {number} cursor @param {number} direction
+ * @returns {{ year: number, month: number }}
+ */
+const searchMonthOf = (anchor, cursor, direction) => {
+  const showing = civilOf(anchor);
+  const at = civilOf(cursor);
+  const anchorLeads = monthOrdinal(showing) > monthOrdinal(at);
+  // Forwards, take whichever month is later; backwards, whichever is earlier.
+  return (direction > 0) === anchorLeads ? showing : at;
+};
+
+/**
+ * Agenda's Next/Prev, as a pure move (#77). Agenda is a **list of the days that
+ * have entries**, so paging it by the month steps over whole screens of nothing;
+ * it steps by the **entry-day** instead — the next or previous day the surface
+ * actually draws a row for, rolling into the adjacent months at the edges.
+ *
+ * The scan across months is bounded ({@link AGENDA_SCAN_MONTHS}), and when it
+ * finds nothing the move degrades to a plain {@link monthStep}: a Next that
+ * silently does nothing reads as a broken control, so this always returns a
+ * different anchor. `day` is the entry-day landed on, or `null` for that
+ * fallback — the caller scrolls to the former and has nothing to scroll to in
+ * the latter.
+ *
+ * Whichever it returns, the day landed on lies in the direction pressed: see
+ * {@link searchMonthOf} for the case that makes that worth stating.
+ *
+ * @param {DayEntry[]} entries already filtered by type
+ * @param {number} anchor the showing month's anchor day index
+ * @param {number} cursor the entry-day being stepped from
+ * @param {number} direction +1 forwards, -1 backwards
+ * @returns {{ anchor: number, day: number | null }}
+ */
+export const stepAgendaDay = (entries, anchor, cursor, direction) => {
+  const { year, month } = searchMonthOf(anchor, cursor, direction);
+  const within = entryDaysIn(entries, year, month).filter((index) =>
+    direction > 0 ? index > cursor : index < cursor,
+  );
+  // The nearest one in the direction of travel: the first ahead, the last behind.
+  const near = direction > 0 ? within[0] : within[within.length - 1];
+  if (near !== undefined) return { anchor: near, day: near };
+
+  let scan = { year, month };
+  for (let hop = 0; hop < AGENDA_SCAN_MONTHS; hop += 1) {
+    scan = addMonths(scan.year, scan.month, direction);
+    const days = entryDaysIn(entries, scan.year, scan.month);
+    const land = direction > 0 ? days[0] : days[days.length - 1];
+    if (land !== undefined) return { anchor: land, day: land };
+  }
+
+  return { anchor: monthStep(anchor, direction), day: null };
+};
+
+/**
  * Greedy interval layout: place each item in the first **lane** (column, in
  * Week; row-stack, in Date-spine) whose previous occupant has already ended,
  * opening a new lane only when every existing one is still busy. Items are
@@ -366,9 +489,10 @@ const pad2 = (value) => String(value).padStart(2, "0");
 const dayAttrOf = ({ year, month, day }) => `${year}-${pad2(month)}-${pad2(day)}`;
 
 /**
- * Mount the calendar into `root`, reading the clock from `now`. Returns nothing:
- * the page is driven entirely through the controls it renders (filter, prev,
- * today, next), which is what a test drives too.
+ * Mount the calendar into `root`, reading the clock from `now`. The page is
+ * driven almost entirely through the controls it renders (filter, prev, today,
+ * next), which is what a test drives too; the one exception is the returned
+ * `drillToAgendaDay`, a **jump** whose target is only known outside the mount.
  *
  * Two hosts, because the header is **pinned** (#73): the controls render into
  * `options.topbar` — the page's sticky `<header>`, which already holds the
@@ -381,6 +505,7 @@ const dayAttrOf = ({ year, month, day }) => `${year}-${pad2(month)}-${pad2(day)}
  * @param {SitePayload} payload
  * @param {Date} now
  * @param {MountOptions} options the page-supplied hosts — currently just the pinned topbar
+ * @returns {{ drillToAgendaDay: (index: number) => void }}
  */
 export const mountCalendar = (root, payload, now, options) => {
   const doc = root.ownerDocument;
@@ -396,8 +521,12 @@ export const mountCalendar = (root, payload, now, options) => {
   // switching view keeps position without any per-view cursor to reconcile
   // (AC 6), and the filter, applied once here, persists across every switch
   // (AC 5).
-  /** @type {{ view: View, anchor: number, filter: Filter }} */
-  const state = { view: "month", anchor: todayIndex, filter: "all" };
+  // `agendaDay` is the one thing the anchor cannot say on its own: the
+  // **entry-day** Agenda is stepping through (#77). It is seeded from today,
+  // re-seeded by Today and by a drill-through, and it is what Next/Prev move
+  // from — the anchor only ever names the month a surface draws.
+  /** @type {{ view: View, anchor: number, filter: Filter, agendaDay: number }} */
+  const state = { view: "month", anchor: todayIndex, filter: "all", agendaDay: todayIndex };
 
   /** @param {string} tag @param {string} [className] @param {string} [text] */
   const el = (tag, className, text) => {
@@ -449,23 +578,72 @@ export const mountCalendar = (root, payload, now, options) => {
   let scrollTarget = todayIndex;
 
   /**
-   * Page by the current view's unit: Week moves the anchor a whole week, every
-   * other view a whole month (keeping the day-of-month where the target month is
-   * long enough). Paging deliberately leaves `scrollTarget` alone: the reader
-   * just moved on purpose, and yanking them back to today would undo it.
+   * Land on an entry-day in Agenda: the day becomes both the anchor (so the
+   * surface draws that day's month) and the cursor the next step moves from, and
+   * it comes to the top of the viewport the same way the Today jump does (#73).
+   * @param {number} index
+   */
+  const goToAgendaDay = (index) => {
+    state.anchor = index;
+    state.agendaDay = index;
+    scrollTarget = index;
+  };
+
+  /**
+   * The drill-through into Agenda (#77): switch surface, seed the cursor on the
+   * day, bring it to the top. Month's and Week's `+N more` controls are its
+   * consumers (#80, #81) — the collapse hands the reader to the reading surface
+   * at the day they were looking at, rather than dead-ending in a count.
+   * @param {number} index the day index to open Agenda on
+   */
+  const drillToAgendaDay = (index) => {
+    state.view = "agenda";
+    goToAgendaDay(index);
+    render();
+  };
+
+  /**
+   * Agenda steps by the **entry-day**, not the month (#77): it lists only the
+   * days that have entries, so a month step there jumps over whole screens of
+   * nothing and often lands on an empty one. {@link stepAgendaDay} finds the next
+   * or previous day the surface actually draws — rolling into the adjacent months
+   * at the edges, and degrading to a month step when the dataset has nothing that
+   * way, so Next/Prev always move.
+   * @param {number} delta
+   */
+  const stepAgenda = (delta) => {
+    const { anchor, day } = stepAgendaDay(
+      filterEntries(entries, state.filter),
+      state.anchor,
+      state.agendaDay,
+      delta,
+    );
+    if (day === null) {
+      // Nothing to land on, so nothing to scroll to. The cursor still follows the
+      // month step: leaving it behind would make the next press step backwards
+      // over ground the reader has already covered.
+      state.anchor = anchor;
+      state.agendaDay = anchor;
+    } else {
+      goToAgendaDay(day);
+    }
+    render();
+  };
+
+  /**
+   * Page by the current view's unit: Agenda moves by the entry-day, Week moves
+   * the anchor a whole week, Month and Date-spine a whole {@link monthStep}.
+   * Month-paging deliberately leaves `scrollTarget` alone: the reader just moved
+   * on purpose, and yanking them back to today would undo it. Agenda is the
+   * exception — the day it steps to *is* where it means to put them.
    * @param {number} delta
    */
   const step = (delta) => {
-    if (state.view === "week") {
-      state.anchor += delta * 7;
-    } else {
-      const { year, month, day } = civilOf(state.anchor);
-      const zeroBased = month - 1 + delta;
-      const nextYear = year + Math.floor(zeroBased / 12);
-      const nextMonth = ((zeroBased % 12) + 12) % 12 + 1;
-      const lastDay = monthLength(nextYear, nextMonth);
-      state.anchor = dayIndexOf(nextYear, nextMonth, Math.min(day, lastDay));
+    if (state.view === "agenda") {
+      stepAgenda(delta);
+      return;
     }
+    state.anchor = state.view === "week" ? state.anchor + delta * 7 : monthStep(state.anchor, delta);
     render();
   };
 
@@ -586,8 +764,10 @@ export const mountCalendar = (root, payload, now, options) => {
         // wherever the last one happened to be scrolled to (#73). Only the
         // *scroll* is reset, not the anchor: a reader who paged to June and
         // switched view is still reading June (§6), and today's row simply is
-        // not on that surface to scroll to.
+        // not on that surface to scroll to. Agenda's cursor comes home with the
+        // scroll, so a step after the switch reads from the present too (#77).
         scrollTarget = todayIndex;
+        state.agendaDay = todayIndex;
         render();
       });
       views.appendChild(button);
@@ -628,6 +808,7 @@ export const mountCalendar = (root, payload, now, options) => {
     // applies, not a behaviour special to this button.
     nav.appendChild(navButton("today", "Today", () => {
       state.anchor = todayIndex;
+      state.agendaDay = todayIndex;
       scrollTarget = todayIndex;
       render();
     }));
@@ -774,14 +955,13 @@ export const mountCalendar = (root, payload, now, options) => {
   /** @param {DayEntry[]} visible @returns {HTMLElement} */
   const renderAgenda = (visible) => {
     const { year, month } = civilOf(state.anchor);
-    const daysInMonth = monthLength(year, month);
     const list = el("div", "agenda");
-    let any = false;
-    for (let day = 1; day <= daysInMonth; day += 1) {
+    // The same day list Next/Prev steps along (#77), so the surface and the
+    // stepper cannot disagree about which days are here.
+    const days = entryDaysIn(visible, year, month);
+    for (const index of days) {
+      const { day } = civilOf(index);
       const onDay = entriesOnDay(visible, dayKey(year, month, day));
-      if (!onDay.length) continue;
-      any = true;
-      const index = dayIndexOf(year, month, day);
       const dayNode = el("div", "agenda__day");
       dayNode.dataset["day"] = dayAttrOf({ year, month, day });
       // Weekday and month sit either side of the date number, so today's disc
@@ -798,7 +978,7 @@ export const mountCalendar = (root, payload, now, options) => {
       dayNode.appendChild(items);
       list.appendChild(dayNode);
     }
-    if (!any) list.appendChild(el("p", "agenda__empty", "No entries this month."));
+    if (!days.length) list.appendChild(el("p", "agenda__empty", "No entries this month."));
     return list;
   };
 
@@ -894,4 +1074,10 @@ export const mountCalendar = (root, payload, now, options) => {
   root.appendChild(surface);
 
   render();
+
+  // The one handle the mount hands back: the page is still driven entirely
+  // through the controls it renders, but a drill-through is a *jump*, and the
+  // day it jumps to is only known outside — from the `+N more` that was clicked
+  // (#80, #81), or from a test. `index.html` ignores this.
+  return { drillToAgendaDay };
 };
