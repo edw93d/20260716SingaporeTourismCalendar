@@ -14,16 +14,22 @@
  * file is free software under AGPLv3 with the rest of the repository.
  *
  * **Month is a navigator, not a reading surface** (#5, ADR-0009 §2): it answers
- * "which days have demand?", lands on today, and drills nowhere yet — the three
- * reading surfaces are #39/#40. So there is deliberately **no magnitude here** —
- * no count badge, no `+N more` collapse, no ranking. Every entry on a day is
- * rendered; a busy day simply grows.
+ * "which days have demand?", lands on today, and drills through to the reading
+ * surfaces rather than trying to be one.
  *
  * Four switchable views (ADR-0009): **Month** navigates; **Week**, **Agenda**
- * and **Date-spine** are the reading surfaces this file adds in #39. No single
- * one is *the* view — reading demand from several angles is the feature. Still
- * **no magnitude** in any of them (ADR-0009 §5): span and names stand in for the
- * size the data does not carry, and nothing is ranked, scored or collapsed.
+ * and **Date-spine** are the reading surfaces. No single one is *the* view —
+ * reading demand from several angles is the feature. There is **no magnitude**
+ * in any of them (ADR-0009 §5): span and names stand in for the size the data
+ * does not carry, and nothing is ranked or scored.
+ *
+ * Two surfaces are **bounded**, and collapse what they cannot fit behind a
+ * `+N more` — a Month cell (#80, ADR-0014 §1) and Week's all-day band (#81).
+ * That is not the magnitude #5 disqualified: the door counts what one bounded
+ * surface could not draw and names a destination, rather than ranking a day
+ * against its neighbours. (This paragraph replaces the file's original
+ * "no `+N more` collapse … nothing is collapsed" claim, which ADR-0014 §1
+ * recorded as implementation debt when it restored ADR-0009's overflow intent.)
  *
  * @typedef {{ uid: string, summary: string, start: string, end: string, location: string, source: string }} SiteEntry
  * @typedef {{ source: string, lastConfirmed: string }} SourceFreshness
