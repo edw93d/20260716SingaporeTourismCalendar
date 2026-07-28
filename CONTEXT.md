@@ -130,12 +130,36 @@ view, and reading demand from multiple perspectives is the point:
   **PortCall** has neither span nor name, so a ~4,000-passenger ship renders like a
   coffee popup in every view; the audience infers size from `vessel`. **Reopen
   trigger:** if real use shows this misleads, magnitude re-enters scope as a
-  *destination redraw*, not a quiet patch.
+  *destination redraw*, not a quiet patch. Month's **`+N more`** (see **Chip**) is not
+  a magnitude reading: it counts what one cell could not fit, and it names a
+  destination rather than ranking a day against its neighbours.
 
 Everything is **static-renderable** (ADR-0009, #10): the views, filter, week paging,
 and Today control are client JS over data already on the page — no server. The UI
 library that implements this (if any) is gated by licensing (#14), not settled here.
 See ADR-0009.
+
+### Chip
+
+How **Month** — and only Month — draws a **CalendarEntry**: **one line**, the summary
+alone, its type carried by colour. It is a leaf, not a stack. The reading surfaces
+draw the same entry in full (name, where, source), and that difference *is* the
+navigator/reading-surface split made visible: a chip answers "is there demand here",
+not "what is it".
+
+Chips are **capped per day** — four rows to a cell, and the overflow past them
+collapses to a **`+N more`** that drills into that day in **Agenda**, spending a row
+itself so an overflowing day is never taller than a full one. That cap is what fixes
+Month to one screen (ADR-0014 §1).
+
+What the line has no room for is on the chip's tooltip, not lost: the location, and
+the **source** label that every entry on a reading surface carries. Deliberate, and a
+narrowing of #38's "every entry is labelled with the source" — the attribution is one
+drill away, on the surface `+N more` hands the reader to. For the same reason the chip
+drops a port call's `Cruise: ` prefix: on a chip that narrow it crowds out the
+`vessel`, which is the only thing telling one call from another. ADR-0001 keeps that
+prose inside `summary` because an iCal client has nothing else to carry the category;
+the chip has its colour.
 
 ### Facts-only extraction
 
