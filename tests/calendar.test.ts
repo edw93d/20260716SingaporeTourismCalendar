@@ -67,6 +67,9 @@ const payloadOf = (overrides: Partial<Payload> = {}): Payload => ({
   ...overrides,
 });
 
+/** The grid's Monday-first column headers, in order. */
+const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
 /** 21 July 2026, mid-morning Singapore — the frozen "now" the page lands on. */
 const JULY_21 = new Date("2026-07-21T02:00:00Z");
 
@@ -454,6 +457,85 @@ describe("Month: capped one-line chips, overflow to Agenda (#80)", () => {
     moreIn("2026-07-15")?.click();
     click("next");
     expect(landedOn()).toBe("2026-07-23");
+  });
+});
+
+describe("Month: the weekend wash and the month-boundary label (#72)", () => {
+  // The stylesheet is read as text: the wash, the recede and the absence of a
+  // positional rule are CSS facts, and jsdom applies no stylesheet at all.
+  const shell = readFileSync("site/index.html", "utf8");
+  /**
+   * Every CSS declaration block whose selector counts positions in the grid.
+   * Comments are stripped first — they discuss `nth-child` at length, and a
+   * comment is not a rule.
+   */
+  const nthChildRules = () =>
+    Array.from(shell.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]*nth-child[^{}]*)\{([^}]*)\}/g), (m) => ({
+      selector: m[1]?.trim() ?? "",
+      body: m[2] ?? "",
+    }));
+  const weekdayHeaders = () => Array.from(root.querySelectorAll(".calendar__weekday"));
+  const weekend = (node: Element | null | undefined) =>
+    node?.classList.contains("is-weekend") ?? false;
+
+  it("washes the Saturday and Sunday cells and their column headers", () => {
+    mount(payloadOf());
+    // 25 and 26 July 2026 are the Saturday and Sunday of today's week.
+    expect(weekend(cell("2026-07-25"))).toBe(true);
+    expect(weekend(cell("2026-07-26"))).toBe(true);
+    expect(weekend(cell("2026-07-24"))).toBe(false); // Friday
+    expect(weekend(cell("2026-07-27"))).toBe(false); // Monday
+
+    const headers = weekdayHeaders();
+    expect(headers.map((h) => h.textContent)).toEqual(WEEKDAY_LABELS);
+    expect(headers.filter(weekend).map((h) => h.textContent)).toEqual(["Sat", "Sun"]);
+  });
+
+  it("says weekend with a class, never by counting positions in the grid", () => {
+    // Production bug 2: an `nth-child` wash drifts the moment any leading child
+    // is added to the grid. The wash names the property it means — the day is a
+    // weekend — so it cannot drift.
+    // Both halves of the wash — the cells and the column headers above them.
+    expect(shell).toMatch(
+      /\.calendar__weekday\.is-weekend,\s*\.calendar__day\.is-weekend\s*\{[^}]*background/,
+    );
+    const painting = nthChildRules().filter((rule) => /background/.test(rule.body));
+    expect(painting.map((rule) => rule.selector)).toEqual([]);
+  });
+
+  it("runs the wash unbroken through an outside-month day, which has none of its own", () => {
+    mount(payloadOf());
+    // July 2026's grid trails into Sat 1 and Sun 2 August: outside the month, and
+    // still the weekend column, so the wash passes straight through them.
+    const trailing = cell("2026-08-01");
+    expect(trailing?.classList.contains("calendar__day--outside")).toBe(true);
+    expect(weekend(trailing)).toBe(true);
+
+    // The outside day paints no wash of its own — grey means exactly one thing in
+    // this grid — and recedes by dropping its own contents to ~25% opacity.
+    expect(shell).not.toMatch(/\.calendar__day--outside\s*\{[^}]*background/);
+    expect(shell).toMatch(/\.calendar__day--outside\s*>\s*\*\s*\{[^}]*opacity:\s*0\.25/);
+  });
+
+  it("prints the month name beside the numeral on the 1st, inside the month and outside it", () => {
+    mount(payloadOf());
+    expect(cell("2026-07-01")?.querySelector(".calendar__monthname")?.textContent).toBe("Jul");
+    expect(cell("2026-08-01")?.querySelector(".calendar__monthname")?.textContent).toBe("Aug");
+    // Only the 1st announces its month; every other day is just its numeral.
+    expect(cell("2026-07-21")?.querySelector(".calendar__monthname")).toBeNull();
+    expect(cell("2026-06-29")?.querySelector(".calendar__monthname")).toBeNull();
+  });
+
+  it("carries the weekend on the model's cell, so the grid never has to count", () => {
+    const cells = monthGridCells(2026, 7, 20260721);
+    expect(cells.find((c) => c.day === 25 && c.month === 7)?.isWeekend).toBe(true);
+    expect(cells.find((c) => c.day === 26 && c.month === 7)?.isWeekend).toBe(true);
+    expect(cells.find((c) => c.day === 24 && c.month === 7)?.isWeekend).toBe(false);
+    // The trailing outside days are weekends too — the property is the day's.
+    expect(cells.find((c) => c.day === 1 && c.month === 8)).toMatchObject({
+      inMonth: false,
+      isWeekend: true,
+    });
   });
 });
 
