@@ -838,30 +838,47 @@ export const mountCalendar = (root, payload, now, options) => {
   const publishTopbarHeight = () => {
     // A remount leaves the previous mount's resize listener alive, holding a
     // header no longer in the page. It must not publish a detached header's
-    // height over the live one's — and having noticed it is stale, it retires
-    // itself rather than firing for the life of the page (#84). Self-eviction
-    // over a teardown function returned from `mountCalendar`: the mount's
-    // contract stays "the page is driven entirely through the controls it
-    // renders", needing no cooperation from a caller who would have to remember
-    // to call it. Two costs. A stale handler survives until the first resize
-    // after its header leaves — one no-op run, which is what the guard was
-    // already doing. And stale here means *detached*, not *superseded*: a
-    // remount into the very same header element leaves both handlers live and
-    // publishing the same height, harmless but not evicted.
-    if (!topbar.isConnected) {
-      doc.defaultView?.removeEventListener("resize", publishTopbarHeight);
-      return;
-    }
+    // height over the live one's.
+    if (!topbar.isConnected) return;
     if (typeof topbar.getBoundingClientRect !== "function") return;
     const { height } = topbar.getBoundingClientRect();
     doc.documentElement.style.setProperty("--topbar-h", `${height}px`);
   };
 
-  // A resize is the one thing that re-wraps the header without re-rendering it,
-  // and a stale `--topbar-h` lands the next jump behind the header — the exact
-  // failure the measurement exists to prevent. The window is reached through the
-  // injected document, never a global.
-  doc.defaultView?.addEventListener("resize", publishTopbarHeight);
+  /**
+   * What a viewport resize invalidates, in **one** listener per mount. A resize
+   * is the one thing that re-wraps the header without re-rendering it, and a
+   * stale `--topbar-h` lands the next jump behind the header — the exact failure
+   * the measurement exists to prevent (#73). It also moves every surface under
+   * an open detail bubble, whose tail is pinned to viewport coordinates the
+   * relayout has just invalidated, so the bubble closes first (#75).
+   *
+   * Having noticed its header is gone, it retires itself rather than firing for
+   * the life of the page (#84). Self-eviction over a teardown function returned
+   * from `mountCalendar`: the mount's contract stays "the page is driven
+   * entirely through the controls it renders", needing no cooperation from a
+   * caller who would have to remember to call it. Two costs. A stale handler
+   * survives until the first resize after its header leaves — one no-op run,
+   * which is what the guard inside was already doing. And stale here means
+   * *detached*, not *superseded*: a remount into the very same header element
+   * leaves both handlers live and publishing the same height, harmless but not
+   * evicted.
+   */
+  const onResize = () => {
+    // The bubble closes before the staleness check, not after it. A bubble hangs
+    // off the document body, not off the mount's root, so a retired mount's
+    // bubble outlives the surface it points at — and a handler that returned
+    // early would leave it stranded in the page with nothing left to dismiss it.
+    closeBubble();
+    if (!topbar.isConnected) {
+      doc.defaultView?.removeEventListener("resize", onResize);
+      return;
+    }
+    publishTopbarHeight();
+  };
+
+  // The window is reached through the injected document, never a global.
+  doc.defaultView?.addEventListener("resize", onResize);
 
   const render = () => {
     // --- Controls: view switcher, type filter, navigation ----------------
@@ -1266,8 +1283,9 @@ export const mountCalendar = (root, payload, now, options) => {
    *
    * What the line drops is on its `title`: the location, and — unlike every
    * reading surface — the source label #38 puts on an entry. Month is the
-   * navigator; the attribution is one click away, on the surface `+N more` and
-   * (later, #75) the chip itself hand the reader to.
+   * navigator; the attribution is one gesture away, on the Agenda `+N more`
+   * hands the reader to and in the detail bubble a double-click on the chip
+   * itself opens (#75).
    * The label drops a port call's `Cruise: ` prefix, as the prototype does. On a
    * chip roughly sixteen characters wide it is eight characters of constant, and
    * what it truncates is the vessel — the one thing that distinguishes one call
@@ -1322,6 +1340,7 @@ export const mountCalendar = (root, payload, now, options) => {
     const node = el("div", className, entry.summary.replace(/^Cruise: /, ""));
     node.dataset["type"] = entry.type;
     node.title = entry.location ? `${entry.summary} — ${entry.location}` : entry.summary;
+    bindBubble(node, entry);
     return node;
   };
 
@@ -1346,6 +1365,7 @@ export const mountCalendar = (root, payload, now, options) => {
     // Every entry is labelled with the source that produced it (#38) — the
     // attribution that lets two labelled duplicates read as two, not one.
     node.appendChild(el("span", "calendar__source", entry.source));
+    bindBubble(node, entry);
     return node;
   };
 
@@ -1366,6 +1386,288 @@ export const mountCalendar = (root, payload, now, options) => {
     const rounded = Math.round(days * 10) / 10;
     return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)} days`;
   };
+
+  // --- The entry-detail bubble (#75) --------------------------------------
+  //
+  // Double-clicking an entry on any view opens a small anchored popover showing
+  // the few honest fields the at-rest surfaces truncate or hide — the chip's
+  // ellipsised title, the location a leaf drops, the source a chip moves to its
+  // tooltip. It is emphatically **not** more fields: the dataset is existence
+  // and timing only (CONTEXT.md §CalendarEntry), so the bubble shows what is
+  // there in full and invents nothing.
+  //
+  // The split below is the whole design. {@link buildBubble} is pure DOM from
+  // one entry and is where every content decision lives, which is what makes it
+  // testable at seam 3; {@link positionBubble} is geometry, measured against a
+  // viewport jsdom does not have, and is deliberately the only part outside it.
+
+  /**
+   * Each source's baked last-confirmed instant, by source key — the same
+   * `payload.sources` list {@link renderFreshness} reads, so the bubble's footer
+   * and the page's disclosure can never disagree about when a source was last
+   * seen. A source the payload says nothing about is simply absent from the map:
+   * the bubble then names the attribution and claims no age for it, rather than
+   * inventing one.
+   */
+  const lastConfirmedBySource = new Map(
+    (payload.sources ?? []).map(({ source, lastConfirmed }) => [source, lastConfirmed]),
+  );
+
+  /**
+   * The type, in the reader's words rather than the schema's. The glossary bans
+   * a bare "event" (CONTEXT.md §Event) and the two types are what it bans it in
+   * favour of — but a hotelier reads "Cruise arrival", not `PortCall`.
+   * @param {DayEntry} entry @returns {string}
+   */
+  const typeLabel = (entry) => (entry.type === "PortCall" ? "Cruise arrival" : "Venue event");
+
+  /**
+   * `Fri 17 Jul` — a day named as a reader reads it, its year left to the caller.
+   * @param {number} index @returns {string}
+   */
+  const dateText = (index) => {
+    const { month, day } = civilOf(index);
+    return `${weekdayLabel(index)} ${day} ${MONTHS_SHORT[month - 1] ?? ""}`;
+  };
+
+  /**
+   * **When**: one day, or the range the entry spans — the year said once, at the
+   * end, because a range inside one year does not need it twice.
+   * @param {DayEntry} entry @returns {string}
+   */
+  const whenText = (entry) =>
+    entry.startIndex === entry.endIndex
+      ? `${dateText(entry.startIndex)} ${civilOf(entry.startIndex).year}`
+      : `${dateText(entry.startIndex)} – ${dateText(entry.endIndex)} ${civilOf(entry.endIndex).year}`;
+
+  /**
+   * **Time**: the published clock times, SGT. The connector carries the fact the
+   * dash cannot — a dash reads as "from … to" within one day, and an arrow says
+   * the end time belongs to a *later* day.
+   * @param {DayEntry} entry @returns {string}
+   */
+  const bubbleTimeText = (entry) =>
+    `${clockText(entry.start)} ${entry.startIndex === entry.endIndex ? "–" : "→"} ${clockText(entry.end)} SGT`;
+
+  /**
+   * The freshness footer, for **this entry's own source** — computed here from
+   * the baked instant and the injected clock, exactly as the page's disclosure
+   * is (#40), never a baked relative string.
+   * @param {DayEntry} entry @returns {string}
+   */
+  const bubbleFootText = (entry) => {
+    const lastConfirmed = lastConfirmedBySource.get(entry.source);
+    return lastConfirmed ? `${entry.source} · confirmed ${freshness(lastConfirmed, now).text}` : entry.source;
+  };
+
+  /**
+   * The bubble, built from one entry: the bake-off's **variant E** — a type
+   * accent band and colour chip carrying the clicked tile's own colour, over a
+   * data-record grid, over the freshness footer.
+   * @param {DayEntry} entry @returns {HTMLElement}
+   */
+  const buildBubble = (entry) => {
+    const node = el("div", "calendar__bubble");
+    // The accent and the chip dot read their colour off this, the same attribute
+    // and the same two colours every surface's entry carries.
+    node.dataset["type"] = entry.type;
+    node.appendChild(el("div", "calendar__bubble-accent"));
+
+    const pad = el("div", "calendar__bubble-pad");
+    const chip = el("div", "calendar__bubble-chip");
+    chip.appendChild(el("span", "calendar__bubble-dot"));
+    chip.appendChild(el("span", undefined, typeLabel(entry)));
+    pad.appendChild(chip);
+    // The full title — the one thing every at-rest surface truncates. The
+    // `Cruise: ` prefix goes for the reason a chip drops it: the chip above says
+    // the type in words, so the prose prefix ADR-0001 keeps in `summary` for an
+    // iCal client is redundant here.
+    pad.appendChild(el("div", "calendar__bubble-title", entry.summary.replace(/^Cruise: /, "")));
+
+    const grid = el("dl", "calendar__bubble-grid");
+    /** @param {string} label @param {string} value */
+    const put = (label, value) => {
+      grid.appendChild(el("dt", undefined, label));
+      grid.appendChild(el("dd", undefined, value));
+    };
+    put("When", whenText(entry));
+    put("Time", bubbleTimeText(entry));
+    // Always drawn, as variant E draws it. `CalendarEntry.location` is a
+    // required string that `project` always composes — venue plus hall, or the
+    // terminal — so a guard here would only ever fire on data the projection
+    // cannot produce, at the cost of a record grid whose rows come and go.
+    put("Where", entry.location);
+    // The same {@link spanText} Date-spine labels its bars with, reused rather
+    // than restated — a bar and its bubble rounding a duration differently is
+    // the kind of drift two copies of one rule always produce.
+    put("Length", spanText(entry.endValue - entry.startValue));
+    pad.appendChild(grid);
+    node.appendChild(pad);
+
+    node.appendChild(el("div", "calendar__bubble-foot", bubbleFootText(entry)));
+    return node;
+  };
+
+  /** Clear air between the anchor node and the bubble. */
+  const BUBBLE_GAP = 10;
+  /** The closest the bubble is allowed to come to a viewport edge. */
+  const BUBBLE_MARGIN = 8;
+  /** The tail's half-width — its `border-width` in the stylesheet. */
+  const BUBBLE_TAIL = 9;
+  /** How far in from the node's left edge the tail aims. */
+  const BUBBLE_TAIL_INSET = 14;
+
+  /**
+   * Place the bubble against the node it was opened from, in **viewport
+   * coordinates** (`position: fixed`): below by default, flipped above when it
+   * would run off the bottom *and* there is room above, clamped horizontally
+   * with the tail kept on the node.
+   *
+   * **This is the one part outside seam 3, and deliberately so** (#75). Every
+   * number here comes from `getBoundingClientRect` and `offsetWidth` measured
+   * against a viewport — and jsdom has no layout engine, so it answers zero to
+   * all of them. The tests drive this function (an exception thrown here would
+   * fail them) and assert only that a placement was applied; the flip, the clamp
+   * and the tail offset are checked against the prototype by eye, as the rest of
+   * round 1's geometry was.
+   *
+   * @param {HTMLElement} node the bubble @param {Element} anchor the node clicked
+   */
+  const positionBubble = (node, anchor) => {
+    const rect = anchor.getBoundingClientRect();
+    const view = doc.defaultView;
+    const width = node.offsetWidth;
+    const height = node.offsetHeight;
+    const viewWidth = view?.innerWidth ?? 0;
+    const viewHeight = view?.innerHeight ?? 0;
+
+    let above = false;
+    let top = rect.bottom + BUBBLE_GAP;
+    // Flipped only when there is somewhere to flip *to*: a bubble moved above a
+    // node it does not fit above either is no better placed than one that
+    // overhangs the bottom.
+    if (top + height + BUBBLE_MARGIN > viewHeight && rect.top - BUBBLE_GAP - height > BUBBLE_MARGIN) {
+      above = true;
+      top = rect.top - BUBBLE_GAP - height;
+    }
+    // The class picks which edge the tail hangs off, so the flip is one fact
+    // stated once and the stylesheet draws both cases from it.
+    node.classList.toggle("calendar__bubble--above", above);
+    node.classList.toggle("calendar__bubble--below", !above);
+
+    const left = Math.max(BUBBLE_MARGIN, Math.min(rect.left, viewWidth - width - BUBBLE_MARGIN));
+    node.style.left = `${left}px`;
+    node.style.top = `${top}px`;
+    // The tail aims a little way in from the node's left edge, then is clamped
+    // inside the bubble's own width — which is what keeps a bubble pushed off a
+    // screen edge still visibly pointing at the entry it describes.
+    const tailAt = Math.min(
+      Math.max(rect.left + BUBBLE_TAIL_INSET, left + BUBBLE_TAIL_INSET),
+      left + width - BUBBLE_TAIL_INSET,
+    );
+    node.style.setProperty("--tail-x", `${tailAt - left - BUBBLE_TAIL}px`);
+  };
+
+  /**
+   * The one open bubble, or `null`. One at a time, page-wide: a second popover
+   * beside the first has nothing to point at that the first does not.
+   * @type {HTMLElement | null}
+   */
+  let openBubble = null;
+
+  const closeBubble = () => {
+    openBubble?.remove();
+    openBubble = null;
+  };
+
+  /**
+   * Build hidden, append, place, reveal. The order matters: a bubble revealed
+   * before it is placed paints for a frame at the top-left corner of the
+   * viewport, because that is where a `position: fixed` node with no offsets
+   * sits. It hangs off the document body rather than the surface, so no
+   * scrolling or `overflow: hidden` container can clip it.
+   * @param {Element} anchor @param {DayEntry} entry
+   */
+  const openBubbleFor = (anchor, entry) => {
+    closeBubble();
+    const node = buildBubble(entry);
+    node.style.visibility = "hidden";
+    (doc.body ?? root).appendChild(node);
+    positionBubble(node, anchor);
+    node.style.visibility = "";
+    openBubble = node;
+  };
+
+  /**
+   * The double-click affordance on one entry node. It is bound by
+   * {@link renderLeaf} and {@link renderEntry} — the two functions every view
+   * draws an entry through — which is both how all five surfaces get it and how
+   * the `+N more` doors are excluded without a rule saying so: a door is
+   * neither, because it navigates rather than describing an entry.
+   *
+   * Double-click, not click: a single click is how a reader scans a chip-dense
+   * Month, and a popover under every one of them would make the navigator
+   * unusable. Two costs are accepted for this round rather than papered over —
+   * the bubble has no keyboard opening, and a short timed Week entry is a small
+   * target.
+   * @param {Element} node @param {DayEntry} entry
+   */
+  const bindBubble = (node, entry) => {
+    node.addEventListener("dblclick", (opened) => {
+      // The innermost entry wins. No surface nests one entry node inside another
+      // today, so this changes nothing yet — it is what keeps the affordance
+      // meaning "the entry you pointed at" if one ever does.
+      opened.stopPropagation();
+      openBubbleFor(node, entry);
+    });
+  };
+
+  /**
+   * Binds one dismissal listener to a target that **outlives the mount** — the
+   * document, the window. Each retires itself the first time it fires after its mount's
+   * root has left the page, the same self-eviction the topbar's resize handler
+   * does (#84): a remount would otherwise leave every previous mount's handlers
+   * firing for the life of the page. Stale here means *detached*, not
+   * *superseded*, with the same caveat #84 records — a remount into the very
+   * same root leaves both live, closing the same bubble twice over, harmlessly.
+   *
+   * Retiring, it takes the bubble with it. The bubble hangs off the document
+   * body rather than the root, so it survives its mount's removal; a listener
+   * that evicted itself without closing would leave a popover in the page
+   * pointing at a surface that has gone, and no path left to dismiss it.
+   *
+   * @param {EventTarget | null | undefined} target @param {string} type
+   * @param {(fired: any) => void} handler @param {boolean} [capture]
+   */
+  const bindDismissal = (target, type, handler, capture = false) => {
+    /** @param {any} fired */
+    const listener = (fired) => {
+      if (!root.isConnected) {
+        closeBubble();
+        target?.removeEventListener(type, listener, capture);
+        return;
+      }
+      handler(fired);
+    };
+    target?.addEventListener(type, listener, capture);
+  };
+
+  // A click anywhere but inside the bubble dismisses it…
+  bindDismissal(doc, "click", (clicked) => {
+    if (openBubble && !openBubble.contains(clicked.target)) closeBubble();
+  });
+  // …as does Esc, which is how a keyboard reader gets out of it.
+  bindDismissal(doc, "keydown", (pressed) => {
+    if (pressed.key === "Escape") closeBubble();
+  });
+  // Any scroll, in **capture** phase: a scroll event does not bubble, so a
+  // listener on the window only sees the page's own scrolling — and Week's grid
+  // and Month's own scroller would slide out from under a bubble that stayed
+  // fixed where it was. Accepted for this round (#75): the bubble closes on a
+  // scroll rather than following its node.
+  bindDismissal(doc.defaultView, "scroll", closeBubble, true);
+  // A resize dismisses it too — through {@link onResize}, which is the mount's
+  // one resize listener rather than a second one racing it.
 
   // The freshness disclosure is a property of the data behind every view, not of
   // the month or the week, so it is rendered once here rather than rebuilt by

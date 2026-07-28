@@ -219,6 +219,30 @@ it replaces agreed with the axis only in a 31-day month — in a 30-day one ever
 progressively low, which the line made visible the moment it had to land on a row's edge.
 #74 — a net-new round-1 item, so it is spec'd on its issue rather than in ADR-0014.
 
+### Entry-detail bubble
+
+The small anchored popover a **double-click** on an entry opens, on any view — the
+**Month** chip, **Week**'s **all-day band** and its timed entries, the **Agenda** row,
+the **Date-spine** bar. The `+N more` doors are excluded: a door navigates, it does not
+describe an entry.
+
+Its job is **not more fields**. The dataset is existence and timing (see
+**CalendarEntry**), so the bubble shows the few honest fields *in full* — the title every
+at-rest surface truncates, the location a leaf drops, the source a **chip** moves to its
+tooltip — and invents none. Type in the reader's words ("Cruise arrival" / "Venue
+event"), When, Time, Where, Length, and a footer naming the entry's own source and how
+long ago it was confirmed, computed from the same `payload.sources` and injected clock
+the page's **Source health** disclosure reads.
+
+Its **content** is a pure function of the entry and is covered at seam 3. Its
+**geometry** is deliberately not: the bubble is placed in viewport coordinates, flipping
+above near the bottom edge and clamping horizontally with its tail kept on the node, and
+every number in that comes from a layout engine jsdom does not have. Two costs are
+accepted rather than papered over: a scroll **closes** the bubble instead of following
+its node, and it has no keyboard opening. #75 — a net-new round-1 item, spec'd on its
+issue rather than in ADR-0014, and the one item that brings the prototype's *visual*
+identity into scope (`prototype/event-bubble`, variant E).
+
 ### Weekend wash
 
 The light grey (4%) **Month** and **Week** carry on Saturday and Sunday — one grey,

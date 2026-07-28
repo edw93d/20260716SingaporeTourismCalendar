@@ -557,6 +557,96 @@
         min-height: 1rem;
       }
 
+      /* --- The entry-detail bubble (#75) ---------------------------------
+         Double-clicking an entry on any view opens this. The look is variant E
+         from the round-1 bake-off (`prototype/event-bubble`): a thin type accent
+         and a colour chip in the entry's own colour, carrying the clicked tile's
+         continuity, over a data-record grid that reads as what this product is —
+         existence and timing, labelled — over the freshness footer.
+
+         It is `position: fixed`, so it is placed in viewport coordinates by
+         `calendar.js` and no scrolling ancestor can clip it. `--tail-x` is the
+         tail's horizontal offset, published by the same placement so the tail
+         keeps pointing at the entry even when the bubble is clamped into the
+         viewport; `--below` / `--above` say which edge it hangs off. The tail is
+         two stacked triangles — the hairline behind, the Canvas fill one pixel
+         in front — which is how a bordered box gets a bordered point. */
+      .calendar__bubble {
+        position: fixed;
+        z-index: 60;
+        width: max-content;
+        max-width: 22rem;
+        background: Canvas;
+        border: 1px solid var(--line);
+        border-radius: 0.6rem;
+        box-shadow: 0 6px 22px color-mix(in srgb, canvastext 16%, transparent);
+      }
+      .calendar__bubble::before,
+      .calendar__bubble::after {
+        content: "";
+        position: absolute;
+        width: 0;
+        height: 0;
+        border: 9px solid transparent;
+      }
+      .calendar__bubble::after { border-width: 8px; }
+      .calendar__bubble--below::before,
+      .calendar__bubble--below::after { bottom: 100%; }
+      .calendar__bubble--below::before { border-bottom-color: var(--line); left: var(--tail-x); }
+      .calendar__bubble--below::after { border-bottom-color: Canvas; left: calc(var(--tail-x) + 1px); }
+      .calendar__bubble--above::before,
+      .calendar__bubble--above::after { top: 100%; }
+      .calendar__bubble--above::before { border-top-color: var(--line); left: var(--tail-x); }
+      .calendar__bubble--above::after { border-top-color: Canvas; left: calc(var(--tail-x) + 1px); }
+      .calendar__bubble-pad { padding: 0.7rem 0.85rem; }
+      .calendar__bubble-title { font-weight: 600; font-size: 0.95rem; line-height: 1.25; }
+      /* The type accent and the chip's dot, in the same two colours every
+         surface's entry carries — the bubble visibly belongs to what was clicked. */
+      .calendar__bubble-accent {
+        height: 4px;
+        border-radius: 0.6rem 0.6rem 0 0;
+        background: #2563eb;
+      }
+      .calendar__bubble[data-type="PortCall"] .calendar__bubble-accent { background: #0d9488; }
+      .calendar__bubble-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.72rem;
+        color: var(--dim);
+        margin-bottom: 0.35rem;
+      }
+      .calendar__bubble-dot {
+        width: 0.6rem;
+        height: 0.6rem;
+        border-radius: 999px;
+        background: #2563eb;
+      }
+      .calendar__bubble[data-type="PortCall"] .calendar__bubble-dot { background: #0d9488; }
+      /* The record grid: an uppercase label beside its value, values in tabular
+         figures so the clock times and the dates line up down the column. */
+      .calendar__bubble-grid {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 0.3rem 0.85rem;
+        font-size: 0.82rem;
+        margin-top: 0.4rem;
+      }
+      .calendar__bubble-grid dt {
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: 0.66rem;
+        font-weight: 600;
+        color: var(--dim);
+        padding-top: 0.08rem;
+      }
+      .calendar__bubble-grid dd { margin: 0; font-variant-numeric: tabular-nums; }
+      .calendar__bubble-foot {
+        padding: 0.45rem 0.85rem;
+        border-top: 1px solid var(--line);
+        font-size: 0.72rem;
+        color: var(--dim);
+      }
       #calendar-status { color: var(--dim); font-size: 0.9rem; padding: 1rem 0; }
     </style>
   </head>
