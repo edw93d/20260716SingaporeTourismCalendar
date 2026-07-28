@@ -32,7 +32,7 @@
  * @typedef {"all" | RecordType} Filter
  * @typedef {"month" | "week" | "agenda" | "spine"} View
  * @typedef {SiteEntry & { type: RecordType, startKey: number, endKey: number, startIndex: number, endIndex: number, startValue: number, endValue: number }} DayEntry
- * @typedef {{ topbar?: Element }} MountOptions
+ * @typedef {{ topbar: Element }} MountOptions
  */
 
 /**
@@ -356,20 +356,31 @@ export const assignLanes = (items, startOf, endOf) => {
 const pad2 = (value) => String(value).padStart(2, "0");
 
 /**
+ * The `data-day` handle every view labels its day node with — the month cell,
+ * the week header and column, the agenda row, the spine row. One function
+ * because it is also read back by the scroll-to-today jump (#73): the five
+ * writers and the one reader have to agree on the shape, whichever view is
+ * showing.
+ * @param {{ year: number, month: number, day: number }} civil @returns {string}
+ */
+const dayAttrOf = ({ year, month, day }) => `${year}-${pad2(month)}-${pad2(day)}`;
+
+/**
  * Mount the calendar into `root`, reading the clock from `now`. Returns nothing:
  * the page is driven entirely through the controls it renders (filter, prev,
  * today, next), which is what a test drives too.
  *
  * Two hosts, because the header is **pinned** (#73): the controls render into
  * `options.topbar` — the page's sticky `<header>`, which already holds the
- * static h1 — and everything that scrolls under it renders into `root`. Without
- * a topbar the module makes its own inside `root`, so a bare `mountCalendar`
- * still produces a whole calendar.
+ * static h1 — and everything that scrolls under it renders into `root`. The
+ * topbar is the page's to supply, not the module's to invent: the h1 inside it
+ * is static markup, and a header the module built for itself would be a second
+ * layout nothing ships.
  *
  * @param {Element} root
  * @param {SitePayload} payload
  * @param {Date} now
- * @param {MountOptions} [options]
+ * @param {MountOptions} options the page-supplied hosts — currently just the pinned topbar
  */
 export const mountCalendar = (root, payload, now, options = {}) => {
   const doc = root.ownerDocument;
@@ -413,7 +424,8 @@ export const mountCalendar = (root, payload, now, options = {}) => {
   root.textContent = "";
   root.className = "calendar";
 
-  const topbar = options.topbar ?? el("header", "topbar");
+  const topbar = options.topbar;
+  if (!topbar) throw new Error("mountCalendar needs the page's topbar to render its controls into.");
   // A second mount into the same shell replaces the controls rather than
   // stacking a second set beside them — `root` is cleared above, but a
   // page-supplied topbar outlives the mount.
@@ -421,7 +433,6 @@ export const mountCalendar = (root, payload, now, options = {}) => {
   /** The controls, rebuilt each render: they carry the current view and title. */
   const controls = el("div", "calendar__controls");
   topbar.appendChild(controls);
-  if (!options.topbar) root.appendChild(topbar);
 
   /** The showing view. Everything here scrolls under the pinned header. */
   const surface = el("div", "calendar__surface");
@@ -501,17 +512,6 @@ export const mountCalendar = (root, payload, now, options = {}) => {
   };
 
   /**
-   * The day's `data-day` attribute value — the handle every view labels its own
-   * row, cell or column with, and so the one selector "bring this day to the
-   * top" needs, whichever view is showing.
-   * @param {number} index @returns {string}
-   */
-  const dayAttr = (index) => {
-    const { year, month, day } = civilOf(index);
-    return `${year}-${pad2(month)}-${pad2(day)}`;
-  };
-
-  /**
    * Bring the pending `scrollTarget` day to the **top of the viewport** (#73).
    * The pinned header would otherwise cover it, so the shell's
    * `scroll-padding-top: var(--topbar-h)` pushes the landing below the header —
@@ -525,7 +525,8 @@ export const mountCalendar = (root, payload, now, options = {}) => {
    */
   const applyScrollTarget = () => {
     if (scrollTarget === null) return;
-    const target = surface.querySelector(`[data-day="${dayAttr(scrollTarget)}"]`) ?? surface;
+    const attr = dayAttrOf(civilOf(scrollTarget));
+    const target = surface.querySelector(`[data-day="${attr}"]`) ?? surface;
     scrollTarget = null;
     if (typeof target.scrollIntoView === "function") target.scrollIntoView({ block: "start" });
   };
@@ -541,6 +542,12 @@ export const mountCalendar = (root, payload, now, options = {}) => {
     const { height } = topbar.getBoundingClientRect();
     doc.documentElement.style.setProperty("--topbar-h", `${height}px`);
   };
+
+  // A resize is the one thing that re-wraps the header without re-rendering it,
+  // and a stale `--topbar-h` lands the next jump behind the header — the exact
+  // failure the measurement exists to prevent. The window is reached through the
+  // injected document, never a global.
+  doc.defaultView?.addEventListener("resize", publishTopbarHeight);
 
   const render = () => {
     // --- Controls: view switcher, type filter, navigation ----------------
@@ -569,9 +576,11 @@ export const mountCalendar = (root, payload, now, options = {}) => {
       if (active) button.classList.add("calendar__viewbtn--active");
       button.addEventListener("click", () => {
         state.view = value;
-        // A view switch behaves exactly like pressing Today: whichever surface
-        // the reader lands on opens on the present, not wherever the last one
-        // happened to be scrolled to (#73).
+        // Whichever surface the reader lands on opens on the present, not
+        // wherever the last one happened to be scrolled to (#73). Only the
+        // *scroll* is reset, not the anchor: a reader who paged to June and
+        // switched view is still reading June (§6), and today's row simply is
+        // not on that surface to scroll to.
         scrollTarget = todayIndex;
         render();
       });
@@ -658,7 +667,7 @@ export const mountCalendar = (root, payload, now, options = {}) => {
     for (const cell of cells) {
       const dayNode = el("div", "calendar__day");
       if (!cell.inMonth) dayNode.classList.add("calendar__day--outside");
-      dayNode.dataset["day"] = `${cell.year}-${pad2(cell.month)}-${pad2(cell.day)}`;
+      dayNode.dataset["day"] = dayAttrOf(cell);
 
       dayNode.appendChild(dayNumberNode(cell.day, cell.isToday, "calendar__daynum"));
 
@@ -687,7 +696,7 @@ export const mountCalendar = (root, payload, now, options = {}) => {
     head.appendChild(el("span", "week__corner"));
     days.forEach((d, i) => {
       const cell = el("div", "week__day");
-      cell.dataset["day"] = `${d.year}-${pad2(d.month)}-${pad2(d.day)}`;
+      cell.dataset["day"] = dayAttrOf(d);
       cell.appendChild(el("span", "week__dayname", WEEKDAYS[i] ?? ""));
       cell.appendChild(dayNumberNode(d.day, d.isToday, "week__daynum", true));
       head.appendChild(cell);
@@ -731,7 +740,7 @@ export const mountCalendar = (root, payload, now, options = {}) => {
 
     for (const d of days) {
       const col = el("div", "week__col");
-      col.dataset["day"] = `${d.year}-${pad2(d.month)}-${pad2(d.day)}`;
+      col.dataset["day"] = dayAttrOf(d);
       const timed = visible.filter((e) => e.startIndex === e.endIndex && e.startIndex === d.index);
       const laid = assignLanes(
         timed,
@@ -768,7 +777,7 @@ export const mountCalendar = (root, payload, now, options = {}) => {
       any = true;
       const index = dayIndexOf(year, month, day);
       const dayNode = el("div", "agenda__day");
-      dayNode.dataset["day"] = `${year}-${pad2(month)}-${pad2(day)}`;
+      dayNode.dataset["day"] = dayAttrOf({ year, month, day });
       // Weekday and month sit either side of the date number, so today's disc
       // rides the number alone rather than washing the whole label.
       const date = el("span", "agenda__date");
@@ -802,7 +811,7 @@ export const mountCalendar = (root, payload, now, options = {}) => {
     for (let day = 1; day <= daysInMonth; day += 1) {
       const index = dayIndexOf(year, month, day);
       const row = el("div", "spine__date");
-      row.dataset["day"] = `${year}-${pad2(month)}-${pad2(day)}`;
+      row.dataset["day"] = dayAttrOf({ year, month, day });
       row.appendChild(el("span", "spine__dayname", weekdayLabel(index)));
       row.appendChild(dayNumberNode(day, index === todayIndex, "spine__datenum", true));
       axis.appendChild(row);
@@ -870,9 +879,10 @@ export const mountCalendar = (root, payload, now, options = {}) => {
     return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)} days`;
   };
 
-  // The freshness disclosure sits above every view's surface — it is not a
-  // property of the month or the week, but of the data behind all of them, so it
-  // is rendered once here rather than rebuilt by every render.
+  // The freshness disclosure is a property of the data behind every view, not of
+  // the month or the week, so it is rendered once here rather than rebuilt by
+  // every render. It still sits directly under the header; ADR-0014 §2 demotes it
+  // into the methodology footer, which is #79's slice, not this one's.
   const fresh = renderFreshness();
   if (fresh) root.appendChild(fresh);
   root.appendChild(surface);

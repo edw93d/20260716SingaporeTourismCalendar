@@ -169,11 +169,10 @@
         border-bottom: 1px solid var(--line);
       }
       /* Every day a scroll can land on carries the same breathing room, on top
-         of the pinned header's height (#73). */
-      .calendar__day,
-      .agenda__day,
-      .spine__date,
-      .week__day { scroll-margin-top: 0.75rem; }
+         of the pinned header's height (#73). Keyed off `data-day` — the handle
+         every view already labels its day nodes with — so a new view inherits it
+         rather than needing another selector here. */
+      [data-day] { scroll-margin-top: 0.75rem; }
       .calendar__day {
         min-height: 6rem;
         padding: 0.3rem;

@@ -520,6 +520,16 @@ describe("sticky header and today-to-top navigation (#73)", () => {
     expect(document.documentElement.style.getPropertyValue("--topbar-h")).toMatch(/^[\d.]+px$/);
   });
 
+  it("republishes --topbar-h when the viewport resizes", () => {
+    // A resize re-wraps the header without re-rendering it, and a stale height
+    // lands the next jump behind the header. jsdom measures every box as zero,
+    // so the grown header is faked.
+    mount(payloadOf());
+    topbar.getBoundingClientRect = () => ({ height: 168 }) as DOMRect;
+    window.dispatchEvent(new Event("resize"));
+    expect(document.documentElement.style.getPropertyValue("--topbar-h")).toBe("168px");
+  });
+
   it("brings today's row to the top of the viewport on first load", () => {
     mount(withToday());
     expect(landedOn()).toBe("2026-07-21");
