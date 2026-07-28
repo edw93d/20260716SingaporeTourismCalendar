@@ -158,10 +158,10 @@ See ADR-0009.
 
 How **Month** draws a **CalendarEntry**: **one line**, the summary alone, its type
 carried by colour. It is a leaf, not a stack. The reading surfaces draw the same entry
-in full (name, where, source) — with the one exception of Week's **All-day band**,
-which is a leaf for its own reason — and that difference *is* the
-navigator/reading-surface split made visible: a chip answers "is there demand here",
-not "what is it".
+in full (name, where, source) — with two exceptions, Week's **All-day band** and
+**Date-spine**'s **Bar**, each of which draws less for its own surface's reason — and
+that difference *is* the navigator/reading-surface split made visible: a chip answers
+"is there demand here", not "what is it".
 
 Chips are **capped per day** — four rows to a cell, and the overflow past them
 collapses to a **`+N more`** that drills into that day in **Agenda**, spending a row
@@ -214,6 +214,32 @@ enclosed by a matching pair: its 00:00 line is the **all-day band**'s bottom bor
 its 24:00 line the hour grid's own. The day is quartered *once*, across the grid — the
 columns paint no rule of their own, because two griddings of one axis are two competing
 readings of it. #78.
+
+### Bar
+
+How **Date-spine** draws a **CalendarEntry**: **two lines** — how long, then the name —
+spanning the whole date rows the entry occupies. Its height *is* its duration, which is
+the whole point of the view, so the height is not free to grow to fit text: a one-date
+entry is one row, and two lines at the spine's own type scale is what that row holds.
+
+So the **Bar** is the second exception to a reading surface drawing the entry in full
+(see **Chip**): the location and the source come off, and a port call's `Cruise: `
+prefix with them, for the reasons the **Chip** drops the same three. A **third**
+narrowing of #38's "every entry is labelled with the source" — the attribution is on
+the tooltip and in the **Entry-detail bubble**, not lost.
+
+Length is on the **Bar** as words because the geometry cannot carry it: the height says
+*which dates*, the label says *how long*. That split is what lets the spine round to
+whole rows — the alternative, a bar drawn to the clock, makes a six-hour entry a sliver
+too small to name, starting part-way down a row it lines up with nothing on.
+
+Concurrent entries are **lane-packed** side by side, and a **Bar** is inset by a
+hairline on all four edges. Both hairlines are load-bearing, not polish: without the
+vertical one, consecutive days in one lane paint flush and read as one long entry;
+without the horizontal one, so do two neighbouring lanes, which is how a cruise arrival
+and a venue event come to share an edge with no gutter between them.
+
+#98, ADR-0015.
 
 ### Week-boundary line
 

@@ -304,12 +304,14 @@
       /* The type is one colour wherever it renders — the Month chip and the
          reading surfaces' entry read as the same thing seen at two zooms. */
       .calendar__entry[data-type="VenueEvent"],
-      .calendar__chip[data-type="VenueEvent"] {
+      .calendar__chip[data-type="VenueEvent"],
+      .spine__bar[data-type="VenueEvent"] {
         background: var(--venue);
         border-left-color: #2563eb;
       }
       .calendar__entry[data-type="PortCall"],
-      .calendar__chip[data-type="PortCall"] {
+      .calendar__chip[data-type="PortCall"],
+      .spine__bar[data-type="PortCall"] {
         background: var(--port);
         border-left-color: #0d9488;
       }
@@ -572,23 +574,54 @@
         pointer-events: none;
         border-top: 1px solid color-mix(in srgb, currentColor 32%, transparent);
       }
-      /* No `min-height` here: the geometry carries the floor. `renderSpine`
-         spans whole day rows, so the shortest bar is one `--spine-row` — and a
-         floor in the stylesheet would only paint a bar taller than the days it
-         claims, which is what used to make same-day neighbours overlap.
+      /* The bar carries its own look rather than the shared `.calendar__entry`
+         one, because it draws {@link renderSpineBar}'s two lines, not the four
+         a reading surface draws. The type colours are *not* restated here — the
+         bar is on the shared `[data-type]` selector above, so "the type is one
+         colour wherever it renders" stays one rule and one pair of hex values.
 
-         `--spine-bar-top` / `--spine-bar-height` are the row geometry the
-         renderer publishes, as percentages of the month. The hairline inset is
+         The type scale is the constraint, not a preference: a one-date bar is
+         one `--spine-row` (28px) less the inset, and 0.72rem/1.2 with 0.1rem of
+         padding is what fits two lines in it. The reading-surface 0.8rem/1.3
+         with 0.25rem of padding fits exactly one — which is why the title used
+         to be clipped away entirely on every single-date entry.
+
+         No `min-height`: the geometry carries the floor. `renderSpine` spans
+         whole day rows, so the shortest bar is one `--spine-row` — and a floor
+         here would only paint a bar taller than the days it claims, which is
+         what used to make same-day neighbours overlap.
+
+         `--spine-bar-*` are the row and lane geometry the renderer publishes, as
+         percentages of the month and of the track. The hairline insets are
          applied here rather than folded into those numbers, so the percentages
-         stay readable as what they are — whole rows — and the separation stays
-         a presentation decision. Without it, two bars on consecutive days in
-         one lane paint flush and read as one continuous band. */
+         stay readable as what they are — whole rows, whole lanes — and the
+         separation stays a presentation decision. Without the vertical one, two
+         bars on consecutive days in one lane paint flush and read as one
+         continuous band; without the horizontal one, so do two neighbouring
+         lanes, which is how a green cruise arrival and a blue venue event come
+         to share an edge with no gutter between them. */
       .spine__bar {
         position: absolute;
         overflow: hidden;
-        gap: 0;
+        font-size: 0.72rem;
+        line-height: 1.2;
+        padding: 0.1rem 0.3rem;
+        border-radius: 0.25rem;
+        border-left: 3px solid var(--dim);
+        background: color-mix(in srgb, canvastext 5%, transparent);
         top: calc(var(--spine-bar-top) + 1px);
         height: calc(var(--spine-bar-height) - 2px);
+        left: calc(var(--spine-bar-left) + 1px);
+        width: calc(var(--spine-bar-width) - 2px);
+      }
+      /* The duration line, dimmed against the name below it — the same relation
+         `.calendar__entry-time` has to its title on the reading surfaces. It is
+         held to one line: the bar's content box is 22.8px, so a `2.3 days` that
+         wrapped in a narrow lane would push the name out of the clip box and
+         bring back the very bug this shape fixes (#98). */
+      .spine__len {
+        color: var(--dim);
+        white-space: nowrap;
       }
 
       /* --- The entry-detail bubble (#75) ---------------------------------
