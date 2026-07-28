@@ -72,6 +72,36 @@ const payloadOf = (overrides: Partial<Payload> = {}): Payload => ({
 /** The grid's Monday-first column headers, in order. */
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+/**
+ * The page's stylesheet, read as text. A wash, a fixed row height, a hairline
+ * and the *absence* of a positional rule are all CSS facts, and jsdom applies no
+ * stylesheet at all — so the two presentation blocks below (#72, #78) assert
+ * against the source, and share these three helpers rather than each growing its
+ * own parser.
+ */
+const shell = readFileSync("site/index.html", "utf8");
+
+/** Every declaration block in the shell, comments stripped — a comment is not a rule. */
+const cssRules = () =>
+  Array.from(
+    shell.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^}]*)\}/g),
+    (match) => ({ selectors: (match[1] ?? "").split(","), body: match[2] ?? "" }),
+  );
+
+/**
+ * Everything the stylesheet declares for one exact selector, wherever it says it
+ * — a rule of its own, or a grouped one it shares.
+ */
+const ruleFor = (selector: string) =>
+  cssRules()
+    .filter((rule) => rule.selectors.some((one) => one.trim() === selector))
+    .map((rule) => rule.body)
+    .join("\n");
+
+/** Does a node carry the weekend wash — by the class that names the day, not a position? */
+const isWashed = (node: Element | null | undefined) =>
+  node?.classList.contains("is-weekend") ?? false;
+
 /** 21 July 2026, mid-morning Singapore — the frozen "now" the page lands on. */
 const JULY_21 = new Date("2026-07-21T02:00:00Z");
 
@@ -494,22 +524,13 @@ describe("Month: capped one-line chips, overflow to Agenda (#80)", () => {
 });
 
 describe("Month: the weekend wash and the month-boundary label (#72)", () => {
-  // The stylesheet is read as text: the wash, the recede and the absence of a
-  // positional rule are CSS facts, and jsdom applies no stylesheet at all.
-  const shell = readFileSync("site/index.html", "utf8");
-  /**
-   * Every CSS declaration block whose selector counts positions in the grid.
-   * Comments are stripped first — they discuss `nth-child` at length, and a
-   * comment is not a rule.
-   */
+  /** Every declaration block whose selector counts positions in the grid. */
   const nthChildRules = () =>
-    Array.from(shell.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]*nth-child[^{}]*)\{([^}]*)\}/g), (m) => ({
-      selector: m[1]?.trim() ?? "",
-      body: m[2] ?? "",
-    }));
+    cssRules()
+      .filter((rule) => rule.selectors.some((one) => one.includes("nth-child")))
+      .map((rule) => ({ selector: rule.selectors.join(",").trim(), body: rule.body }));
   const weekdayHeaders = () => Array.from(root.querySelectorAll(".calendar__weekday"));
-  const weekend = (node: Element | null | undefined) =>
-    node?.classList.contains("is-weekend") ?? false;
+  const weekend = isWashed;
 
   it("washes the Saturday and Sunday cells and their column headers", () => {
     mount(payloadOf());
@@ -889,6 +910,102 @@ describe("Week: the all-day band — inclusive ends, reserved lanes, overflow (#
     );
     switchView("week");
     expect(bands()[0]?.textContent).toBe("ODYSSEY / VILLA VIE RESIDENCES at Singapore Cruise Centre");
+  });
+});
+
+describe("Week: legibility marks, header alignment and the weekend wash (#78)", () => {
+  const weekDay = (day: string) => root.querySelector(`.week__day[data-day="${day}"]`);
+  const weekCol = (day: string) => root.querySelector(`.week__col[data-day="${day}"]`);
+  const weekend = isWashed;
+  const hairlines = () =>
+    Array.from(root.querySelectorAll(".week__grid .week__hline")) as HTMLElement[];
+
+  it("quarters the day with hairlines at 06:00, 12:00 and 18:00, behind the events", () => {
+    mount(payloadOf());
+    switchView("week");
+    // A quarter of the 24-hour column each: an event's time reads off its
+    // vertical position without counting from the gutter.
+    expect(hairlines().map((line) => line.style.top)).toEqual(["25%", "50%", "75%"]);
+    // Drawn before the columns, so the events positioned inside them paint over.
+    const grid = root.querySelector(".week__grid") as HTMLElement;
+    const kinds = Array.from(grid.children, (node) => node.className);
+    expect(kinds.slice(0, 3)).toEqual(["week__hline", "week__hline", "week__hline"]);
+  });
+
+  it("quarters the day once, across the grid, not eight times inside each column", () => {
+    // The columns used to paint their own three-hourly stripes. Two griddings of
+    // one axis are two competing readings of it, and only the hairlines start
+    // where the gutter ends — so the column keeps no rule of its own.
+    expect(ruleFor(".week__col")).not.toMatch(/repeating-linear-gradient/);
+  });
+
+  it("starts the hairlines after the hour-label gutter, off the gutter's own width", () => {
+    // One source for the gutter width, so the hairline cannot start half a
+    // column early the next time the gutter is resized.
+    expect(ruleFor(".week__hline")).toMatch(/left:\s*var\(--week-gutter\)/);
+    expect(ruleFor(".week")).toMatch(/--week-gutter:/);
+  });
+
+  it("closes the day at 24:00 with the line the all-day band opens it with at 00:00", () => {
+    expect(ruleFor(".week__grid")).toMatch(/border-bottom:\s*1px solid var\(--line\)/);
+    expect(ruleFor(".week__allday")).toMatch(/border-bottom:\s*1px solid var\(--line\)/);
+  });
+
+  it("holds the header row to a fixed height, centred, whatever appears in it", () => {
+    const rule = ruleFor(".week__day");
+    expect(rule).toMatch(/align-items:\s*center/);
+    expect(rule).toMatch(/min-height:/);
+  });
+
+  it("keeps the header row's shape whether or not the disc or a month label shows", () => {
+    mount(payloadOf());
+    switchView("week");
+    click("next"); // Mon 27 Jul – Sun 2 Aug: no today, and a month boundary
+    // Every cell is the same three-part row — weekday, numeral, and the month
+    // name only where a month opens — so nothing in it can grow the row.
+    expect(weekDay("2026-07-28")?.textContent).toBe("Tue28");
+    expect(weekDay("2026-08-01")?.textContent).toBe("Sat1Aug");
+    expect(weekDay("2026-08-01")?.querySelector(".calendar__monthname")?.textContent).toBe("Aug");
+    expect(weekDay("2026-07-31")?.querySelector(".calendar__monthname")).toBeNull();
+  });
+
+  it("gives the month-boundary label an explicit small size, not the cell's 1rem", () => {
+    // Month's date row sets 0.8rem around it, so the label used to look right
+    // there and render oversized in Week, which has no such row.
+    expect(ruleFor(".calendar__monthname")).toMatch(/font-size:\s*0\.8rem/);
+  });
+
+  it("washes the Saturday and Sunday header cells and hour columns, by class", () => {
+    mount(payloadOf());
+    switchView("week");
+    // 25 and 26 July 2026 are the Saturday and Sunday of today's week.
+    expect(weekend(weekDay("2026-07-25"))).toBe(true);
+    expect(weekend(weekDay("2026-07-26"))).toBe(true);
+    expect(weekend(weekDay("2026-07-24"))).toBe(false); // Friday
+    expect(weekend(weekDay("2026-07-20"))).toBe(false); // Monday
+    expect(weekend(weekCol("2026-07-25"))).toBe(true);
+    expect(weekend(weekCol("2026-07-26"))).toBe(true);
+    expect(weekend(weekCol("2026-07-24"))).toBe(false);
+    expect(weekend(weekCol("2026-07-20"))).toBe(false);
+  });
+
+  it("runs the wash unbroken from the header through the band to the foot of the grid", () => {
+    // Three surfaces, one grey: the header cell, the hour column, and — because
+    // the band is a single seven-column grid, not seven nodes — a gradient over
+    // its last two sevenths. Anything less reads as three unrelated stripes.
+    expect(shell).toMatch(/\.week__day\.is-weekend,\s*\.week__col\.is-weekend\s*\{[^}]*var\(--weekend\)/);
+    expect(ruleFor(".week__band-grid")).toMatch(
+      /linear-gradient\([^)]*71\.4286%[^)]*var\(--weekend\)/,
+    );
+  });
+
+  it("carries the weekend on the model's day, so the grid never counts columns", () => {
+    // The Week grid holds the gutter and the hairlines as leading children, so
+    // an `nth-child` wash lands three columns off. (#72's Month block asserts
+    // no positional rule paints anywhere in the stylesheet.)
+    const today = sgtDayIndex(JULY_21);
+    const week = weekDaysOf(today, today);
+    expect(week.map((d) => d.isWeekend)).toEqual([false, false, false, false, false, true, true]);
   });
 });
 

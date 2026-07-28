@@ -162,6 +162,17 @@ const mondayOf = (index) => index - ((index + 3) % 7);
 const weekdayLabel = (index) => WEEKDAYS[(index + 3) % 7] ?? "";
 
 /**
+ * The `Date.getUTCDay()` weekday (0=Sun) of a day index, for the day-indexed
+ * views to reach {@link isWeekend} with — Week has no `Date` in hand where it
+ * needs the answer, only the index. Day index 0 (1970-01-01) is a Thursday,
+ * which is `getUTCDay()` 4; {@link mondayOf} counts the same Thursday from a
+ * Monday-first zero, three places along, which is why its offset is 3 and this
+ * one's is 4.
+ * @param {number} index @returns {number}
+ */
+const weekdayOf = (index) => (index + 4) % 7;
+
+/**
  * Saturday or Sunday, from a `Date.getUTCDay()` weekday (0=Sun). The weekend is
  * a property of the *day*, which is the whole of #72's wash rule: the grid marks
  * it with a class read from this, never by counting columns.
@@ -348,14 +359,17 @@ export const monthGridCells = (year, month, todayKey) => {
  * `sgtDayIndex`). Week paging works by moving the anchor ±7; the view always
  * shows the whole working-and-weekend week the anchor lands in.
  *
+ * `isWeekend` is the day's own property, exactly as it is on a Month cell (#72,
+ * #78) — Week needs it more, not less: its grid carries the hour gutter and the
+ * hairlines as leading children, so a wash counted from the front of the grid
+ * lands three columns off.
+ *
  * @param {number} anchorIndex
  * @param {number} todayIndex
- * @returns {{ year: number, month: number, day: number, index: number, key: number, isToday: boolean }[]}
+ * @returns {{ year: number, month: number, day: number, index: number, key: number, isToday: boolean, isWeekend: boolean }[]}
  */
 export const weekDaysOf = (anchorIndex, todayIndex) => {
-  // 1970-01-01 (index 0) is a Thursday, three days after Monday, so
-  // `(index + 3) % 7` is the day's distance back to Monday.
-  const monday = anchorIndex - ((anchorIndex + 3) % 7);
+  const monday = mondayOf(anchorIndex);
   const days = [];
   for (let offset = 0; offset < 7; offset += 1) {
     const index = monday + offset;
@@ -367,6 +381,7 @@ export const weekDaysOf = (anchorIndex, todayIndex) => {
       index,
       key: dayKey(year, month, day),
       isToday: index === todayIndex,
+      isWeekend: isWeekend(weekdayOf(index)),
     });
   }
   return days;
@@ -640,6 +655,17 @@ export const mountCalendar = (root, payload, now, options) => {
     isToday
       ? el("span", small ? "disc disc--sm" : "disc", String(day))
       : el("span", baseClass ?? undefined, String(day));
+
+  /**
+   * The month-boundary label beside the numeral on the **1st** — Apple's
+   * convention (#72), in Month's date row and in the Week header (#78). One
+   * function for both, because the label's size is explicit in the CSS to stop
+   * the Week cell inflating it, and a second call site drawing its own span is
+   * how that quietly stops being true.
+   * @param {number} month 1–12 @returns {HTMLElement}
+   */
+  const monthNameNode = (month) =>
+    el("span", "calendar__monthname", MONTHS_SHORT[month - 1] ?? "");
 
   // --- The two hosts: the pinned header, and what scrolls under it --------
   root.textContent = "";
@@ -964,9 +990,7 @@ export const mountCalendar = (root, payload, now, options) => {
       // The numeral needs no class of its own: the row above carries Month's date
       // type scale, and today's disc brings its own.
       date.appendChild(dayNumberNode(cell.day, cell.isToday, null));
-      if (cell.day === 1) {
-        date.appendChild(el("span", "calendar__monthname", MONTHS_SHORT[cell.month - 1] ?? ""));
-      }
+      if (cell.day === 1) date.appendChild(monthNameNode(cell.month));
       dayNode.appendChild(date);
 
       // Month is fixed to one screen (ADR-0014 §1): chips are one line and capped
@@ -1004,14 +1028,23 @@ export const mountCalendar = (root, payload, now, options) => {
     const days = weekDaysOf(state.anchor, todayIndex);
     const wrap = el("div", "week");
 
-    // Column headers: Mon–Sun with each day's date.
+    // Column headers: Mon–Sun with each day's date, and on the 1st the month it
+    // opens — Apple's convention, the same one Month follows (#72). The row is
+    // held to a fixed height and centred in CSS, so neither the today disc nor
+    // that label can grow it and knock the day row out of alignment (#78).
     const head = el("div", "week__head");
     head.appendChild(el("span", "week__corner"));
     days.forEach((d, i) => {
       const cell = el("div", "week__day");
       cell.dataset["day"] = dayAttrOf(d);
+      // The weekend wash, marked by what the day *is* (#72, #78). In Week the
+      // wash is a property of the **column**, so the same class is put on the
+      // hour column below and the band paints the matching two sevenths — one
+      // grey running the full height of the view, not three unrelated stripes.
+      if (d.isWeekend) cell.classList.add("is-weekend");
       cell.appendChild(el("span", "week__dayname", WEEKDAYS[i] ?? ""));
       cell.appendChild(dayNumberNode(d.day, d.isToday, "week__daynum", true));
+      if (d.day === 1) cell.appendChild(monthNameNode(d.month));
       head.appendChild(cell);
     });
     wrap.appendChild(head);
@@ -1063,6 +1096,19 @@ export const mountCalendar = (root, payload, now, options) => {
     // single-day entry positioned by its true published clock time. Overlapping
     // entries split the column into side-by-side lanes.
     const body = el("div", "week__grid");
+    // The legibility marks (#78): faint hairlines quartering the day at 06:00,
+    // 12:00 and 18:00, so an entry's time reads off its vertical position
+    // instead of being counted down from the gutter. They are absolutely
+    // positioned, so they are out of the grid's flow and start after the hour
+    // gutter; appended **first**, so the columns' wash and the entries
+    // positioned inside them both paint over the guide rather than under it.
+    // The day's opening 00:00 line is the all-day band's bottom border and its
+    // closing 24:00 line is the grid's own, so the four quarters are enclosed.
+    for (const percentDownTheDay of [25, 50, 75]) {
+      const line = el("div", "week__hline");
+      line.style.top = `${percentDownTheDay}%`;
+      body.appendChild(line);
+    }
     const gutter = el("div", "week__gutter");
     for (let hour = 0; hour < 24; hour += 3) {
       const mark = el("span", "week__hour", `${pad2(hour)}:00`);
@@ -1074,6 +1120,7 @@ export const mountCalendar = (root, payload, now, options) => {
     for (const d of days) {
       const col = el("div", "week__col");
       col.dataset["day"] = dayAttrOf(d);
+      if (d.isWeekend) col.classList.add("is-weekend");
       const timed = visible.filter((e) => e.startIndex === e.endIndex && e.startIndex === d.index);
       const laid = assignLanes(
         timed,

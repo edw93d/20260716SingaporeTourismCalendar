@@ -191,20 +191,41 @@ surfaces — it draws the same leaf a **Chip** does, and narrows #38's source la
 its tooltip for the same reason. #81 — a net-new round-1 item, so it is spec'd on the
 issue rather than in ADR-0014.
 
+### Legibility marks
+
+The faint hairlines that quarter **Week**'s day at 06:00, 12:00 and 18:00, behind the
+entries, starting where the hour-label gutter ends. They are what lets an entry's time
+be read off its vertical position without counting down from the gutter. The day is
+enclosed by a matching pair: its 00:00 line is the **all-day band**'s bottom border and
+its 24:00 line the hour grid's own. The day is quartered *once*, across the grid — the
+columns paint no rule of their own, because two griddings of one axis are two competing
+readings of it. #78.
+
 ### Weekend wash
 
-The light grey (4%) **Month** carries on Saturday and Sunday — the cells and the two
-column headers above them. It is **structural**: a property of the *day*, marked with
+The light grey (4%) **Month** and **Week** carry on Saturday and Sunday — one grey,
+one meaning, both views. In Month it is the cells and the two column headers above
+them. In Week the wash is a property of the **column**, so it runs the full height of
+the view: the header cell, the **all-day band**, and the hour column below. The band
+is one seven-column grid rather than seven nodes, so it takes the wash as a gradient
+over its last two sevenths; anything less and the wash reads as three unrelated
+stripes rather than one Saturday and one Sunday.
+
+It is **structural**: a property of the *day*, marked with
 an `is-weekend` class read from the date, never an `nth-child` position rule (which
 drifts the moment anything else joins the grid — the round-1 prototype hit exactly
-that). Its counterpart rule is **grey means exactly one thing in this grid: weekend.**
+that, and the trap is worse in Week, whose grid carries the hour gutter and the
+quartering hairlines as leading children, so counting from the front lands three
+columns off). Its counterpart rule is **grey means exactly one thing in this grid: weekend.**
 So nothing else tints a cell: today is a red disc alone (#71), and an **outside-month**
 day — one the Monday-first grid pads a week with — carries no wash of its own. The
 weekend wash runs straight through it unbroken; it recedes instead by fading its own
 contents (numeral and **chips**) to 25%. With no wash left to announce a month
-boundary, the **1st** prints its month name beside the numeral ("1 Jul", "1 Aug").
-#72 — a net-new round-1 item, so it is spec'd on the issue rather than in ADR-0014
-(which records only that round's *reversals*).
+boundary, the **1st** prints its month name beside the numeral ("1 Jul", "1 Aug") —
+in the Week header too, at an explicit small size, since that cell has no date row to
+inherit one from. #72 (Month) and #78 (Week) — net-new round-1 items, so they are
+spec'd on their issues rather than in ADR-0014 (which records only that round's
+*reversals*).
 
 ### Facts-only extraction
 
