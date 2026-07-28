@@ -336,6 +336,13 @@
         padding: 0.25rem 0.4rem;
         border-radius: 0.3rem;
       }
+      /* The phone tightening every other surface gets, restated for Agenda: the
+         rule above matches `.calendar__entry` on specificity and comes later, so
+         it would otherwise swallow it. Same proportion, larger base. Declared
+         here rather than beside the other phone rules for that ordering reason. */
+      @media (max-width: 40rem) {
+        .agenda .calendar__entry { font-size: 0.76rem; }
+      }
       .agenda .calendar__entry-time { font-size: 0.72rem; }
       .agenda .calendar__entry-where { font-size: 0.75rem; }
       .agenda__empty { color: var(--dim); padding: 1rem 0; }

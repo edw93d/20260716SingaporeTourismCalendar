@@ -367,6 +367,36 @@ const monthStep = (anchor, delta) => {
 };
 
 /**
+ * Months since year 0, so two civil months can be compared as one number.
+ * @param {{ year: number, month: number }} civil
+ * @returns {number}
+ */
+const monthOrdinal = ({ year, month }) => year * 12 + month;
+
+/**
+ * The month the search reads from. Normally the showing month — a reader paging
+ * Agenda steps through what is in front of them. But the anchor and the cursor
+ * can part company: a view switch brings the cursor home to today while the
+ * anchor stays on the month the reader had paged to (#73 §6). Reading *back*
+ * from a month already ahead of the cursor can only land ahead of it — a Prev
+ * that moves the reader forwards — and reading *forward* from a month behind it
+ * is the same fault upside down. So when the anchor sits the wrong side of the
+ * cursor for the direction pressed, the cursor's own month is where the search
+ * honestly starts. The anchor says which month is showing; it never reverses the
+ * direction the reader asked for.
+ *
+ * @param {number} anchor @param {number} cursor @param {number} direction
+ * @returns {{ year: number, month: number }}
+ */
+const searchMonthOf = (anchor, cursor, direction) => {
+  const showing = civilOf(anchor);
+  const at = civilOf(cursor);
+  const anchorLeads = monthOrdinal(showing) > monthOrdinal(at);
+  // Forwards, take whichever month is later; backwards, whichever is earlier.
+  return (direction > 0) === anchorLeads ? showing : at;
+};
+
+/**
  * Agenda's Next/Prev, as a pure move (#77). Agenda is a **list of the days that
  * have entries**, so paging it by the month steps over whole screens of nothing;
  * it steps by the **entry-day** instead — the next or previous day the surface
@@ -379,6 +409,9 @@ const monthStep = (anchor, delta) => {
  * fallback — the caller scrolls to the former and has nothing to scroll to in
  * the latter.
  *
+ * Whichever it returns, the day landed on lies in the direction pressed: see
+ * {@link searchMonthOf} for the case that makes that worth stating.
+ *
  * @param {DayEntry[]} entries already filtered by type
  * @param {number} anchor the showing month's anchor day index
  * @param {number} cursor the entry-day being stepped from
@@ -386,7 +419,7 @@ const monthStep = (anchor, delta) => {
  * @returns {{ anchor: number, day: number | null }}
  */
 export const stepAgendaDay = (entries, anchor, cursor, direction) => {
-  const { year, month } = civilOf(anchor);
+  const { year, month } = searchMonthOf(anchor, cursor, direction);
   const within = entryDaysIn(entries, year, month).filter((index) =>
     direction > 0 ? index > cursor : index < cursor,
   );

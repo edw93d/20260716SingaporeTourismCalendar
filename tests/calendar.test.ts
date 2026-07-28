@@ -610,7 +610,7 @@ describe("Agenda day-stepping navigation (#77)", () => {
     congress({ uid: `${date}@x`, summary: `Entry ${date}`, start: `${date}T02:00:00Z`, end: `${date}T10:00:00Z` });
 
   /**
-   * Event-days either side of the frozen 21 July, plus one in August. July's are
+   * Entry-days either side of the frozen 21 July, plus one in August. July's are
    * 10, 21 (today) and 24; August's are 3 and 28 — enough for a step inside the
    * month, a roll forward off the last one, and a roll back off the first.
    */
@@ -756,6 +756,37 @@ describe("Agenda day-stepping navigation (#77)", () => {
     switchView("agenda");
     click("next");
     expect(landedOn()).toBe("2026-08-03");
+  });
+
+  it("steps back from the cursor when the showing month is ahead of it", () => {
+    // The mirror of the case above, and the one that used to break the control's
+    // whole promise: reading *back* from a month that is already ahead of the
+    // cursor can only land ahead of it. Prev must move back — onto 10 July, the
+    // entry-day behind today — not forward onto 24 July.
+    mount(spread());
+    switchView("agenda");
+    click("next"); // 24 July
+    click("next"); // 3 August — the anchor is now August, the cursor with it
+    switchView("month");
+    switchView("agenda"); // the cursor comes home to 21 July; the anchor stays in August
+    click("prev");
+    expect(landedOn()).toBe("2026-07-10");
+    expect(title()).toBe("July 2026");
+  });
+
+  it("steps on from the cursor when the showing month is behind it", () => {
+    // The same defect the other way up: a Next that reads forward from a month
+    // behind the cursor lands behind it too. The anchor says which month is
+    // showing, but it never reverses the direction the reader pressed.
+    mount(spread());
+    switchView("agenda");
+    click("prev"); // 10 July
+    click("prev"); // nothing behind it — the month step back to June
+    expect(title()).toBe("June 2026");
+    switchView("month");
+    switchView("agenda"); // the cursor comes home to 21 July; the anchor stays in June
+    click("next");
+    expect(landedOn()).toBe("2026-07-24");
   });
 
   it("resumes from today after Today is pressed, whatever the cursor was", () => {
