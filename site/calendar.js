@@ -389,6 +389,19 @@ export const mountCalendar = (root, payload, now) => {
   };
 
   /**
+   * The date-number node for a day (#71): today's is a solid red disc with a
+   * white numeral — the single "today" signal in every view — and any other
+   * day's keeps its view's own number class. `small` selects the compact disc
+   * the Week header needs so its day row does not distort. Nothing else marks
+   * today, so no cell, column, or row is tinted merely because today falls in it.
+   * @param {number} day @param {boolean} isToday @param {string | null} baseClass @param {boolean} [small]
+   */
+  const dayNumberNode = (day, isToday, baseClass, small = false) =>
+    isToday
+      ? el("span", small ? "disc disc--sm" : "disc", String(day))
+      : el("span", baseClass ?? undefined, String(day));
+
+  /**
    * Page by the current view's unit: Week moves the anchor a whole week, every
    * other view a whole month (keeping the day-of-month where the target month is
    * long enough). @param {number} delta
@@ -556,10 +569,9 @@ export const mountCalendar = (root, payload, now) => {
     for (const cell of cells) {
       const dayNode = el("div", "calendar__day");
       if (!cell.inMonth) dayNode.classList.add("calendar__day--outside");
-      if (cell.isToday) dayNode.classList.add("calendar__day--today");
       dayNode.dataset["day"] = `${cell.year}-${pad2(cell.month)}-${pad2(cell.day)}`;
 
-      dayNode.appendChild(el("span", "calendar__daynum", String(cell.day)));
+      dayNode.appendChild(dayNumberNode(cell.day, cell.isToday, "calendar__daynum"));
 
       // Every entry on the day, in full. No overflow collapse: Month is the
       // navigator, and hiding entries behind a `+N more` count is the density
@@ -586,10 +598,9 @@ export const mountCalendar = (root, payload, now) => {
     head.appendChild(el("span", "week__corner"));
     days.forEach((d, i) => {
       const cell = el("div", "week__day");
-      if (d.isToday) cell.classList.add("week__day--today");
       cell.dataset["day"] = `${d.year}-${pad2(d.month)}-${pad2(d.day)}`;
       cell.appendChild(el("span", "week__dayname", WEEKDAYS[i] ?? ""));
-      cell.appendChild(el("span", "week__daynum", String(d.day)));
+      cell.appendChild(dayNumberNode(d.day, d.isToday, "week__daynum", true));
       head.appendChild(cell);
     });
     wrap.appendChild(head);
@@ -631,7 +642,6 @@ export const mountCalendar = (root, payload, now) => {
 
     for (const d of days) {
       const col = el("div", "week__col");
-      if (d.isToday) col.classList.add("week__col--today");
       col.dataset["day"] = `${d.year}-${pad2(d.month)}-${pad2(d.day)}`;
       const timed = visible.filter((e) => e.startIndex === e.endIndex && e.startIndex === d.index);
       const laid = assignLanes(
@@ -670,10 +680,13 @@ export const mountCalendar = (root, payload, now) => {
       const index = dayIndexOf(year, month, day);
       const dayNode = el("div", "agenda__day");
       dayNode.dataset["day"] = `${year}-${pad2(month)}-${pad2(day)}`;
-      if (index === todayIndex) dayNode.classList.add("agenda__day--today");
-      dayNode.appendChild(
-        el("span", "agenda__date", `${weekdayLabel(index)} ${day} ${MONTHS_SHORT[month - 1]}`),
-      );
+      // Weekday and month sit either side of the date number, so today's disc
+      // rides the number alone rather than washing the whole label.
+      const date = el("span", "agenda__date");
+      date.appendChild(el("span", undefined, weekdayLabel(index)));
+      date.appendChild(dayNumberNode(day, index === todayIndex, null));
+      date.appendChild(el("span", undefined, MONTHS_SHORT[month - 1] ?? ""));
+      dayNode.appendChild(date);
       const items = el("div", "agenda__items");
       // `entriesOnDay` repeats a multi-day entry under each day it spans, so a
       // congress appears on each of its days here — as it should (§3).
@@ -701,9 +714,8 @@ export const mountCalendar = (root, payload, now) => {
       const index = dayIndexOf(year, month, day);
       const row = el("div", "spine__date");
       row.dataset["day"] = `${year}-${pad2(month)}-${pad2(day)}`;
-      if (index === todayIndex) row.classList.add("spine__date--today");
       row.appendChild(el("span", "spine__dayname", weekdayLabel(index)));
-      row.appendChild(el("span", "spine__datenum", String(day)));
+      row.appendChild(dayNumberNode(day, index === todayIndex, "spine__datenum", true));
       axis.appendChild(row);
     }
     wrap.appendChild(axis);

@@ -29,7 +29,7 @@
         color-scheme: light dark;
         --line: color-mix(in srgb, currentColor 18%, transparent);
         --dim: color-mix(in srgb, currentColor 55%, transparent);
-        --today: color-mix(in srgb, canvastext 8%, transparent);
+        --today-red: #ff3b30;
         --venue: color-mix(in srgb, #2563eb 16%, transparent);
         --port: color-mix(in srgb, #0d9488 18%, transparent);
       }
@@ -160,12 +160,27 @@
       .calendar__day:nth-child(7n) { border-right: none; }
       .calendar__day--outside { background: color-mix(in srgb, canvastext 3%, transparent); }
       .calendar__day--outside .calendar__daynum { color: var(--dim); }
-      .calendar__day--today { background: var(--today); }
-      .calendar__day--today .calendar__daynum {
-        font-weight: 700;
-        text-decoration: underline;
-      }
       .calendar__daynum { font-size: 0.85rem; }
+
+      /* Today (#71): one signal, every view — a solid red disc with a white
+         numeral, on the date number itself. It replaces the old grey cell wash,
+         the bold, and the underline, so nothing tints a whole cell, column, or
+         row merely because today falls in it. The Week header uses `--sm` so the
+         taller disc does not distort its day row. */
+      .disc {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 1.55rem; height: 1.55rem; padding: 0 0.3rem;
+        border-radius: 999px; background: var(--today-red);
+        color: #fff; font-weight: 600; font-variant-numeric: tabular-nums;
+        line-height: 1;
+      }
+      .disc--sm { min-width: 1.35rem; height: 1.35rem; font-size: 0.8rem; }
+      /* The Month cell and Week header are stretch flex columns, so the disc —
+         a flex child — would otherwise fill the column's full width and read as a
+         bar. Size it to its numeral: left in the Month cell (where the number
+         lives), centred in the Week header (which centres its day column). */
+      .calendar__day .disc { align-self: flex-start; }
+      .week__day .disc { align-self: center; }
 
       .calendar__entry {
         font-size: 0.8rem;
@@ -215,7 +230,6 @@
       }
       .week__dayname { font-size: 0.75rem; color: var(--dim); }
       .week__daynum { font-weight: 600; }
-      .week__day--today { background: var(--today); }
       .week__corner {
         font-size: 0.65rem;
         color: var(--dim);
@@ -256,7 +270,6 @@
           var(--line) calc(100% / 8 - 1px), var(--line) calc(100% / 8)
         );
       }
-      .week__col--today { background-color: var(--today); }
       .week__event {
         position: absolute;
         overflow: hidden;
@@ -273,11 +286,16 @@
         border-bottom: 1px solid var(--line);
       }
       .agenda__date {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        /* Top-align the label in its grid row so a tall multi-item day keeps the
+           date beside its first entry, not floated to the row's vertical middle. */
+        align-self: start;
         font-weight: 600;
         font-size: 0.85rem;
         font-variant-numeric: tabular-nums;
       }
-      .agenda__day--today .agenda__date { text-decoration: underline; }
       .agenda__items { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
       .agenda__empty { color: var(--dim); padding: 1rem 0; }
 
@@ -296,8 +314,6 @@
         font-variant-numeric: tabular-nums;
       }
       .spine__datenum { font-weight: 600; color: inherit; }
-      .spine__date--today { background: var(--today); }
-      .spine__date--today .spine__datenum { text-decoration: underline; }
       .spine__track { position: relative; min-height: 43rem; }
       .spine__bar {
         position: absolute;

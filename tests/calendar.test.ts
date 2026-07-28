@@ -158,7 +158,50 @@ describe("the rendered page", () => {
   it("lands on today's month, in Singapore time, with no configuration", () => {
     mount(payloadOf());
     expect(title()).toBe("July 2026");
-    expect(cell("2026-07-21")?.classList.contains("calendar__day--today")).toBe(true);
+    // Today is marked by the red disc on its date number, not a cell class.
+    expect(cell("2026-07-21")?.querySelector(".disc")?.textContent).toBe("21");
+  });
+
+  it("marks today with the red disc on the date number in every view, tinting no cell", () => {
+    // Give today (21 July) an entry so the Agenda actually renders its row.
+    const onToday = congress({
+      uid: "today@x",
+      summary: "Today Event",
+      start: "2026-07-21T02:00:00Z",
+      end: "2026-07-21T06:00:00Z",
+    });
+    mount(payloadOf({ venueEvents: [congress(), onToday] }));
+
+    // Month: the day number is the disc; a non-today day number is not.
+    expect(cell("2026-07-21")?.querySelector(".disc")?.textContent).toBe("21");
+    expect(cell("2026-07-20")?.querySelector(".disc")).toBeNull();
+
+    // Week: the header carries the small disc variant on today.
+    switchView("week");
+    const weekToday = root.querySelector('.week__day[data-day="2026-07-21"]');
+    expect(weekToday?.querySelector(".disc.disc--sm")?.textContent).toBe("21");
+
+    // Agenda: the disc sits on the date number, beside the untouched weekday/month.
+    switchView("agenda");
+    const agendaToday = root.querySelector('.agenda__day[data-day="2026-07-21"]');
+    expect(agendaToday?.querySelector(".agenda__date .disc")?.textContent).toBe("21");
+
+    // Date-spine: the axis row for today carries the small disc.
+    switchView("spine");
+    const spineToday = root.querySelector('.spine__date[data-day="2026-07-21"]');
+    expect(spineToday?.querySelector(".disc.disc--sm")?.textContent).toBe("21");
+
+    // No view tints a whole cell, column, or row because today falls in it —
+    // every legacy "today" emphasis class is gone from every view.
+    for (const view of ["month", "week", "agenda", "spine"]) {
+      switchView(view);
+      expect(
+        root.querySelector(
+          ".calendar__day--today, .week__day--today, .week__col--today," +
+            " .agenda__day--today, .spine__date--today",
+        ),
+      ).toBeNull();
+    }
   });
 
   it("renders a multi-day entry on every day it spans, and nowhere else", () => {
