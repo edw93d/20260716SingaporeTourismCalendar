@@ -1869,6 +1869,9 @@ describe("the entry-detail bubble (#75)", () => {
     // flips with the bubble and follows `--tail-x` when it is clamped.
     expect(ruleFor(".calendar__bubble")).toMatch(/position:\s*fixed/);
     expect(ruleFor(".calendar__bubble")).toMatch(/border-radius:\s*0\.6rem/);
+    // The prototype's lift, at its own weight: a popover that sits heavier than
+    // the bake-off's is a different bubble, in the one round that spec'd look.
+    expect(ruleFor(".calendar__bubble")).toMatch(/box-shadow:\s*0 6px 22px[^;]*16%/);
     expect(shell).toMatch(/\.calendar__bubble--below::before[^{]*\{[^}]*var\(--tail-x\)/);
     expect(shell).toMatch(/\.calendar__bubble--above::before[^{]*\{[^}]*var\(--tail-x\)/);
   });

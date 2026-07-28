@@ -1492,9 +1492,11 @@ export const mountCalendar = (root, payload, now, options) => {
     };
     put("When", whenText(entry));
     put("Time", bubbleTimeText(entry));
-    // Drawn only when there is one, as an entry's `where` is: a blank row in a
-    // record grid claims a field the dataset did not carry.
-    if (entry.location) put("Where", entry.location);
+    // Always drawn, as variant E draws it. `CalendarEntry.location` is a
+    // required string that `project` always composes — venue plus hall, or the
+    // terminal — so a guard here would only ever fire on data the projection
+    // cannot produce, at the cost of a record grid whose rows come and go.
+    put("Where", entry.location);
     // The same {@link spanText} Date-spine labels its bars with, reused rather
     // than restated — a bar and its bubble rounding a duration differently is
     // the kind of drift two copies of one rule always produce.
