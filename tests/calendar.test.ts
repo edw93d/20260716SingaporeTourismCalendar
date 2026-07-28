@@ -806,6 +806,12 @@ describe("four switchable reading surfaces", () => {
     expect(bar.querySelector(".calendar__entry-where, .calendar__source")).toBeNull();
     expect(bar.title).toContain("Cruise: ODYSSEY / VILLA VIE RESIDENCES");
     expect(bar.title).toContain("Singapore Cruise Centre");
+    expect(bar.title).toContain("scc");
+
+    // The duration is held to one line. In 22.8px of content box a label that
+    // wrapped would push the name out of the clip box — this bug, by the back
+    // door — so the lane can be as narrow as the packer makes it.
+    expect(ruleFor(".spine__len")).toMatch(/white-space:\s*nowrap/);
 
     // The bar carries its own type scale, not `.calendar__entry`'s: at 0.8rem/1.3
     // with 0.25rem of padding the second line does not fit in 26px.

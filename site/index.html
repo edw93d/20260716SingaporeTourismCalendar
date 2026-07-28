@@ -615,8 +615,14 @@
         width: calc(var(--spine-bar-width) - 2px);
       }
       /* The duration line, dimmed against the name below it — the same relation
-         `.calendar__entry-time` has to its title on the reading surfaces. */
-      .spine__len { color: var(--dim); }
+         `.calendar__entry-time` has to its title on the reading surfaces. It is
+         held to one line: the bar's content box is 22.8px, so a `2.3 days` that
+         wrapped in a narrow lane would push the name out of the clip box and
+         bring back the very bug this shape fixes (#98). */
+      .spine__len {
+        color: var(--dim);
+        white-space: nowrap;
+      }
 
       /* --- The entry-detail bubble (#75) ---------------------------------
          Double-clicking an entry on any view opens this. The look is variant E

@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-28
-- **Ticket:** #98
+- **Ticket:** [#98](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/98)
 - **Narrows:** #38 ("every entry is labelled with the source"), for the third time — after
   the **Month** chip (#80) and Week's **all-day band** (#81), both already recorded in
   `CONTEXT.md`.

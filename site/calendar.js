@@ -1455,7 +1455,11 @@ export const mountCalendar = (root, payload, now, options) => {
     // day-resolution geometry cannot carry (see {@link renderSpine}).
     node.appendChild(el("div", "spine__len", lengthText));
     node.appendChild(el("div", undefined, entry.summary.replace(/^Cruise: /, "")));
-    node.title = entry.location ? `${entry.summary} — ${entry.location}` : entry.summary;
+    // Both fields the bar drops, in one hover: where with an em dash as the
+    // reading surfaces punctuate it, then the source with the `·` the bubble's
+    // foot uses (see {@link bubbleFootText}).
+    const where = entry.location ? `${entry.summary} — ${entry.location}` : entry.summary;
+    node.title = `${where} · ${entry.source}`;
     bindBubble(node, entry);
     return node;
   };
