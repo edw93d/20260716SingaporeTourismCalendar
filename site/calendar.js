@@ -540,6 +540,10 @@ export const mountCalendar = (root, payload, now, options) => {
    * a stale constant would land a jumped-to row behind it (#73).
    */
   const publishTopbarHeight = () => {
+    // A remount leaves the previous mount's resize listener alive, holding a
+    // header no longer in the page. It must not publish a detached header's
+    // height over the live one's.
+    if (!topbar.isConnected) return;
     if (typeof topbar.getBoundingClientRect !== "function") return;
     const { height } = topbar.getBoundingClientRect();
     doc.documentElement.style.setProperty("--topbar-h", `${height}px`);
