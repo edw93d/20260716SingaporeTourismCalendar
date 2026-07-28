@@ -38,7 +38,7 @@
  * @typedef {"all" | RecordType} Filter
  * @typedef {"month" | "week" | "agenda" | "spine"} View
  * @typedef {SiteEntry & { type: RecordType, startKey: number, endKey: number, startIndex: number, endIndex: number, startValue: number, endValue: number }} DayEntry
- * @typedef {{ topbar: Element }} MountOptions
+ * @typedef {{ topbar: Element, freshness: Element }} MountOptions
  */
 
 /**
@@ -596,22 +596,38 @@ const pad2 = (value) => String(value).padStart(2, "0");
 const dayAttrOf = ({ year, month, day }) => `${year}-${pad2(month)}-${pad2(day)}`;
 
 /**
+ * Empty a **page-supplied** host of what a previous mount left in it. `root` is
+ * the module's and is cleared wholesale, but the topbar (#73) and the
+ * methodology footer's freshness slot (#79) are the page's and outlive the
+ * mount — so a second mount has to replace what it put there rather than stack
+ * a second set beside it.
+ * @param {Element} host @param {string} className what this mount renders into that host
+ */
+const clearPriorMount = (host, className) => {
+  for (const stale of Array.from(host.querySelectorAll(`.${className}`))) stale.remove();
+};
+
+/**
  * Mount the calendar into `root`, reading the clock from `now`. The page is
  * driven almost entirely through the controls it renders (filter, prev, today,
  * next), which is what a test drives too; the one exception is the returned
  * `drillToAgendaDay`, a **jump** whose target is only known outside the mount.
  *
- * Two hosts, because the header is **pinned** (#73): the controls render into
- * `options.topbar` — the page's sticky `<header>`, which already holds the
- * static h1 — and everything that scrolls under it renders into `root`. The
- * topbar is the page's to supply, not the module's to invent: the h1 inside it
- * is static markup, and a header the module built for itself would be a second
- * layout nothing ships.
+ * **Three hosts**, because the page chrome brackets the calendar above and
+ * below: the controls render into `options.topbar` — the page's sticky
+ * `<header>` (#73), which already holds the static h1 — everything that scrolls
+ * under it renders into `root`, and the per-source freshness disclosure renders
+ * into `options.freshness`, the slot the methodology footer keeps for it (#79,
+ * ADR-0014 §2). All three are the page's to supply, not the module's to invent:
+ * the h1 and the notes are static markup, and chrome the module built for
+ * itself would be a second layout nothing ships. What the module still owns is
+ * what the disclosure *says* — computed here, in the browser, against the
+ * injected clock.
  *
  * @param {Element} root
  * @param {SitePayload} payload
  * @param {Date} now
- * @param {MountOptions} options the page-supplied hosts — currently just the pinned topbar
+ * @param {MountOptions} options the page-supplied hosts: the pinned topbar and the footer's freshness slot
  * @returns {{ drillToAgendaDay: (index: number) => void }}
  */
 export const mountCalendar = (root, payload, now, options) => {
@@ -675,10 +691,11 @@ export const mountCalendar = (root, payload, now, options) => {
   // shipped as plain JS to a browser, where nothing enforces that at the call.
   const topbar = options?.topbar;
   if (!topbar) throw new Error("mountCalendar needs the page's topbar to render its controls into.");
-  // A second mount into the same shell replaces the controls rather than
-  // stacking a second set beside them — `root` is cleared above, but a
-  // page-supplied topbar outlives the mount.
-  for (const stale of Array.from(topbar.querySelectorAll(".calendar__controls"))) stale.remove();
+  const freshnessHost = options?.freshness;
+  if (!freshnessHost) {
+    throw new Error("mountCalendar needs the methodology footer's slot to render the freshness disclosure into.");
+  }
+  clearPriorMount(topbar, "calendar__controls");
   /** The controls, rebuilt each render: they carry the current view and title. */
   const controls = el("div", "calendar__controls");
   topbar.appendChild(controls);
@@ -779,11 +796,13 @@ export const mountCalendar = (root, payload, now, options) => {
   };
 
   /**
-   * The per-source freshness disclosure (#40) — always visible, in every view,
-   * because it is the page's role as the only always-true proof the pipeline ran.
-   * One line per source, its elapsed lag computed here from the baked instant and
-   * the injected `now`; a source two days or more stale escalates to a prominent
-   * warning. The unit is the source, never a record (ADR-0004).
+   * The per-source freshness disclosure (#40) — present in every view, because it
+   * is the page's role as the only always-true proof the pipeline ran. #79 narrows
+   * *always visible* to **disclosed, not surfaced** (ADR-0014 §2): the mechanism is
+   * untouched and only its place on the page changes, from under the header to the
+   * methodology footer. One line per source, its elapsed lag computed here from the
+   * baked instant and the injected `now`; a source two days or more stale escalates
+   * to a prominent warning. The unit is the source, never a record (ADR-0004).
    * @returns {HTMLElement | null}
    */
   const renderFreshness = () => {
@@ -1671,10 +1690,14 @@ export const mountCalendar = (root, payload, now, options) => {
 
   // The freshness disclosure is a property of the data behind every view, not of
   // the month or the week, so it is rendered once here rather than rebuilt by
-  // every render. It still sits directly under the header; ADR-0014 §2 demotes it
-  // into the methodology footer, which is #79's slice, not this one's.
+  // every render. It lands in the methodology footer's slot rather than under
+  // the header (#79, ADR-0014 §2) — **disclosed, not surfaced**: still present,
+  // still computed here against the injected clock, so a frozen page still shows
+  // a growing lag, and being outside the view surface is what keeps it visible
+  // in all four views without a rerender.
+  clearPriorMount(freshnessHost, "calendar__freshness");
   const fresh = renderFreshness();
-  if (fresh) root.appendChild(fresh);
+  if (fresh) freshnessHost.appendChild(fresh);
   root.appendChild(surface);
 
   render();

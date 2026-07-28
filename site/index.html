@@ -64,11 +64,14 @@
         padding: 1rem 0 0.5rem;
         border-bottom: 1px solid var(--line);
       }
+      /* The page chrome, at the prototype's type scale (#79): the h1 that names
+         the page, and the quieter h2 and notes the footer reads at — the lede
+         that used to sit between the header and the grid is prose in that footer
+         now, so it has no rule of its own. */
       h1 { font-size: 1.4rem; line-height: 1.3; margin: 0 0 0.75rem; }
-      .lede { margin: 1rem 0 1.5rem; color: var(--dim); max-width: 42rem; }
-      h2 { font-size: 1.1rem; margin: 2rem 0 0.5rem; }
+      h2 { font-size: 1.05rem; margin: 2rem 0 0.5rem; }
       code { font-size: 0.9em; }
-      .note { color: var(--dim); font-size: 0.9rem; max-width: 42rem; }
+      .note { color: var(--dim); font-size: 0.9rem; max-width: 46rem; }
 
       /* Controls, on two lines inside the pinned header: the period and its
          stepper above, the view tabs and the type filter below. Each line puts
@@ -108,15 +111,18 @@
         font-weight: 600;
       }
 
-      /* Per-source freshness (#40): the always-visible line that is the only
-         proof the pipeline ran, escalating to a prominent warning once a source
-         has gone quiet for two days or more. The elapsed text is computed in the
-         browser at load — see `calendar.js` — so a frozen page grows its own lag. */
+      /* Per-source freshness (#40): the line that is the only proof the pipeline
+         ran, escalating to a prominent warning once a source has gone quiet for
+         two days or more. The elapsed text is computed in the browser at load —
+         see `calendar.js` — so a frozen page grows its own lag. It reads from the
+         methodology footer's slot rather than from under the header (#79,
+         ADR-0014 §2): disclosed to a reader who looks, no longer competing with
+         the calendar for the first look. */
       .calendar__freshness {
         display: flex;
         flex-wrap: wrap;
         gap: 0.4rem 0.75rem;
-        margin: 1rem 0;
+        margin: 0.5rem 0 1rem;
         font-size: 0.8rem;
       }
       .calendar__freshness-item {
@@ -661,17 +667,33 @@
       <h1>Singapore tourism &amp; MICE demand calendar</h1>
     </header>
 
-    <p class="lede">
-      Public listings of what is happening in Singapore — conferences, exhibitions,
-      concerts, consumer festivals, and cruise arrivals — aggregated into
-      <strong>existence and timing</strong> records, for people who plan around
-      demand landing. Each source shows when it was last confirmed, below — the
-      calendar is only ever as current as that. Days shown in Singapore time.
-    </p>
-
     <div id="calendar" class="calendar">
       <p id="calendar-status">Loading the calendar…</p>
     </div>
+
+    <!--
+      The methodology footer (#79). Nothing here competes with the calendar for
+      first attention: the lede that used to sit above the grid, the per-source
+      freshness disclosure demoted out of prime real estate (ADR-0014 §2), and the
+      Singapore-time caption as the notes' last line (ADR-0014 §3). The freshness
+      slot is empty markup the page owns — `calendar.js` fills it, so the elapsed
+      lag is still the browser's arithmetic against a live clock and a frozen page
+      still shows its lag growing.
+    -->
+    <section class="methodology">
+      <h2>Methodology notes</h2>
+      <div class="methodology__freshness"></div>
+      <p class="note">
+        Public listings of what is happening in Singapore — conferences, exhibitions,
+        concerts, consumer festivals, and cruise arrivals — aggregated into
+        <strong>existence and timing</strong> records, for people who plan around
+        demand landing. Each source shows when it was last confirmed, above — the
+        calendar is only ever as current as that. Coverage is still growing, so
+        nothing here is yet a complete picture of Singapore demand. Facts only —
+        names, dates, venues, as published.
+        Days shown in Singapore time.
+      </p>
+    </section>
 
     <h2>Subscribe</h2>
     <ul>
@@ -685,10 +707,12 @@
       together, filtered here for free.
     </p>
 
+    <!--
+      What the coverage and facts-only caveats left behind: the licence line
+      alone, since those two sentences are methodology and now read there (#79).
+    -->
     <p class="note">
-      Coverage is still growing, so nothing here is yet a complete picture of
-      Singapore demand. Facts only — names, dates, venues, as published. Free
-      software under AGPLv3:
+      Free software under AGPLv3:
       <a href="https://github.com/edw93d/20260716SingaporeTourismCalendar">source</a>.
     </p>
 
@@ -703,10 +727,11 @@
 
       const root = document.getElementById("calendar");
       const topbar = document.querySelector(".topbar");
+      const freshness = document.querySelector(".methodology__freshness");
       try {
         const response = await fetch("./calendar.json", { cache: "no-cache" });
         if (!response.ok) throw new Error(`calendar.json: ${response.status}`);
-        mountCalendar(root, await response.json(), new Date(), { topbar });
+        mountCalendar(root, await response.json(), new Date(), { topbar, freshness });
       } catch (error) {
         root.innerHTML =
           '<p id="calendar-status">The calendar could not be loaded. The feeds above still work.</p>';

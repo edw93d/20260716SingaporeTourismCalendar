@@ -107,12 +107,14 @@ const JULY_21 = new Date("2026-07-21T02:00:00Z");
 
 let root: HTMLElement;
 let topbar: HTMLElement;
+let freshnessHost: HTMLElement;
 
 /**
- * The page shell `site/index.html` supplies: a pinned `<header class="topbar">`
- * holding the static h1, into which the controls render (#73), and the mount
- * root below it holding the scrolling surface. The tests build the same shell so
- * the DOM under test is the DOM the page ships.
+ * The page shell `site/index.html` supplies three hosts: a pinned
+ * `<header class="topbar">` holding the static h1, into which the controls
+ * render (#73); the mount root below it holding the scrolling surface; and the
+ * methodology footer's freshness slot, below both (#79, ADR-0014 §2). The tests
+ * build the same shell so the DOM under test is the DOM the page ships.
  */
 beforeEach(() => {
   document.body.textContent = "";
@@ -121,11 +123,16 @@ beforeEach(() => {
   topbar.className = "topbar";
   topbar.appendChild(document.createElement("h1"));
   root = document.createElement("div");
-  document.body.append(topbar, root);
+  const methodology = document.createElement("section");
+  methodology.className = "methodology";
+  freshnessHost = document.createElement("div");
+  freshnessHost.className = "methodology__freshness";
+  methodology.appendChild(freshnessHost);
+  document.body.append(topbar, root, methodology);
 });
 
 const mount = (payload: Payload, now: Date = JULY_21) =>
-  mountCalendar(root, payload, now, { topbar });
+  mountCalendar(root, payload, now, { topbar, freshness: freshnessHost });
 
 /** Controls live in the topbar, the surface in the root — query the page. */
 const find = (selector: string) => document.body.querySelector(selector);
@@ -1190,7 +1197,7 @@ describe("sticky header and today-to-top navigation (#73)", () => {
       second.className = "topbar";
       document.body.prepend(second);
       root.textContent = "";
-      mountCalendar(root, payloadOf(), JULY_21, { topbar: second });
+      mountCalendar(root, payloadOf(), JULY_21, { topbar: second, freshness: freshnessHost });
       expect(live()).toBe(2);
 
       second.getBoundingClientRect = () => ({ height: 168 }) as DOMRect;
@@ -1488,9 +1495,48 @@ describe("the static shell (#73)", () => {
   });
 });
 
+describe("the page chrome (#79, ADR-0014 §2 and §3)", () => {
+  /** The methodology footer's markup, from its opening tag to its closing one. */
+  const footer = shell.match(/<section class="methodology">([\s\S]*?)<\/section>/)?.[1] ?? "";
+
+  it("names the page with an h1 and leaves no lede above the calendar", () => {
+    // The h1 is what a reader (and a crawler) meets first; the marketing prose
+    // that used to sit between it and the grid is demoted into the footer, so
+    // the calendar is the first thing under the header.
+    expect(shell).toMatch(/<h1>[^<]*Singapore[\s\S]*?<\/h1>/);
+    expect(shell).not.toMatch(/class="lede"/);
+  });
+
+  it("puts the methodology footer below the calendar, carrying the lede prose", () => {
+    expect(footer).not.toBe("");
+    expect(shell.indexOf('<section class="methodology">')).toBeGreaterThan(
+      shell.indexOf('id="calendar"'),
+    );
+    expect(footer).toMatch(/<h2>Methodology notes<\/h2>/);
+    expect(footer).toContain("existence and timing");
+  });
+
+  it("hosts the freshness disclosure in the footer, above the notes", () => {
+    // Demoted, not deleted (ADR-0014 §2): the shell owns *where* the disclosure
+    // sits, `calendar.js` owns what it says — which is still computed in the
+    // browser, so a frozen page grows its own lag.
+    expect(footer).toContain('class="methodology__freshness"');
+    expect(footer.indexOf('class="methodology__freshness"')).toBeLessThan(
+      footer.indexOf('class="note"'),
+    );
+  });
+
+  it("ends the methodology notes with the Singapore-time caption (ADR-0014 §3)", () => {
+    const notes = footer.match(/<p class="note">([\s\S]*?)<\/p>/)?.[1] ?? "";
+    expect(notes.trim()).toMatch(/Days shown in Singapore time\.$/);
+  });
+});
+
 describe("per-source freshness disclosure (#40)", () => {
+  // Queried from the page, not from `root`: the disclosure was demoted out of
+  // the mount root into the methodology footer (#79, ADR-0014 §2).
   const freshItem = (source: string) =>
-    root.querySelector(`.calendar__freshness-item[data-source="${source}"]`);
+    document.body.querySelector(`.calendar__freshness-item[data-source="${source}"]`);
   const agoText = (source: string) =>
     freshItem(source)?.querySelector(".calendar__freshness-ago")?.textContent;
   const isStale = (source: string) =>
@@ -1513,6 +1559,26 @@ describe("per-source freshness disclosure (#40)", () => {
       switchView(view);
       expect(freshItem("suntec")).not.toBeNull();
     }
+  });
+
+  it("renders into the methodology footer, not into the calendar (#79)", () => {
+    // Demoted, not deleted (ADR-0014 §2): still present, still client-computed,
+    // still a live region — only its prominence drops. A screen reader has to
+    // keep hearing the lag, so the `role=status` moves with it.
+    mount(payloadOf({ sources: [{ source: "suntec", lastConfirmed: "2026-07-21T00:00:00Z" }] }));
+    const list = freshnessHost.querySelector(".calendar__freshness");
+    expect(list).not.toBeNull();
+    expect(list?.getAttribute("role")).toBe("status");
+    expect(root.querySelector(".calendar__freshness")).toBeNull();
+  });
+
+  it("replaces the disclosure on a remount rather than stacking a second one", () => {
+    // The footer host is the page's and outlives the mount, so — like the
+    // topbar's controls — a second mount has to clear what the first left.
+    const payload = payloadOf({ sources: [{ source: "suntec", lastConfirmed: "2026-07-21T00:00:00Z" }] });
+    mount(payload);
+    mount(payload);
+    expect(freshnessHost.querySelectorAll(".calendar__freshness")).toHaveLength(1);
   });
 
   it("renders a large, growing lag when the baked instant is far in the past", () => {
