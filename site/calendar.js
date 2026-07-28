@@ -14,16 +14,22 @@
  * file is free software under AGPLv3 with the rest of the repository.
  *
  * **Month is a navigator, not a reading surface** (#5, ADR-0009 §2): it answers
- * "which days have demand?", lands on today, and drills nowhere yet — the three
- * reading surfaces are #39/#40. So there is deliberately **no magnitude here** —
- * no count badge, no `+N more` collapse, no ranking. Every entry on a day is
- * rendered; a busy day simply grows.
+ * "which days have demand?", lands on today, and drills through to the reading
+ * surfaces rather than trying to be one.
  *
  * Four switchable views (ADR-0009): **Month** navigates; **Week**, **Agenda**
- * and **Date-spine** are the reading surfaces this file adds in #39. No single
- * one is *the* view — reading demand from several angles is the feature. Still
- * **no magnitude** in any of them (ADR-0009 §5): span and names stand in for the
- * size the data does not carry, and nothing is ranked, scored or collapsed.
+ * and **Date-spine** are the reading surfaces. No single one is *the* view —
+ * reading demand from several angles is the feature. There is **no magnitude**
+ * in any of them (ADR-0009 §5): span and names stand in for the size the data
+ * does not carry, and nothing is ranked or scored.
+ *
+ * Two surfaces are **bounded**, and collapse what they cannot fit behind a
+ * `+N more` — a Month cell (#80, ADR-0014 §1) and Week's all-day band (#81).
+ * That is not the magnitude #5 disqualified: the door counts what one bounded
+ * surface could not draw and names a destination, rather than ranking a day
+ * against its neighbours. (This paragraph replaces the file's original
+ * "no `+N more` collapse … nothing is collapsed" claim, which ADR-0014 §1
+ * recorded as implementation debt when it restored ADR-0009's overflow intent.)
  *
  * @typedef {{ uid: string, summary: string, start: string, end: string, location: string, source: string }} SiteEntry
  * @typedef {{ source: string, lastConfirmed: string }} SourceFreshness
@@ -118,6 +124,26 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
  * the control spends a row like a chip does.
  */
 const MONTH_CELL_ROWS = 4;
+
+/**
+ * How many lanes Week's **all-day band** always reserves (#81). It is a
+ * reservation, not a cap on the data: the band is drawn to this height whether
+ * the week holds nothing or overflows it, so paging from a quiet week to a busy
+ * one never shifts the hour grid under it. Four is what the real dataset's worst
+ * week needs, so the overflow door is insurance rather than everyday behaviour.
+ */
+export const WEEK_BAND_LANES = 4;
+
+/**
+ * How many of a surface's `rows` actually hold entries, given `needed` of them
+ * want one. The rule both bounded surfaces share (#80, #81): the `+N more` door
+ * **spends a row like an entry does**, so a Month cell that overflows is exactly
+ * as tall as one that fills its cap, and an overflowing week is exactly as tall
+ * as one that fills the band. Below the ceiling nothing is hidden — the cap is a
+ * bound, not a truncation.
+ * @param {number} needed @param {number} rows @returns {number}
+ */
+const rowsForEntries = (needed, rows) => (needed > rows ? rows - 1 : rows);
 
 /** The number of days in a civil month. @param {number} year @param {number} month @returns {number} */
 const monthLength = (year, month) => new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -504,6 +530,41 @@ export const assignLanes = (items, startOf, endOf) => {
 
   const lanes = laneEnds.length;
   return placed.map((p) => ({ ...p, lanes }));
+};
+
+/**
+ * Lay Week's all-day band out: which entries get a lane, and which collapse
+ * behind the overflow door (#81).
+ *
+ * Two things the band does that {@link assignLanes} deliberately does not:
+ *
+ * 1. **Inclusive ends.** `assignLanes` is half-open — a lane frees at the value
+ *    its occupant ended on, which is right for the spine's day-values and the
+ *    timed columns' minutes, and both callers keep that contract. An all-day
+ *    range is not half-open: an entry running 20–22 July *occupies* the 22nd, so
+ *    one starting on the 22nd shares a day with it and must not share its lane.
+ *    The band converts inclusive to exclusive at the call — `endIndex + 1` — so
+ *    the packer's "strictly after" test means what the band needs. The band is
+ *    still **drawn** from `startIndex` to `endIndex`.
+ * 2. **A fixed height.** The band reserves {@link WEEK_BAND_LANES} lanes whatever
+ *    the week holds. Past them the entries collapse into a `+N more` that spends
+ *    the last reserved lane itself — {@link rowsForEntries}, the same rule a
+ *    Month cell's cap follows, so an overflowing week is never taller than one
+ *    that merely fills the band.
+ *
+ * @template {{ startIndex: number, endIndex: number }} T
+ * @param {T[]} multiDay
+ * @returns {{ shown: { item: T, lane: number }[], hidden: T[] }}
+ */
+export const packAllDayBand = (multiDay) => {
+  const laid = assignLanes(multiDay, (e) => e.startIndex, (e) => e.endIndex + 1);
+  // `lanes` is the packer's own count of what the set needed — the same number
+  // for every placed item, and nothing to re-derive here.
+  const cap = rowsForEntries(laid[0]?.lanes ?? 0, WEEK_BAND_LANES);
+  return {
+    shown: laid.filter((x) => x.lane < cap).map(({ item, lane }) => ({ item, lane })),
+    hidden: laid.filter((x) => x.lane >= cap).map((x) => x.item),
+  };
 };
 
 /** @param {number} value @returns {string} */
@@ -921,16 +982,13 @@ export const mountCalendar = (root, payload, now, options) => {
       // hands the reader to a reading surface at the day they were looking at
       // rather than hiding entries behind a count.
       const onDay = entriesOnDay(visible, cell.key);
-      const cap = onDay.length > MONTH_CELL_ROWS ? MONTH_CELL_ROWS - 1 : MONTH_CELL_ROWS;
+      const cap = rowsForEntries(onDay.length, MONTH_CELL_ROWS);
       for (const entry of onDay.slice(0, cap)) dayNode.appendChild(renderChip(entry));
 
       const hidden = onDay.length - cap;
       if (hidden > 0) {
-        const more = el("button", "calendar__more", `+${hidden} more →`);
-        more.setAttribute("type", "button");
         const index = dayIndexOf(cell.year, cell.month, cell.day);
-        more.addEventListener("click", () => drillToAgendaDay(index));
-        dayNode.appendChild(more);
+        dayNode.appendChild(moreButton("calendar__more", hidden, index));
       }
       body.appendChild(dayNode);
     }
@@ -959,27 +1017,47 @@ export const mountCalendar = (root, payload, now, options) => {
     wrap.appendChild(head);
 
     // The all-day band: a multi-day entry has no single hour, so it rides a band
-    // spanning the columns it covers (ADR-0009 §3), stacked into rows where two
-    // bands overlap.
+    // spanning the columns it covers (ADR-0009 §3), stacked into lanes where two
+    // bands share a day. {@link packAllDayBand} owns both rules the band does not
+    // share with the hour grid — inclusive ends, and a reserved height — so this
+    // renderer only draws what it is handed.
+    //
+    // The band is drawn even when the week has nothing on it: an empty band that
+    // holds its height is the point of the reservation, and a band that vanished
+    // would move the hour grid every time the reader paged past a quiet week.
     const multiDay = visible.filter(
       (e) => e.startIndex !== e.endIndex && e.endIndex >= weekStart && e.startIndex <= weekEnd,
     );
-    if (multiDay.length) {
-      const band = el("div", "week__allday");
-      band.appendChild(el("span", "week__corner", "All-day"));
-      const grid = el("div", "week__band-grid");
-      for (const { item, lane } of assignLanes(multiDay, (e) => e.startIndex, (e) => e.endIndex)) {
-        const leftCol = Math.max(item.startIndex, weekStart) - weekStart;
-        const rightCol = Math.min(item.endIndex, weekEnd) - weekStart;
-        const node = renderEntry(item);
-        node.classList.add("week__band");
-        node.style.gridColumn = `${leftCol + 1} / ${rightCol + 2}`;
-        node.style.gridRow = String(lane + 1);
-        grid.appendChild(node);
-      }
-      band.appendChild(grid);
-      wrap.appendChild(band);
+    const { shown, hidden } = packAllDayBand(multiDay);
+    const band = el("div", "week__allday");
+    band.appendChild(el("span", "week__corner", "All-day"));
+    const bandGrid = el("div", "week__band-grid");
+    // The reservation is published to the CSS rather than duplicated in it, so
+    // the lane count the packer enforces and the rows the band draws cannot drift.
+    bandGrid.style.setProperty("--band-lanes", String(WEEK_BAND_LANES));
+    for (const { item, lane } of shown) {
+      const leftCol = Math.max(item.startIndex, weekStart) - weekStart;
+      const rightCol = Math.min(item.endIndex, weekEnd) - weekStart;
+      const node = renderBand(item);
+      node.style.gridColumn = `${leftCol + 1} / ${rightCol + 2}`;
+      node.style.gridRow = String(lane + 1);
+      bandGrid.appendChild(node);
     }
+    if (hidden.length) {
+      // The same door Month's cell opens (#80): the overflow hands the reader to
+      // Agenda rather than dead-ending in a count. It aims at the **earliest
+      // hidden entry's day** — where the entries the band could not fit actually
+      // begin, which is deliberately not clamped to the showing week: a band
+      // running into this week from the last one is read from its own first day,
+      // and Agenda draws it under every day it spans anyway.
+      const earliest = Math.min(...hidden.map((e) => e.startIndex));
+      const more = moreButton("week__band week__band--more", hidden.length, earliest);
+      more.style.gridColumn = "1 / -1";
+      more.style.gridRow = String(WEEK_BAND_LANES);
+      bandGrid.appendChild(more);
+    }
+    band.appendChild(bandGrid);
+    wrap.appendChild(band);
 
     // The hour grid: a gutter of hour marks, then one column per day with each
     // single-day entry positioned by its true published clock time. Overlapping
@@ -1111,8 +1189,50 @@ export const mountCalendar = (root, payload, now, options) => {
    * the full summary survives on the `title` and on every reading surface.
    * @param {DayEntry} entry @returns {HTMLElement}
    */
-  const renderChip = (entry) => {
-    const node = el("div", "calendar__chip", entry.summary.replace(/^Cruise: /, ""));
+  const renderChip = (entry) => renderLeaf(entry, "calendar__chip");
+
+  /**
+   * The **overflow door** both bounded surfaces open (#80, #81): the control a
+   * cap or a reservation leaves behind, naming a destination rather than
+   * dead-ending in a count. One function because the two surfaces must not
+   * quietly diverge on what it says or where it goes — only on where it sits,
+   * which the caller styles. It is a `button`, not a decorated `div`, because it
+   * navigates and has to be reachable from the keyboard.
+   * @param {string} className @param {number} hidden @param {number} index the day Agenda opens on
+   * @returns {HTMLButtonElement}
+   */
+  const moreButton = (className, hidden, index) => {
+    const node = /** @type {HTMLButtonElement} */ (el("button", className, `+${hidden} more →`));
+    node.setAttribute("type", "button");
+    node.addEventListener("click", () => drillToAgendaDay(index));
+    return node;
+  };
+
+  /**
+   * Week's **all-day band**: the same one-line leaf as {@link renderChip}, drawn
+   * across the columns the entry spans (#81).
+   *
+   * It is one line for the reason the chip is: the band reserves a fixed number
+   * of lanes so a quiet and a busy week share a height, and a lane can only be a
+   * fixed height if what rides in it is a single line. So the band narrows #38's
+   * "every entry is labelled with the source" exactly as the chip does — the
+   * location and the source move to the `title`, one drill away on the reading
+   * surface the band's `+N more` hands the reader to. The hour grid below it is
+   * unaffected: a timed entry there is still the full {@link renderEntry}.
+   * @param {DayEntry} entry @returns {HTMLElement}
+   */
+  const renderBand = (entry) => renderLeaf(entry, "week__band");
+
+  /**
+   * The one-line leaf both dense surfaces draw: the summary alone, its type
+   * carried by colour, with what the line has no room for on its `title`. The
+   * `Cruise: ` prefix is dropped because on a line this narrow it is eight
+   * characters of constant crowding out the `vessel` — the one thing telling one
+   * call from another (see {@link renderChip}).
+   * @param {DayEntry} entry @param {string} className @returns {HTMLElement}
+   */
+  const renderLeaf = (entry, className) => {
+    const node = el("div", className, entry.summary.replace(/^Cruise: /, ""));
     node.dataset["type"] = entry.type;
     node.title = entry.location ? `${entry.summary} — ${entry.location}` : entry.summary;
     return node;

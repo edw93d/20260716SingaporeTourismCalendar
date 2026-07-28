@@ -2,6 +2,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  WEEK_BAND_LANES,
   assignLanes,
   entriesOnDay,
   filterEntries,
@@ -9,6 +10,7 @@ import {
   monthGridCells,
   mountCalendar,
   normalizeEntries,
+  packAllDayBand,
   sgtDayIndex,
   sgtDayKey,
   sgtMinutesOfDay,
@@ -197,6 +199,37 @@ describe("the model, in Singapore time", () => {
     const laid = assignLanes(spans, (x) => x.s, (x) => x.e);
     expect(laid.map((l) => l.lane)).toEqual([0, 1, 0]);
     expect(laid.every((l) => l.lanes === 2)).toBe(true);
+  });
+
+  it("keeps two all-day entries that touch on one day out of the same lane (#81)", () => {
+    // The packer is half-open (the test above), but an all-day range is
+    // **inclusive** of its end day: 10–12 and 12–14 both occupy day 12, so a
+    // half-open read of `endIndex` would stack them in one lane and draw them
+    // overlapping. The band packs against `endIndex + 1` instead — the fix lives
+    // in this caller's derivation, not in `assignLanes`'s contract.
+    const { shown } = packAllDayBand([
+      { startIndex: 10, endIndex: 12 },
+      { startIndex: 12, endIndex: 14 },
+      // Starting the day after 14 ends, this one is genuinely clear of both.
+      { startIndex: 15, endIndex: 16 },
+    ]);
+    expect(shown.map((s) => s.lane)).toEqual([0, 1, 0]);
+  });
+
+  it("reserves the band's lanes whatever the week holds, collapsing the rest (#81)", () => {
+    // Four mutually overlapping entries fill the reserved lanes exactly — the
+    // reservation is not a truncation, so nothing is hidden.
+    const four = Array.from({ length: 4 }, (_, i) => ({ startIndex: 10, endIndex: 14, id: i }));
+    expect(packAllDayBand(four).shown).toHaveLength(4);
+    expect(packAllDayBand(four).hidden).toEqual([]);
+
+    // A fifth needs a fifth lane, so the last reserved lane is spent on the
+    // overflow door instead: three show, two collapse. The band's height is the
+    // same either way.
+    const five = Array.from({ length: 5 }, (_, i) => ({ startIndex: 10, endIndex: 14, id: i }));
+    const { shown, hidden } = packAllDayBand(five);
+    expect(shown.map((s) => s.item.id)).toEqual([0, 1, 2]);
+    expect(hidden.map((h) => h.id)).toEqual([3, 4]);
   });
 
   it("pads a month to whole Monday-first weeks", () => {
@@ -675,6 +708,10 @@ describe("four switchable reading surfaces", () => {
   });
 
   it("introduces no magnitude in any view — no count, ranking or overflow", () => {
+    // The two `+N more` doors (#80's cell, #81's all-day band) are overflow, not
+    // magnitude: neither appears until its surface runs out of room, and this
+    // week has room. Nothing anywhere counts or ranks a day against its
+    // neighbours.
     const many = Array.from({ length: 5 }, (_, index) =>
       congress({ uid: `m${index}@x`, summary: `Fair ${index}`, source: `src${index}` }),
     );
@@ -683,6 +720,175 @@ describe("four switchable reading surfaces", () => {
       switchView(view);
       expect(root.textContent ?? "").not.toMatch(/\+\s*\d+\s*more/i);
     }
+  });
+});
+
+describe("Week: the all-day band — inclusive ends, reserved lanes, overflow (#81)", () => {
+  const { landedOn } = trackScrollTargets();
+
+  const bands = () =>
+    Array.from(root.querySelectorAll(".week__band:not(.week__band--more)")) as HTMLElement[];
+  const bandMore = () => root.querySelector(".week__band--more") as HTMLButtonElement | null;
+  /** The reserved rows the band publishes for its CSS to lay out against. */
+  const reservedLanes = () =>
+    (root.querySelector(".week__band-grid") as HTMLElement | null)?.style.getPropertyValue(
+      "--band-lanes",
+    );
+
+  /** `count` all-day entries spanning Tue 21 — Thu 23 July, inside today's week. */
+  const overlapping = (count: number) =>
+    payloadOf({
+      venueEvents: Array.from({ length: count }, (_, index) =>
+        congress({
+          uid: `m${index}@x`,
+          summary: `Fair ${index}`,
+          source: `src${index}`,
+          start: "2026-07-21T02:00:00Z",
+          end: "2026-07-23T08:00:00Z",
+        }),
+      ),
+      portCalls: [],
+    });
+
+  it("keeps an entry ending on a day and one starting on it in separate lanes", () => {
+    // 20–22 July and 22–24 July both occupy Wednesday the 22nd, so drawing them
+    // in one lane would overlap them on that column.
+    mount(
+      payloadOf({
+        venueEvents: [
+          congress({ uid: "a@x", summary: "Ends Wed", start: "2026-07-20T02:00:00Z", end: "2026-07-22T08:00:00Z" }),
+          congress({ uid: "b@x", summary: "Starts Wed", start: "2026-07-22T02:00:00Z", end: "2026-07-24T08:00:00Z" }),
+        ],
+        portCalls: [],
+      }),
+    );
+    switchView("week");
+    expect(bands().map((b) => b.style.gridRow)).toEqual(["1", "2"]);
+  });
+
+  it("puts an entry that clears the previous one's last day back in lane 1", () => {
+    // 20–21 July then 22–24: the second starts the day *after* the first ends,
+    // so they share no day and the packer reuses the lane. The inclusive-end fix
+    // must not simply push everything into a lane of its own.
+    mount(
+      payloadOf({
+        venueEvents: [
+          congress({ uid: "a@x", summary: "Mon–Tue", start: "2026-07-20T02:00:00Z", end: "2026-07-21T08:00:00Z" }),
+          congress({ uid: "b@x", summary: "Wed–Fri", start: "2026-07-22T02:00:00Z", end: "2026-07-24T08:00:00Z" }),
+        ],
+        portCalls: [],
+      }),
+    );
+    switchView("week");
+    expect(bands().map((b) => b.style.gridRow)).toEqual(["1", "1"]);
+  });
+
+  it("reserves the same lanes in a quiet week as in a busy one, so the grid never jumps", () => {
+    mount(payloadOf({ venueEvents: [], portCalls: [] }));
+    switchView("week");
+    // The band is drawn even with nothing on it — its height is what a week
+    // with four overlapping entries would need, so paging does not shift the
+    // hour grid up and down.
+    expect(root.querySelector(".week__allday")).not.toBeNull();
+    expect(bands()).toHaveLength(0);
+    expect(reservedLanes()).toBe(String(WEEK_BAND_LANES));
+
+    mount(overlapping(4));
+    switchView("week");
+    expect(bands()).toHaveLength(4);
+    expect(reservedLanes()).toBe(String(WEEK_BAND_LANES));
+    expect(bandMore()).toBeNull();
+  });
+
+  it("spends the last reserved lane on `+N more` once there is overflow", () => {
+    mount(overlapping(6));
+    switchView("week");
+    // Three bands, not four: the door costs the lane it occupies, so an
+    // overflowing week is exactly as tall as one that fills the reservation.
+    expect(bands().map((b) => b.textContent)).toEqual(["Fair 0", "Fair 1", "Fair 2"]);
+    const more = bandMore();
+    expect(more?.textContent).toMatch(/\+3 more/);
+    expect(more?.style.gridRow).toBe(String(WEEK_BAND_LANES));
+    expect(more?.style.gridColumn).toBe("1 / -1");
+  });
+
+  it("hands `+N more` to Agenda on the earliest hidden entry's day", () => {
+    mount(
+      payloadOf({
+        venueEvents: [
+          // Three from Monday fill the lanes the reservation shows…
+          ...Array.from({ length: 3 }, (_, index) =>
+            congress({
+              uid: `m${index}@x`,
+              summary: `Fair ${index}`,
+              start: "2026-07-20T02:00:00Z",
+              end: "2026-07-24T08:00:00Z",
+            }),
+          ),
+          // …and these two, both starting Wednesday, are what overflows. The
+          // reader is handed to the 22nd — where the hidden entries begin, not
+          // where the week does.
+          congress({ uid: "h1@x", summary: "Hidden Expo", start: "2026-07-22T02:00:00Z", end: "2026-07-24T08:00:00Z" }),
+          congress({ uid: "h2@x", summary: "Hidden Fair", start: "2026-07-23T02:00:00Z", end: "2026-07-24T08:00:00Z" }),
+        ],
+        portCalls: [],
+      }),
+    );
+    switchView("week");
+    bandMore()?.click();
+    expect(root.querySelector(".agenda")).not.toBeNull();
+    expect(root.querySelector(".week")).toBeNull();
+    expect(
+      root.querySelector('.agenda__day[data-day="2026-07-22"]')?.textContent,
+    ).toContain("Hidden Expo");
+    expect(landedOn()).toBe("2026-07-22");
+  });
+
+  it("aims `+N more` at a hidden entry's own first day, even before the showing week", () => {
+    // The overflowing entry runs into this week from the last one. The door goes
+    // where it *begins* — Agenda draws it under every day it spans, so the
+    // reader lands on the entry rather than on an arbitrary Monday.
+    mount(
+      payloadOf({
+        // Five entries running 15 — 24 July: the band shows three and hides two,
+        // and every one of them started five days before this week's Monday.
+        venueEvents: Array.from({ length: 5 }, (_, index) =>
+          congress({
+            uid: `m${index}@x`,
+            summary: `Fair ${index}`,
+            start: "2026-07-15T02:00:00Z",
+            end: "2026-07-24T08:00:00Z",
+          }),
+        ),
+        portCalls: [],
+      }),
+    );
+    switchView("week");
+    bandMore()?.click();
+    expect(landedOn()).toBe("2026-07-15");
+  });
+
+  it("draws a band as one line — the summary, ellipsised, with the rest on its title", () => {
+    mount(payloadOf({ portCalls: [] })); // congress spans 17–19 July
+    switchView("week");
+    click("prev"); // the week holding 13–19 July
+    const [band] = bands();
+    expect(band?.textContent).toBe("Global MICE Congress");
+    // A band is a leaf: stacking the location and the source under it would
+    // undo the fixed lane height the reservation buys.
+    expect(band?.querySelector(".calendar__entry-where, .calendar__source")).toBeNull();
+    expect(band?.title).toBe("Global MICE Congress — Suntec Convention Centre, Level 4, Hall 404");
+  });
+
+  it("drops a port call's `Cruise: ` prefix on the band, as the chip does", () => {
+    mount(
+      payloadOf({
+        venueEvents: [],
+        portCalls: [cruise({ start: "2026-07-21T00:00:00Z", end: "2026-07-23T08:00:00Z" })],
+      }),
+    );
+    switchView("week");
+    expect(bands()[0]?.textContent).toBe("ODYSSEY / VILLA VIE RESIDENCES at Singapore Cruise Centre");
   });
 });
 
