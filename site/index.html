@@ -43,10 +43,21 @@
          narrow screen); the scrolled-to rows add their own 0.75rem
          `scroll-margin-top` on top of it as breathing room. */
       html { scroll-padding-top: var(--topbar-h, 0px); }
+      /* The page frame, at the round-1 prototype's width. 78rem rather than the
+         70rem it replaces is paid for by Month: measured over the live payload
+         (Jul–Sep 2026), the wider cell drops the chips that ellipsise at rest
+         from 178/261 to 141/261 — a seventh of every name in the grid, readable
+         without a drill. It costs nothing on Agenda, the surface a long line
+         could hurt: no entry title wraps at either width. Two things it does
+         **not** buy, so neither is claimed: the `+N more` doors are unchanged
+         (the cap is four rows, never a width), and a majority of chips still
+         truncate — the full name lives on the tooltip and in the bubble (#75),
+         which is the chip's design and not a gap width could close. Binds only
+         above a 1280px viewport; below 1152px the two widths are identical. */
       body {
         margin: 0 auto;
-        padding: 0 1rem 4rem;
-        max-width: 70rem;
+        padding: 0 1rem 5rem;
+        max-width: 78rem;
         font: 1rem/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
       }
 
