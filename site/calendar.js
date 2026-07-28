@@ -136,6 +136,22 @@ const mondayOf = (index) => index - ((index + 3) % 7);
 const weekdayLabel = (index) => WEEKDAYS[(index + 3) % 7] ?? "";
 
 /**
+ * Saturday or Sunday, from a `Date.getUTCDay()` weekday (0=Sun). The weekend is
+ * a property of the *day*, which is the whole of #72's wash rule: the grid marks
+ * it with a class read from this, never by counting columns.
+ * @param {number} weekday @returns {boolean}
+ */
+const isWeekend = (weekday) => weekday === 0 || weekday === 6;
+
+/**
+ * The weekend column labels, **derived** from the same predicate the day cells
+ * use rather than restated as strings — the header and the cells under it wash
+ * on one fact, so they cannot drift apart. `WEEKDAYS` is Monday-first, so its
+ * column `i` is the `(i + 1) % 7` weekday.
+ */
+const WEEKEND_LABELS = new Set(WEEKDAYS.filter((_, column) => isWeekend((column + 1) % 7)));
+
+/**
  * A calendar day in Singapore time, as a comparable `YYYYMMDD` integer — which
  * orders chronologically as a plain number, so "does this day fall inside this
  * span?" is two `<=` with no date arithmetic and no month-boundary special case.
@@ -263,10 +279,15 @@ export const entriesOnDay = (entries, key) =>
  * The cells of a month's grid, Monday-first, padded to whole weeks with the
  * trailing/leading days of the adjacent months (marked `inMonth: false`).
  *
+ * `isWeekend` is the day's own property, read from its date (#72) — not its
+ * position in the returned array. That is what lets the grid mark the wash with
+ * a class instead of counting children, which drifts the moment anything else is
+ * added to the grid.
+ *
  * @param {number} year
  * @param {number} month  1–12
  * @param {number} todayKey
- * @returns {{ year: number, month: number, day: number, key: number, inMonth: boolean, isToday: boolean }[]}
+ * @returns {{ year: number, month: number, day: number, key: number, inMonth: boolean, isToday: boolean, isWeekend: boolean }[]}
  */
 export const monthGridCells = (year, month, todayKey) => {
   const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay(); // 0=Sun
@@ -290,6 +311,7 @@ export const monthGridCells = (year, month, todayKey) => {
       key,
       inMonth: cellMonth === month && cellYear === year,
       isToday: key === todayKey,
+      isWeekend: isWeekend(date.getUTCDay()),
     });
   }
   return cells;
@@ -856,16 +878,35 @@ export const mountCalendar = (root, payload, now, options) => {
     const grid = el("div", "calendar__grid");
 
     const head = el("div", "calendar__weekdays");
-    for (const label of WEEKDAYS) head.appendChild(el("span", "calendar__weekday", label));
+    for (const label of WEEKDAYS) {
+      const column = el("span", "calendar__weekday", label);
+      if (WEEKEND_LABELS.has(label)) column.classList.add("is-weekend");
+      head.appendChild(column);
+    }
     grid.appendChild(head);
 
     const body = el("div", "calendar__weeks");
     for (const cell of cells) {
       const dayNode = el("div", "calendar__day");
       if (!cell.inMonth) dayNode.classList.add("calendar__day--outside");
+      // The weekend wash (#72), marked by what the day *is*. It runs through the
+      // outside-month days unbroken — they carry no wash of their own and recede
+      // by fading their contents instead — so grey means exactly one thing in
+      // this grid: weekend.
+      if (cell.isWeekend) dayNode.classList.add("is-weekend");
       dayNode.dataset["day"] = dayAttrOf(cell);
 
-      dayNode.appendChild(dayNumberNode(cell.day, cell.isToday, "calendar__daynum"));
+      // The date row: the numeral, and on the 1st the month it opens. A leading
+      // or trailing row would otherwise be an unlabelled run of numbers, now that
+      // no wash distinguishes it (Apple's convention, #72).
+      const date = el("div", "calendar__date");
+      // The numeral needs no class of its own: the row above carries Month's date
+      // type scale, and today's disc brings its own.
+      date.appendChild(dayNumberNode(cell.day, cell.isToday, null));
+      if (cell.day === 1) {
+        date.appendChild(el("span", "calendar__monthname", MONTHS_SHORT[cell.month - 1] ?? ""));
+      }
+      dayNode.appendChild(date);
 
       // Month is fixed to one screen (ADR-0014 §1): chips are one line and capped
       // per day, and the overflow past the cap collapses to a `+N more` that

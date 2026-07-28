@@ -161,6 +161,21 @@ drops a port call's `Cruise: ` prefix: on a chip that narrow it crowds out the
 prose inside `summary` because an iCal client has nothing else to carry the category;
 the chip has its colour.
 
+### Weekend wash
+
+The light grey (4%) **Month** carries on Saturday and Sunday — the cells and the two
+column headers above them. It is **structural**: a property of the *day*, marked with
+an `is-weekend` class read from the date, never an `nth-child` position rule (which
+drifts the moment anything else joins the grid — the round-1 prototype hit exactly
+that). Its counterpart rule is **grey means exactly one thing in this grid: weekend.**
+So nothing else tints a cell: today is a red disc alone (#71), and an **outside-month**
+day — one the Monday-first grid pads a week with — carries no wash of its own. The
+weekend wash runs straight through it unbroken; it recedes instead by fading its own
+contents (numeral and **chips**) to 25%. With no wash left to announce a month
+boundary, the **1st** prints its month name beside the numeral ("1 Jul", "1 Aug").
+#72 — a net-new round-1 item, so it is spec'd on the issue rather than in ADR-0014
+(which records only that round's *reversals*).
+
 ### Facts-only extraction
 
 Extract event **facts** (name, date, venue, vessel) and never copyrightable

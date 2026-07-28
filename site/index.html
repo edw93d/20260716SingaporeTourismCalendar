@@ -30,6 +30,9 @@
         --line: color-mix(in srgb, currentColor 18%, transparent);
         --dim: color-mix(in srgb, currentColor 55%, transparent);
         --today-red: #ff3b30;
+        /* The weekend wash (#72): light enough to read as structure rather than
+           as content, and the only grey in the grid. */
+        --weekend: color-mix(in srgb, canvastext 4%, transparent);
         --venue: color-mix(in srgb, #2563eb 16%, transparent);
         --port: color-mix(in srgb, #0d9488 18%, transparent);
       }
@@ -190,17 +193,28 @@
         overflow: hidden;
       }
       .calendar__day:nth-child(7n) { border-right: none; }
-      .calendar__day--outside { background: color-mix(in srgb, canvastext 3%, transparent); }
-      .calendar__day--outside .calendar__daynum { color: var(--dim); }
-      /* The date row is the disc's height whether or not the day is today (#71),
-         so the week today falls in is not a row taller than the others. */
-      .calendar__daynum {
-        font-size: 0.8rem;
-        line-height: 1.3;
-        height: 1.55rem;
+      /* The weekend wash (#72): Saturday and Sunday, their cells and their column
+         headers. Keyed off the `is-weekend` class `calendar.js` puts on the day
+         it belongs to — deliberately **not** an `nth-child` position rule, which
+         drifts the moment any leading child joins the grid. */
+      .calendar__weekday.is-weekend,
+      .calendar__day.is-weekend { background: var(--weekend); }
+      /* An outside-month day carries no wash of its own: the weekend wash runs
+         straight through it, so grey means exactly one thing in this grid. It
+         recedes instead by fading its own contents — number and chips. */
+      .calendar__day--outside > * { opacity: 0.25; }
+      /* The date row: the numeral and, on the 1st, the month name beside it
+         (#72). It is the disc's height whether or not the day is today (#71), so
+         the week today falls in is not a row taller than the others — and it
+         carries the type scale, so the numeral is the same size either way. */
+      .calendar__date {
         display: flex;
         align-items: center;
+        height: 1.55rem;
+        font-size: 0.8rem;
+        line-height: 1.3;
       }
+      .calendar__monthname { margin-left: 0.25rem; color: var(--dim); }
 
       /* Today (#71): one signal, every view — a solid red disc with a white
          numeral, on the date number itself. It replaces the old grey cell wash,
@@ -215,11 +229,11 @@
         line-height: 1;
       }
       .disc--sm { min-width: 1.35rem; height: 1.35rem; font-size: 0.8rem; }
-      /* The Month cell and Week header are stretch flex columns, so the disc —
-         a flex child — would otherwise fill the column's full width and read as a
-         bar. Size it to its numeral: left in the Month cell (where the number
-         lives), centred in the Week header (which centres its day column). */
-      .calendar__day .disc { align-self: flex-start; }
+      /* The Week header is a stretch flex column, so the disc — a flex child —
+         would otherwise fill the column's full width and read as a bar. Size it
+         to its numeral, centred like the day column it sits in. (Month needs no
+         such rule: its disc rides a flex *row*, `.calendar__date`, which sizes
+         its children to their content already.) */
       .week__day .disc { align-self: center; }
 
       /* --- Month chips: one line each, capped per day (#80, ADR-0014 §1) ---
