@@ -596,6 +596,18 @@ const pad2 = (value) => String(value).padStart(2, "0");
 const dayAttrOf = ({ year, month, day }) => `${year}-${pad2(month)}-${pad2(day)}`;
 
 /**
+ * Empty a **page-supplied** host of what a previous mount left in it. `root` is
+ * the module's and is cleared wholesale, but the topbar (#73) and the
+ * methodology footer's freshness slot (#79) are the page's and outlive the
+ * mount — so a second mount has to replace what it put there rather than stack
+ * a second set beside it.
+ * @param {Element} host @param {string} className what this mount renders into that host
+ */
+const clearPriorMount = (host, className) => {
+  for (const stale of Array.from(host.querySelectorAll(`.${className}`))) stale.remove();
+};
+
+/**
  * Mount the calendar into `root`, reading the clock from `now`. The page is
  * driven almost entirely through the controls it renders (filter, prev, today,
  * next), which is what a test drives too; the one exception is the returned
@@ -683,10 +695,7 @@ export const mountCalendar = (root, payload, now, options) => {
   if (!freshnessHost) {
     throw new Error("mountCalendar needs the methodology footer's slot to render the freshness disclosure into.");
   }
-  // A second mount into the same shell replaces the controls rather than
-  // stacking a second set beside them — `root` is cleared above, but a
-  // page-supplied topbar outlives the mount.
-  for (const stale of Array.from(topbar.querySelectorAll(".calendar__controls"))) stale.remove();
+  clearPriorMount(topbar, "calendar__controls");
   /** The controls, rebuilt each render: they carry the current view and title. */
   const controls = el("div", "calendar__controls");
   topbar.appendChild(controls);
@@ -1685,10 +1694,8 @@ export const mountCalendar = (root, payload, now, options) => {
   // the header (#79, ADR-0014 §2) — **disclosed, not surfaced**: still present,
   // still computed here against the injected clock, so a frozen page still shows
   // a growing lag, and being outside the view surface is what keeps it visible
-  // in all four views without a rerender. The slot is the page's and outlives
-  // the mount, so a second mount replaces the disclosure the way the topbar
-  // replaces its controls.
-  for (const stale of Array.from(freshnessHost.querySelectorAll(".calendar__freshness"))) stale.remove();
+  // in all four views without a rerender.
+  clearPriorMount(freshnessHost, "calendar__freshness");
   const fresh = renderFreshness();
   if (fresh) freshnessHost.appendChild(fresh);
   root.appendChild(surface);

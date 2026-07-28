@@ -1496,8 +1496,6 @@ describe("the static shell (#73)", () => {
 });
 
 describe("the page chrome (#79, ADR-0014 §2 and §3)", () => {
-  const shell = readFileSync("site/index.html", "utf8");
-
   /** The methodology footer's markup, from its opening tag to its closing one. */
   const footer = shell.match(/<section class="methodology">([\s\S]*?)<\/section>/)?.[1] ?? "";
 
