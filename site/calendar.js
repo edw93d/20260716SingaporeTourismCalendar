@@ -382,7 +382,7 @@ const dayAttrOf = ({ year, month, day }) => `${year}-${pad2(month)}-${pad2(day)}
  * @param {Date} now
  * @param {MountOptions} options the page-supplied hosts — currently just the pinned topbar
  */
-export const mountCalendar = (root, payload, now, options = {}) => {
+export const mountCalendar = (root, payload, now, options) => {
   const doc = root.ownerDocument;
   if (!doc) throw new Error("mountCalendar needs a root attached to a document.");
 
@@ -424,7 +424,9 @@ export const mountCalendar = (root, payload, now, options = {}) => {
   root.textContent = "";
   root.className = "calendar";
 
-  const topbar = options.topbar;
+  // Read defensively: the types say `topbar` is required, but this module is
+  // shipped as plain JS to a browser, where nothing enforces that at the call.
+  const topbar = options?.topbar;
   if (!topbar) throw new Error("mountCalendar needs the page's topbar to render its controls into.");
   // A second mount into the same shell replaces the controls rather than
   // stacking a second set beside them — `root` is cleared above, but a
