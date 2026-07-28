@@ -1057,6 +1057,54 @@ describe("sticky header and today-to-top navigation (#73)", () => {
     expect(document.documentElement.style.getPropertyValue("--topbar-h")).toBe("168px");
   });
 
+  it("evicts a remounted-over mount's resize listener instead of accumulating them", () => {
+    // #84: every mount registers a resize listener holding *its* topbar. Without
+    // eviction they pile up for the life of the page, N-1 of them dead weight.
+    // Track the "resize" handlers *this test* registers by wrapping the
+    // window's own registry. Identity, not a count: earlier tests in this file
+    // mounted into the same jsdom window and their handlers retire on the same
+    // dispatch, which a bare counter would charge to this test.
+    const resizeHandlers = new Set<unknown>();
+    const { addEventListener: add, removeEventListener: remove } = window;
+    window.addEventListener = function (this: Window, type: string, handler: unknown, ...rest: never[]) {
+      if (type === "resize") resizeHandlers.add(handler);
+      return add.call(this, type, handler as EventListener, ...rest);
+    } as typeof window.addEventListener;
+    window.removeEventListener = function (this: Window, type: string, handler: unknown, ...rest: never[]) {
+      if (type === "resize") resizeHandlers.delete(handler);
+      return remove.call(this, type, handler as EventListener, ...rest);
+    } as typeof window.removeEventListener;
+    const live = () => resizeHandlers.size;
+
+    try {
+      mount(payloadOf());
+      // The page replaces the shell wholesale: the first mount's header leaves
+      // the document, and a fresh one takes its place.
+      topbar.remove();
+      const second = document.createElement("header");
+      second.className = "topbar";
+      document.body.prepend(second);
+      root.textContent = "";
+      mountCalendar(root, payloadOf(), JULY_21, { topbar: second });
+      expect(live()).toBe(2);
+
+      second.getBoundingClientRect = () => ({ height: 168 }) as DOMRect;
+      window.dispatchEvent(new Event("resize"));
+      // The stale handler noticed its header was gone and unregistered itself;
+      // the live one still published.
+      expect(live()).toBe(1);
+      expect(document.documentElement.style.getPropertyValue("--topbar-h")).toBe("168px");
+
+      second.getBoundingClientRect = () => ({ height: 42 }) as DOMRect;
+      window.dispatchEvent(new Event("resize"));
+      expect(live()).toBe(1);
+      expect(document.documentElement.style.getPropertyValue("--topbar-h")).toBe("42px");
+    } finally {
+      window.addEventListener = add;
+      window.removeEventListener = remove;
+    }
+  });
+
   it("brings today's row to the top of the viewport on first load", () => {
     mount(withToday());
     expect(landedOn()).toBe("2026-07-21");

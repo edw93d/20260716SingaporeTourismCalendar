@@ -838,8 +838,20 @@ export const mountCalendar = (root, payload, now, options) => {
   const publishTopbarHeight = () => {
     // A remount leaves the previous mount's resize listener alive, holding a
     // header no longer in the page. It must not publish a detached header's
-    // height over the live one's.
-    if (!topbar.isConnected) return;
+    // height over the live one's — and having noticed it is stale, it retires
+    // itself rather than firing for the life of the page (#84). Self-eviction
+    // over a teardown function returned from `mountCalendar`: the mount's
+    // contract stays "the page is driven entirely through the controls it
+    // renders", needing no cooperation from a caller who would have to remember
+    // to call it. Two costs. A stale handler survives until the first resize
+    // after its header leaves — one no-op run, which is what the guard was
+    // already doing. And stale here means *detached*, not *superseded*: a
+    // remount into the very same header element leaves both handlers live and
+    // publishing the same height, harmless but not evicted.
+    if (!topbar.isConnected) {
+      doc.defaultView?.removeEventListener("resize", publishTopbarHeight);
+      return;
+    }
     if (typeof topbar.getBoundingClientRect !== "function") return;
     const { height } = topbar.getBoundingClientRect();
     doc.documentElement.style.setProperty("--topbar-h", `${height}px`);
