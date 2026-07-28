@@ -327,16 +327,56 @@
         padding: 0.25rem 0.35rem;
         align-self: center;
       }
-      /* The all-day band: multi-day entries ride here rather than the grid. */
-      .week__allday { border-bottom: 1px solid var(--line); }
+      /* --- The all-day band (#81) -----------------------------------------
+         Multi-day entries ride here rather than in the hour grid. Its rows are a
+         **reservation**, not a fit: the same lanes are drawn whether the week is
+         empty or overflowing, so paging from a quiet week to a busy one never
+         shifts the hour grid under it. `--band-lanes` is published by
+         `calendar.js` alongside the lane count its packer enforces, so the two
+         cannot drift. Deliberately no fallback: the reservation has exactly one
+         source, and a band that lost it should collapse visibly rather than
+         quietly agree with a number nobody is maintaining. */
+      .week__allday { border-bottom: 1px solid var(--line); --band-row: 1.35rem; }
       .week__band-grid {
         grid-column: 2 / -1;
         display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        gap: 0.15rem;
-        padding: 0.2rem 0;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        grid-template-rows: repeat(var(--band-lanes), var(--band-row));
+        gap: 1px;
+        padding: 1px 0;
       }
-      .week__band { min-width: 0; }
+      /* A band is the same one-line leaf as a Month chip, at the band's own
+         tighter type scale — the fixed lane height is what a single line buys. */
+      .week__band {
+        font-size: 0.68rem;
+        line-height: 1.2;
+        padding: 0 0.2rem;
+        border-radius: 0.25rem;
+        border-left: 3px solid var(--dim);
+        background: color-mix(in srgb, canvastext 5%, transparent);
+        /* A grid item defaults to `min-width: auto`, so a long band title would
+           push the whole week wider than the page rather than ellipsising. */
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .week__band[data-type="VenueEvent"] { background: var(--venue); border-left-color: #2563eb; }
+      .week__band[data-type="PortCall"] { background: var(--port); border-left-color: #0d9488; }
+      /* The band's overflow door, styled like Month's: no box of its own, because
+         it is a link to somewhere (Agenda, the day the hidden entries begin) and
+         not an entry. It spends the last reserved lane rather than adding one. */
+      .week__band--more {
+        border: none;
+        background: none;
+        font: inherit;
+        font-size: 0.68rem;
+        color: var(--dim);
+        text-align: left;
+        text-decoration: underline;
+        cursor: pointer;
+      }
+      .week__band--more:hover { color: inherit; }
       /* The hour grid: a gutter of marks, then one relative column per day the
          timed entries position within by their true clock time. */
       .week__grid {

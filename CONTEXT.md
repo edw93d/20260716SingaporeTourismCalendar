@@ -130,9 +130,10 @@ view, and reading demand from multiple perspectives is the point:
   **PortCall** has neither span nor name, so a ~4,000-passenger ship renders like a
   coffee popup in every view; the audience infers size from `vessel`. **Reopen
   trigger:** if real use shows this misleads, magnitude re-enters scope as a
-  *destination redraw*, not a quiet patch. Month's **`+N more`** (see **Chip**) is not
-  a magnitude reading: it counts what one cell could not fit, and it names a
-  destination rather than ranking a day against its neighbours.
+  *destination redraw*, not a quiet patch. The two **`+N more`** doors — Month's cell
+  (see **Chip**) and Week's **All-day band** — are not a magnitude reading: each counts
+  what one bounded surface could not fit, and names a destination rather than ranking a
+  day against its neighbours.
 
 Everything is **static-renderable** (ADR-0009, #10): the views, filter, week paging,
 and Today control are client JS over data already on the page — no server. The UI
@@ -141,9 +142,10 @@ See ADR-0009.
 
 ### Chip
 
-How **Month** — and only Month — draws a **CalendarEntry**: **one line**, the summary
-alone, its type carried by colour. It is a leaf, not a stack. The reading surfaces
-draw the same entry in full (name, where, source), and that difference *is* the
+How **Month** draws a **CalendarEntry**: **one line**, the summary alone, its type
+carried by colour. It is a leaf, not a stack. The reading surfaces draw the same entry
+in full (name, where, source) — with the one exception of Week's **All-day band**,
+which is a leaf for its own reason — and that difference *is* the
 navigator/reading-surface split made visible: a chip answers "is there demand here",
 not "what is it".
 
@@ -160,6 +162,34 @@ drops a port call's `Cruise: ` prefix: on a chip that narrow it crowds out the
 `vessel`, which is the only thing telling one call from another. ADR-0001 keeps that
 prose inside `summary` because an iCal client has nothing else to carry the category;
 the chip has its colour.
+
+### All-day band
+
+Where **Week** draws an entry spanning more than one day. A multi-day entry has no
+single hour, so it cannot honestly be placed in the hour grid; it rides a band above
+it, across the columns it covers.
+
+Two rules the band does not share with the hour grid below it:
+
+- **All-day ranges are inclusive of their end day.** An entry running 20–22 Jul
+  *occupies* the 22nd, so one starting on the 22nd shares a day with it and must not
+  share a lane. The shared interval packer is half-open — which is right for the
+  **Date-spine**'s day-values and the hour grid's minutes, and both keep it — so the
+  band converts inclusive to exclusive at its own call (`endIndex + 1`). Getting this
+  wrong drew two touching entries on top of each other; it was one of round 1's two
+  production bugs (#81).
+- **The band reserves a fixed number of lanes** (four) whatever the week holds, so a
+  quiet week and a busy one are the same height and paging never shifts the hour grid.
+  Past the reservation the entries collapse into a **`+N more`** that spends the last
+  reserved lane itself and drills to the earliest hidden entry's day in **Agenda** —
+  the same door Month's **Chip** cap opens, and no more a magnitude reading than that
+  one. On today's dataset the worst week needs exactly the reserved lanes, so the door
+  is insurance rather than everyday behaviour.
+
+A fixed lane height means a band is **one line**, so — alone among the reading
+surfaces — it draws the same leaf a **Chip** does, and narrows #38's source label onto
+its tooltip for the same reason. #81 — a net-new round-1 item, so it is spec'd on the
+issue rather than in ADR-0014.
 
 ### Weekend wash
 
