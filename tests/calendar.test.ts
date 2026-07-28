@@ -757,6 +757,65 @@ describe("four switchable reading surfaces", () => {
     expect(rule).not.toMatch(/min-height/);
   });
 
+  it("Date-spine keeps a gutter between neighbouring lanes, so two types never share an edge", () => {
+    // The lane geometry is published as clean percentages, like the row geometry
+    // above, and the stylesheet insets it. Painted flush — which is what setting
+    // `left`/`width` directly did — a green PortCall's background abuts a blue
+    // VenueEvent's 3px border with nothing between them, and two lanes read as
+    // one continuous band.
+    mount(payloadOf()); // congress 17–19 July, cruise 18 July: concurrent, two lanes
+    switchView("spine");
+    const bars = Array.from(root.querySelectorAll(".spine__bar")) as HTMLElement[];
+    expect(bars).toHaveLength(2);
+    for (const bar of bars) {
+      expect(bar.style.getPropertyValue("--spine-bar-left")).toMatch(/%$/);
+      expect(bar.style.getPropertyValue("--spine-bar-width")).toMatch(/%$/);
+      // Nothing sets the properties themselves — the inset is the stylesheet's.
+      expect(bar.style.left).toBe("");
+      expect(bar.style.width).toBe("");
+    }
+    // Two lanes, each half the track, side by side.
+    expect(bars.map((b) => parsePct(b.style.getPropertyValue("--spine-bar-width")))).toEqual([50, 50]);
+    expect(
+      bars.map((b) => parsePct(b.style.getPropertyValue("--spine-bar-left"))).sort((a, b) => a - b),
+    ).toEqual([0, 50]);
+
+    const rule = ruleFor(".spine__bar");
+    expect(rule).toMatch(/left:\s*calc\(var\(--spine-bar-left\)\s*\+\s*1px\)/);
+    expect(rule).toMatch(/width:\s*calc\(var\(--spine-bar-width\)\s*-\s*2px\)/);
+  });
+
+  it("Date-spine's bar is two lines — the duration and the name, and nothing that will not fit", () => {
+    // A one-date bar is one `--spine-row` tall, because its height *is* its
+    // duration (ADR-0009 §3). The four-line reading-surface entry needs more than
+    // twice that, so every single-date entry rendered as a duration label with
+    // its name clipped away. Two lines at the spine's own type scale is what
+    // fits: the location and the source come off, as they do on a Month chip.
+    mount(payloadOf());
+    switchView("spine");
+    const bar = barByType("PortCall");
+
+    expect(bar.querySelector(".spine__len")?.textContent).toBe("8 hr");
+    // The name is a node of its own, not text clipped out of view — and a port
+    // call's `Cruise: ` prefix is dropped, so the vessel survives the width.
+    expect(bar.children).toHaveLength(2);
+    expect(bar.children[1]?.textContent).toBe("ODYSSEY / VILLA VIE RESIDENCES at Singapore Cruise Centre");
+
+    // The two fields that do not fit are gone from the bar, not merely hidden —
+    // and both are still one drill away, on the `title` and in the bubble (#75).
+    expect(bar.querySelector(".calendar__entry-where, .calendar__source")).toBeNull();
+    expect(bar.title).toContain("Cruise: ODYSSEY / VILLA VIE RESIDENCES");
+    expect(bar.title).toContain("Singapore Cruise Centre");
+
+    // The bar carries its own type scale, not `.calendar__entry`'s: at 0.8rem/1.3
+    // with 0.25rem of padding the second line does not fit in 26px.
+    expect(bar.classList.contains("calendar__entry")).toBe(false);
+    const rule = ruleFor(".spine__bar");
+    expect(rule).toMatch(/font-size:\s*0\.72rem/);
+    expect(rule).toMatch(/line-height:\s*1\.2/);
+    expect(rule).toMatch(/padding:\s*0\.1rem\s+0\.3rem/);
+  });
+
   it("Date-spine gives an entry its own lane when it shares a date with one that ends that day", () => {
     // The congress runs 20–22 July SGT and the call is the evening of the 22nd.
     // On the clock they do not overlap — the congress closes at 16:00, the call
@@ -773,8 +832,12 @@ describe("four switchable reading surfaces", () => {
     const bars = Array.from(root.querySelectorAll(".spine__bar")) as HTMLElement[];
     expect(bars).toHaveLength(2);
     // Two lanes: each bar takes half the track, and they sit at different offsets.
-    for (const bar of bars) expect(parsePct(bar.style.width)).toBeCloseTo(50, 4);
-    expect(new Set(bars.map((bar) => bar.style.left)).size).toBe(2);
+    // Read off the published lane geometry, not `left`/`width` themselves — the
+    // stylesheet owns those, because it is what insets the gutter into them.
+    for (const bar of bars) {
+      expect(parsePct(bar.style.getPropertyValue("--spine-bar-width"))).toBeCloseTo(50, 4);
+    }
+    expect(new Set(bars.map((bar) => bar.style.getPropertyValue("--spine-bar-left"))).size).toBe(2);
   });
 
   it("applies the type filter once and keeps it across every view switch", () => {
@@ -790,10 +853,13 @@ describe("four switchable reading surfaces", () => {
     for (const view of ["week", "agenda", "spine", "month"]) {
       switchView(view);
       expect((find(".calendar__filter") as HTMLSelectElement).value).toBe("PortCall");
-      // Month draws chips, the reading surfaces draw entries — the filter is one
-      // rule over both, so the assertion has to cover whichever the view renders.
+      // Month draws chips, Date-spine draws bars, the other reading surfaces draw
+      // entries — the filter is one rule over all three, so the assertion has to
+      // cover whichever node the view renders.
       const shown = (type: string) =>
-        root.querySelectorAll(`.calendar__entry[data-type="${type}"], .calendar__chip[data-type="${type}"]`).length;
+        root.querySelectorAll(
+          `.calendar__entry[data-type="${type}"], .calendar__chip[data-type="${type}"], .spine__bar[data-type="${type}"]`,
+        ).length;
       expect(shown("VenueEvent")).toBe(0);
       expect(shown("PortCall")).toBeGreaterThan(0);
     }

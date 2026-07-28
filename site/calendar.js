@@ -1311,15 +1311,15 @@ export const mountCalendar = (root, payload, now, options) => {
       // is why the height counts `end - start + 1` rows.
       const start = Math.max(item.startIndex, monthStart);
       const end = Math.min(item.endIndex, monthEnd - 1);
-      const node = renderEntry(item, spanText(item.endValue - item.startValue));
-      node.classList.add("spine__bar");
-      // The row geometry is published as percentages and the stylesheet insets
-      // it by a hairline, so two bars on consecutive days in one lane stay two
-      // bars instead of painting flush into a single band.
+      const node = renderSpineBar(item, spanText(item.endValue - item.startValue));
+      // Both axes of geometry are published as percentages and the stylesheet
+      // insets each by a hairline: vertically so two bars on consecutive days in
+      // one lane stay two bars, horizontally so neighbouring lanes keep a gutter
+      // instead of painting flush into one continuous band.
       node.style.setProperty("--spine-bar-top", topOf(start));
       node.style.setProperty("--spine-bar-height", `${((end - start + 1) / span) * 100}%`);
-      node.style.left = `${(lane / lanes) * 100}%`;
-      node.style.width = `${(1 / lanes) * 100}%`;
+      node.style.setProperty("--spine-bar-left", `${(lane / lanes) * 100}%`);
+      node.style.setProperty("--spine-bar-width", `${(1 / lanes) * 100}%`);
       track.appendChild(node);
     }
     wrap.appendChild(track);
@@ -1416,6 +1416,46 @@ export const mountCalendar = (root, payload, now, options) => {
     // Every entry is labelled with the source that produced it (#38) — the
     // attribution that lets two labelled duplicates read as two, not one.
     node.appendChild(el("span", "calendar__source", entry.source));
+    bindBubble(node, entry);
+    return node;
+  };
+
+  /**
+   * **Date-spine's bar**: two lines — the duration, then the name. The second
+   * exception to "a reading surface draws the entry in full", and for the same
+   * kind of reason Week's **all-day band** is the first: the surface's own
+   * geometry decides how much text there is room for, and here that geometry is
+   * the point of the view.
+   *
+   * A one-date bar is exactly one `--spine-row` tall — 28px, less the hairline
+   * inset — and that is not negotiable, because a bar's height *is* its
+   * duration (ADR-0009 §3). Two lines at 0.72rem/1.2 is what fits; the four
+   * lines {@link renderEntry} draws need more than twice it, which is why every
+   * single-date entry on this view rendered as a duration label with its title
+   * clipped away entirely. Buying the room by growing the row instead would put
+   * July's track past 1,900px and make the whole view unreadable to buy one
+   * line of text that is already one drill away.
+   *
+   * So the location and the source come off, exactly as they do on the **Month**
+   * chip — a third narrowing of #38's "every entry is labelled with the source",
+   * with the attribution still on the `title` and in the detail bubble (#75).
+   * The `Cruise: ` prefix goes for the chip's reason too: on a bar this narrow it
+   * is eight characters of constant crowding out the `vessel`.
+   *
+   * Its own builder rather than a branch inside {@link renderLeaf}: the lead line
+   * has to be classed to be dimmed, and a shared builder that names one surface's
+   * class — or takes it as a fourth parameter — is a worse trade than the three
+   * lines of preamble repeated here.
+   * @param {DayEntry} entry @param {string} lengthText @returns {HTMLElement}
+   */
+  const renderSpineBar = (entry, lengthText) => {
+    const node = el("div", "spine__bar");
+    node.dataset["type"] = entry.type;
+    // The bar's height says *which dates*; this says *how long*. The one number
+    // day-resolution geometry cannot carry (see {@link renderSpine}).
+    node.appendChild(el("div", "spine__len", lengthText));
+    node.appendChild(el("div", undefined, entry.summary.replace(/^Cruise: /, "")));
+    node.title = entry.location ? `${entry.summary} — ${entry.location}` : entry.summary;
     bindBubble(node, entry);
     return node;
   };
@@ -1653,10 +1693,11 @@ export const mountCalendar = (root, payload, now, options) => {
 
   /**
    * The double-click affordance on one entry node. It is bound by
-   * {@link renderLeaf} and {@link renderEntry} — the two functions every view
-   * draws an entry through — which is both how all five surfaces get it and how
-   * the `+N more` doors are excluded without a rule saying so: a door is
-   * neither, because it navigates rather than describing an entry.
+   * {@link renderLeaf}, {@link renderEntry} and {@link renderSpineBar} — the
+   * three functions every view draws an entry through — which is both how all
+   * five surfaces get it and how the `+N more` doors are excluded without a rule
+   * saying so: a door is none of them, because it navigates rather than
+   * describing an entry.
    *
    * Double-click, not click: a single click is how a reader scans a chip-dense
    * Month, and a popover under every one of them would make the navigator
