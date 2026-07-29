@@ -601,6 +601,23 @@ const pad2 = (value) => String(value).padStart(2, "0");
 const dayAttrOf = ({ year, month, day }) => `${year}-${pad2(month)}-${pad2(day)}`;
 
 /**
+ * Which way a view lays its days out — the one fact a **landing** turns on
+ * (#107). Month and Week run the days *across* the top, so no day is a row
+ * further down the page and there is nothing to bring up; Agenda and Date-spine
+ * run them *down* it, where the day genuinely is a row.
+ *
+ * Deliberately a property of the view rather than a `=== "month"` check, and
+ * deliberately **not** the navigator/reading-surface split `CONTEXT.md` already
+ * draws: Week is a reading surface that lands like the navigator. Two
+ * independent properties, so a new view is classified against this one on its
+ * own terms.
+ *
+ * @param {View} view
+ * @returns {boolean} true when the days run across the top
+ */
+const laysDaysAcross = (view) => view === "month" || view === "week";
+
+/**
  * Empty a **page-supplied** host of what a previous mount left in it. `root` is
  * the module's and is cleared wholesale, but the topbar (#73) and the
  * methodology footer's freshness slot (#79) are the page's and outlive the
@@ -709,10 +726,12 @@ export const mountCalendar = (root, payload, now, options) => {
   const surface = el("div", "calendar__surface");
 
   /**
-   * The day to bring to the **top of the viewport** after the next render, or
-   * `null` to leave the scroll where the reader put it. Seeded with today, so
-   * first load lands on the present the same way the Today control does (#73) —
-   * the rule is applied after every render, not special-cased into one button.
+   * The pending **landing**: the day to bring to the top of the viewport after
+   * the next render, or `null` to leave the scroll where the reader put it.
+   * Seeded with today, so first load lands on the present the same way the Today
+   * control does (#73) — the rule is applied after every render, not
+   * special-cased into one button. What the day resolves to on the page is the
+   * showing view's business, not this field's: see {@link applyScrollTarget}.
    * @type {number | null}
    */
   let scrollTarget = todayIndex;
@@ -834,21 +853,36 @@ export const mountCalendar = (root, payload, now, options) => {
   };
 
   /**
-   * Bring the pending `scrollTarget` day to the **top of the viewport** (#73).
-   * The pinned header would otherwise cover it, so the shell's
+   * Apply the pending **landing** — the day a render brings to the **top of the
+   * viewport** (#73). The pinned header would otherwise cover it, so the shell's
    * `scroll-padding-top: var(--topbar-h)` pushes the landing below the header —
    * which is why {@link publishTopbarHeight} runs first, every render.
    *
+   * Where the day is a row the landing is that row; where the days run across
+   * the top ({@link laysDaysAcross}) it is the **surface**, because there is no
+   * row to bring up. Month is the view that made this load-bearing (#107):
+   * landing on its *cell* put today's week row at the top and scrolled the weeks
+   * above it off, which is ADR-0014 §1's "Month is fixed to one screen" broken
+   * by the scroll. The rule is applied to all four writers of `scrollTarget`
+   * rather than special-cased into the Today control, because three of them
+   * (first load, a view switch, Today) land on Month.
+   *
    * A day the showing view does not render (today, while the reader is two
-   * months back) falls back to the top of the surface rather than leaving them
-   * stranded mid-scroll. `scrollIntoView` is absent in jsdom, which has no
-   * layout at all, so the call is guarded and a test asserts only which element
-   * was asked to come up.
+   * months back; or a day Agenda has no entries for) falls back to the top of
+   * the surface rather than leaving them stranded mid-scroll — the same place
+   * the across-the-top views land by rule.
+   *
+   * `scrollIntoView` is absent in jsdom, which has no layout at all, so the call
+   * is guarded and a test asserts only which element was asked to come up. That
+   * blindness is why this bug shipped: "today's cell came to the top" and "the
+   * month came to the top" are the same assertion without a viewport, so the
+   * browser is the only place the rule can be checked (see #107's prototype).
    */
   const applyScrollTarget = () => {
     if (scrollTarget === null) return;
     const attr = dayAttrOf(civilOf(scrollTarget));
-    const target = surface.querySelector(`[data-day="${attr}"]`) ?? surface;
+    const target =
+      laysDaysAcross(state.view) ? surface : (surface.querySelector(`[data-day="${attr}"]`) ?? surface);
     scrollTarget = null;
     if (typeof target.scrollIntoView === "function") target.scrollIntoView({ block: "start" });
   };
@@ -932,9 +966,10 @@ export const mountCalendar = (root, payload, now, options) => {
       button.addEventListener("click", () => {
         state.view = value;
         // Whichever surface the reader lands on opens on the present, not
-        // wherever the last one happened to be scrolled to (#73). Only the
-        // *scroll* is reset, not the anchor: a reader who paged to June and
-        // switched view is still reading June (§6), and today's row simply is
+        // wherever the last one happened to be scrolled to (#73) — as today's
+        // row, or as the whole surface where the days run across the top (#107).
+        // Only the *scroll* is reset, not the anchor: a reader who paged to June
+        // and switched view is still reading June (§6), and today's row simply is
         // not on that surface to scroll to. Agenda's cursor comes home with the
         // scroll, so a step after the switch reads from the present too (#77).
         scrollTarget = todayIndex;
@@ -975,8 +1010,9 @@ export const mountCalendar = (root, payload, now, options) => {
     nav.appendChild(navButton("prev", "‹ Prev", () => step(-1)));
     // Today returns to the present from anywhere — and the anchor is *reset*, not
     // stepped, so it lands home regardless of how far the reader wandered. It
-    // also brings today's row to the top, which is the same rule every render
-    // applies, not a behaviour special to this button.
+    // also requests a landing, which is the same rule every render applies, not a
+    // behaviour special to this button: on Month that brings the whole month up,
+    // not today's week row (#107).
     nav.appendChild(navButton("today", "Today", () => {
       state.anchor = todayIndex;
       state.agendaDay = todayIndex;
