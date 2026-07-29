@@ -280,6 +280,28 @@ and a venue event come to share an edge with no gutter between them.
 
 #98, #100, ADR-0015 and ADR-0016.
 
+### Week number
+
+The **ISO-8601** number of the week **Week**'s title names — `Week 31, 27 Jul – 2 Aug 2026`.
+Demand planning quotes weeks by number, and a bare range gives a reader nothing to say.
+Not "week of year", which names a different and looser thing.
+
+ISO is chosen because an ISO week **is** a Monday-first week, so it is exactly the row the
+grid draws: the number is a function of the same single fact the week views' geometry, the
+Monday-first weekday labels and the **Week-boundary line** all read from. Nothing else can
+name these rows. The alternative a reader will notice — CLDR's default, which is what Apple
+Calendar shows under `en-SG` — runs its weeks **Sunday–Saturday**, so one row of this grid
+straddles two of its weeks and no single number is right for all seven days.
+
+Two readings are correct rather than glitches: a year opening on a Thursday has **53**
+weeks (2026 does), and the week numbered 1 can open in the previous December. The
+**week-year is implicit** — the dates on the same line carry it — and the range prints
+**both** years when it straddles one, since `Week 1` beside a December date is the moment a
+reader must be told which December.
+
+The number appears in the **Week title only**: the other three views page by the month and
+have no week to number. #109, ADR-0018.
+
 ### Week-boundary line
 
 The rule **Date-spine** draws at the top of each Monday, across the date axis *and* the
