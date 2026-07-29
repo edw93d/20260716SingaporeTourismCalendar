@@ -40,4 +40,26 @@ B also carries `scroll-margin-top` on `.calendar__surface`, matching what
 
 ## Verdict
 
-_(record which variant won and why, then fold it into the real code)_
+**B wins.** Folded into `main` as the **Landing** rule — issue #107, PR #108.
+
+A and C are indistinguishable from B *at rest*, because a fresh load starts at
+`scrollY` 0 and both put the whole month on screen. They only diverge once the
+reader has scrolled. Measured at 1440x900, viewport 816:
+
+| | Today from the ICS block | Date-spine -> Month: grid top / bottom | whole month visible? |
+|---|---|---|---|
+| **B** | `scrollY` 384 -> 0 | 148 / 722 | **yes** |
+| **C** | 384 -> 384 (no-op) | **-293** / 281 | no |
+
+C was rejected on that second column: it reaches the *reported* bug by a
+different trigger — three week rows off the top, over half the screen given to
+the methodology notes — so it is a hole rather than a rule. It removes Month's
+landing and leaves the reader wherever the previous surface put them, on a page
+whose footer is taller than its grid.
+
+Two things the prototype settled that argument alone had not:
+
+- **Week's day node and the surface are the same pixel** (both 148), so folding
+  Week into the rule by axis is free rather than a widened blast radius.
+- **The bug fires on first load**, before any control is touched — so scoping the
+  fix to the Today control would have left it in place.
