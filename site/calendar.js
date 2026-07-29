@@ -167,6 +167,36 @@ const mondayOf = (index) => index - ((index + 3) % 7);
 const weekdayLabel = (index) => WEEKDAYS[(index + 3) % 7] ?? "";
 
 /**
+ * The **ISO-8601 week number** of the week containing `index` (#109) — the number
+ * Week's title quotes, because planning talks in weeks ("let's look at week 31")
+ * and a range alone gives nothing to say.
+ *
+ * ISO is the scheme that fits this grid rather than merely one of several: an ISO
+ * week *is* a Monday-first week, so it is exactly the row {@link weekDaysOf} draws,
+ * and the number is a function of {@link mondayOf} alone — no second notion of
+ * where a week starts enters the model. The rejected alternative is CLDR's default
+ * rule (week 1 is whichever week holds 1 January), which is what Apple Calendar
+ * shows under `en-SG`; it cannot be matched here, because `en-SG` also starts weeks
+ * on **Sunday**, so one row of this grid straddles two of its weeks. See ADR-0018.
+ *
+ * The rule reduces to two facts. A week's **Thursday** names its ISO year — that is
+ * the whole of the "week 1 holds at least four days of the new year" rule, since the
+ * Thursday is the week's median day. And week 1 of that year is the week holding
+ * 4 January, which is the earliest date the first Thursday can be. So the answer is
+ * the number of whole weeks from that Monday to this one.
+ *
+ * Two consequences are correct rather than edge cases to suppress: a year beginning
+ * on a Thursday has **53** weeks (2026 does), and the week numbered 1 can open in
+ * the previous December (week 1 of 2026 opens 29 Dec 2025).
+ * @param {number} index @returns {number}
+ */
+const isoWeekOf = (index) => {
+  const monday = mondayOf(index);
+  const { year } = civilOf(monday + 3);
+  return (monday - mondayOf(dayIndexOf(year, 1, 4))) / 7 + 1;
+};
+
+/**
  * The `Date.getUTCDay()` weekday (0=Sun) of a day index, for the day-indexed
  * views to reach {@link isWeekend} with — Week has no `Date` in hand where it
  * needs the answer, only the index. Day index 0 (1970-01-01) is a Thursday,
@@ -806,7 +836,19 @@ export const mountCalendar = (root, payload, now, options) => {
     render();
   };
 
-  /** The nav title for the current view. @returns {string} */
+  /**
+   * The nav title for the current view. Week leads with its {@link isoWeekOf}
+   * number (#109) and the other three name their month, which is the paging unit
+   * split showing through: Week steps a week, so it is the only view with a week
+   * to number.
+   *
+   * The range drops whatever the closing date already says — the month when both
+   * ends share one, the year when both ends share one. The third branch is the
+   * year-straddle (#109): the two ISO weeks that cross a New Year print **both**
+   * years, because `Week 1` beside a range opening in December is the one moment
+   * a reader has to be told which December.
+   * @returns {string}
+   */
   const titleText = () => {
     const { year, month } = civilOf(state.anchor);
     if (state.view !== "week") return `${MONTHS[month - 1]} ${year}`;
@@ -814,9 +856,12 @@ export const mountCalendar = (root, payload, now, options) => {
     const weekStart = mondayOf(state.anchor);
     const a = civilOf(weekStart);
     const b = civilOf(weekStart + 6);
-    return a.month === b.month
-      ? `${a.day} – ${b.day} ${MONTHS_SHORT[b.month - 1]} ${b.year}`
-      : `${a.day} ${MONTHS_SHORT[a.month - 1]} – ${b.day} ${MONTHS_SHORT[b.month - 1]} ${b.year}`;
+    const opens = `${a.day} ${MONTHS_SHORT[a.month - 1]}`;
+    const closes = `${b.day} ${MONTHS_SHORT[b.month - 1]} ${b.year}`;
+    const range = a.month === b.month ? `${a.day} – ${closes}`
+      : a.year === b.year ? `${opens} – ${closes}`
+      : `${opens} ${a.year} – ${closes}`;
+    return `Week ${isoWeekOf(state.anchor)}, ${range}`;
   };
 
   /**

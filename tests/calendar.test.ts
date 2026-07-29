@@ -929,7 +929,7 @@ describe("four switchable reading surfaces", () => {
     expect(title()).not.toBe(start);
     click("today");
     // Today's week contains 21 July 2026 (Mon 20 – Sun 26).
-    expect(title()).toBe("20 – 26 Jul 2026");
+    expect(title()).toBe("Week 30, 20 – 26 Jul 2026");
   });
 
   it("introduces no magnitude in any view — no count, ranking or overflow", () => {
@@ -945,6 +945,64 @@ describe("four switchable reading surfaces", () => {
       switchView(view);
       expect(root.textContent ?? "").not.toMatch(/\+\s*\d+\s*more/i);
     }
+  });
+});
+
+describe("Week: the title carries its ISO week number (#109)", () => {
+  it("counts the week number up with the paging, and leaves the other views bare", () => {
+    // Planning quotes weeks by number, so Week leads with one. The number is a
+    // reading of the week the title already names, so it moves with the paging
+    // rather than being pinned to the landing week.
+    mount(payloadOf());
+    switchView("week");
+    click("next");
+    click("next");
+    expect(title()).toBe("Week 32, 3 – 9 Aug 2026");
+
+    // Only Week has a week to number: the other three page by the month, and a
+    // stray "Week 32" on a month title is the failure this guards.
+    for (const view of ["month", "agenda", "spine"]) {
+      switchView(view);
+      expect(title()).not.toContain("Week");
+    }
+  });
+
+  it("carries the ISO year boundary, both ways, rather than suppressing it", () => {
+    // The two cases every hand-rolled ISO week function gets wrong, and the two
+    // the year-straddle branch exists for. Each string pins three facts at once:
+    // the week number, the ISO year it belongs to, and both civil years.
+    //
+    // 2026 begins on a Thursday, so ISO gives it 53 weeks: its week 1 opens in
+    // December 2025, and its week 53 closes in January 2027. Neither is an edge
+    // case to round away — a reader paging through New Year sees exactly this.
+    mount(payloadOf(), new Date("2025-12-31T02:00:00Z"));
+    switchView("week");
+    expect(title()).toBe("Week 1, 29 Dec 2025 – 4 Jan 2026");
+
+    mount(payloadOf(), new Date("2026-12-30T02:00:00Z"));
+    switchView("week");
+    expect(title()).toBe("Week 53, 28 Dec 2026 – 3 Jan 2027");
+
+    // The 52-week rollover reads the same way, so the straddle branch is not
+    // special-casing the long year — it is reading the two civil years.
+    mount(payloadOf(), new Date("2025-01-01T02:00:00Z"));
+    switchView("week");
+    expect(title()).toBe("Week 1, 30 Dec 2024 – 5 Jan 2025");
+  });
+
+  it("anchors week 1 on 4 January, so a year opening late in the week starts at 1", () => {
+    // The assertion that pins ISO *as the choice* rather than merely as a working
+    // week count (ADR-0018). ISO's anchor is 4 January; CLDR's default — the rule
+    // Apple Calendar applies under en-SG — is 1 January. The two agree whenever
+    // 1 January falls Mon–Thu, which is most years and every year the cases above
+    // touch, so nothing there can tell them apart.
+    //
+    // 2027 opens on a **Friday**, which is where they split. Under ISO those three
+    // January days belong to the previous year's week 53, and week 1 opens on
+    // Monday 4 January. Under the 1-January anchor this same week reads "Week 2".
+    mount(payloadOf(), new Date("2027-01-06T02:00:00Z"));
+    switchView("week");
+    expect(title()).toBe("Week 1, 4 – 10 Jan 2027");
   });
 });
 
@@ -1636,7 +1694,7 @@ describe("Agenda day-stepping navigation (#77)", () => {
     }
     switchView("week");
     click("next");
-    expect(title()).toBe("27 Jul – 2 Aug 2026");
+    expect(title()).toBe("Week 31, 27 Jul – 2 Aug 2026");
   });
 
   it("drills to a day in Agenda from anywhere, seeding the cursor there", () => {
