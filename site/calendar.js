@@ -1738,6 +1738,13 @@ export const mountCalendar = (root, payload, now, options) => {
    * unusable. Two costs are accepted for this round rather than papered over —
    * the bubble has no keyboard opening, and a short timed Week entry is a small
    * target.
+   *
+   * A third cost arrived with the affordance (#105, ADR-0017). The four classes
+   * this binds to now carry `cursor: pointer` and a hover lift, and a pointer
+   * promises *one* click where the gesture takes two. The stylesheet's selector
+   * list is that of these three renderers by rule, not by coincidence: a fifth
+   * entry surface must inherit the binding and the affordance together, or the
+   * grid goes back to advertising some of what it opens and not the rest.
    * @param {Element} node @param {DayEntry} entry
    */
   const bindBubble = (node, entry) => {

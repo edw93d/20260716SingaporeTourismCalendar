@@ -336,6 +336,57 @@
         color: var(--dim);
       }
 
+      /* --- The entry affordance (#105) ------------------------------------
+         Left alone, an entry inherits the default `text` I-beam and reads as
+         prose — while the `+N more` door beside it already says `pointer`. The
+         one thing on the grid you can act on was the one thing not saying so.
+
+         The selector list is the four classes `bindBubble` reaches, and that is
+         the rule: **the affordance follows the binding.** Everything drawn
+         through `renderLeaf`, `renderEntry` or `renderSpineBar` opens a bubble,
+         so everything drawn through them looks like it does. The `+N more`
+         doors are excluded by the same fact that excludes them from the
+         binding (ADR-0014) — a door navigates rather than describing an entry,
+         so it is none of the three. Add a fifth entry surface and it inherits
+         both together or neither.
+
+         Month's door needs no exclusion (`.calendar__more` is its own class),
+         but Week's is built as `week__band week__band--more` — a modifier *on*
+         the band, so it answers to `.week__band` and has to be subtracted by
+         name. It already carries its own `cursor: pointer`; what the `:not()`
+         keeps off it is the lift, which would paint a box behind a control
+         drawn as bare underlined text. */
+
+         `pointer` under-describes the gesture: the hand conventionally promises
+         one click and the bubble takes two (#75). Accepted knowingly — the
+         alternatives are recorded in ADR-0017 — because the recovery from the
+         broken promise *is* the discovery: a reader who clicks once and sees
+         nothing clicks again, and the second click is the gesture. */
+      .calendar__chip,
+      .calendar__entry,
+      .week__band:not(.week__band--more),
+      .spine__bar {
+        cursor: pointer;
+      }
+      /* The lift is what a reader actually notices; the cursor only confirms it
+         once they have already looked. One inset wash laid *over* whatever
+         colour the node carries, rather than a background of its own, so the
+         VenueEvent blue, the PortCall teal and the untyped grey all lift by the
+         same amount from one rule, and it flips with `canvastext` in dark mode.
+
+         Behind `hover: hover` because a `:hover` on a touch device sticks after
+         the tap — the entry would sit lifted until something else was tapped,
+         reading as a selected state this calendar does not have. `cursor` needs
+         no such guard: it is simply inert where there is no pointer. */
+      @media (hover: hover) {
+        .calendar__chip:hover,
+        .calendar__entry:hover,
+        .week__band:not(.week__band--more):hover,
+        .spine__bar:hover {
+          box-shadow: inset 0 0 0 999px color-mix(in srgb, canvastext 7%, transparent);
+        }
+      }
+
       /* --- Week: days across, hours down (ADR-0009 §3) -------------------
          `--week-gutter` is the hour-label column, and the one place its width is
          written: the three grids below lay their first column out with it and
