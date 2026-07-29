@@ -1414,32 +1414,65 @@ describe("sticky header and today-to-top navigation (#73)", () => {
     }
   });
 
-  it("brings today's row to the top of the viewport on first load", () => {
+  it("lands on the whole month, not today's week row, on first load", () => {
+    // Month is the default view, and it lays its days out *across* the top — so
+    // there is no row to bring up and the landing is the surface. Landing on
+    // today's cell instead put its week row at the top of the viewport and
+    // scrolled the weeks above it off the screen, which is ADR-0014 §1's "Month
+    // is fixed to one screen" broken by the scroll (#107).
     mount(withToday());
-    expect(landedOn()).toBe("2026-07-21");
+    expect(landedOn()).toBeUndefined();
+    expect(scrolled.at(-1)).toBe(root.querySelector(".calendar__surface"));
   });
 
-  it("brings today's row to the top on every view switch", () => {
+  it("lands by the view's day axis on every view switch", () => {
     mount(withToday());
-    for (const view of ["agenda", "spine", "week", "month"]) {
-      switchView(view);
-      expect(landedOn()).toBe("2026-07-21");
-    }
-    // The row landed on is the day's own row in the showing view, not the grid.
+    // Down the page: the day is a row, so the row is what comes up.
     switchView("agenda");
     expect(scrolled.at(-1)).toBe(root.querySelector('.agenda__day[data-day="2026-07-21"]'));
     switchView("spine");
     expect(scrolled.at(-1)).toBe(root.querySelector('.spine__date[data-day="2026-07-21"]'));
+
+    // Across the top: no row to bring up, so the surface comes up instead. Week
+    // is a *reading surface* that lands like the navigator — the axis rule cuts
+    // across the navigator/reading-surface split rather than following it.
+    const surface = root.querySelector(".calendar__surface");
+    for (const view of ["week", "month"]) {
+      switchView(view);
+      expect(landedOn()).toBeUndefined();
+      expect(scrolled.at(-1)).toBe(surface);
+    }
   });
 
-  it("brings today's row to the top when Today is pressed from anywhere", () => {
+  it("requests a landing on Today from anywhere, whichever axis is showing", () => {
     mount(withToday());
     click("prev");
     click("prev");
-    const before = scrolled.length;
+
+    // Month: the landing is the surface, so the whole month comes back into view
+    // rather than the reader being yanked to today's week row.
+    const beforeMonth = scrolled.length;
     click("today");
-    expect(scrolled.length).toBeGreaterThan(before);
+    expect(scrolled.length).toBeGreaterThan(beforeMonth);
+    expect(scrolled.at(-1)).toBe(root.querySelector(".calendar__surface"));
+
+    // Date-spine: unchanged by #107 — today's row is still what comes up.
+    switchView("spine");
+    click("prev");
+    click("prev");
+    const beforeSpine = scrolled.length;
+    click("today");
+    expect(scrolled.length).toBeGreaterThan(beforeSpine);
     expect(landedOn()).toBe("2026-07-21");
+  });
+
+  it("never reaches for a day node on a view that lays its days across the top", () => {
+    // The rule is a property of the *view*, not a fallback that happens to fire
+    // because the day is missing: today's cell is present in Month's grid, and
+    // the landing still passes it over.
+    mount(withToday());
+    expect(root.querySelector('.calendar__day[data-day="2026-07-21"]')).not.toBeNull();
+    expect(scrolled).not.toContain(root.querySelector('.calendar__day[data-day="2026-07-21"]'));
   });
 
   it("leaves the scroll alone when paging with Prev and Next", () => {

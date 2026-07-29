@@ -150,9 +150,43 @@ view, and reading demand from multiple perspectives is the point:
   day against its neighbours.
 
 Everything is **static-renderable** (ADR-0009, #10): the views, filter, week paging,
-and Today control are client JS over data already on the page — no server. The UI
+the Today control and the **Landing** it asks for are client JS over data already on
+the page — no server. The UI
 library that implements this (if any) is gated by licensing (#14), not settled here.
 See ADR-0009.
+
+### Landing
+
+The day a render brings to the **top of the viewport**. Four things ask for one, and
+none of them is the reader scrolling: **first load**, a **view switch**, the **Today**
+control, and the `+N more` **drill-through**. Paging with Prev/Next asks for nothing —
+that is the reader moving deliberately, and moving them again would undo the step they
+just took.
+
+Where the day lands depends on one property of the showing view — **which way it lays
+its days out**:
+
+| | Days run | The landing is |
+|---|---|---|
+| **Month**, **Week** | across the top | the **surface** — the whole view |
+| **Agenda**, **Date-spine** | down the page | that day's **row** |
+
+A view with its days across the top has no row further down to bring up, so asking for
+one is meaningless: on **Month** it fetched today's *week* row and scrolled the weeks
+above it off the screen, which is ADR-0014's "Month is fixed to one screen" broken by
+the scroll rather than by the grid. A day the showing view does not draw at all — today,
+while the reader is two months back — falls back to the surface too.
+
+This is a **second, independent property of a view**, and it deliberately does not
+follow the navigator/reading-surface split above: **Week** is a reading surface that
+lands like the navigator. Naming it is what stops someone reading that as an
+inconsistency and "fixing" Week back.
+
+**Only a browser can check it.** The test bed has no layout, so it can see *which*
+element was asked to come up but never *where the reader ends up* — and "today's cell
+came to the top" and "the whole month came to the top" are the same observation without
+a viewport. That blindness is how the rule shipped wrong; the prototype that settled it
+is the primary source (#107, `prototype/month-landing`).
 
 ### Chip
 

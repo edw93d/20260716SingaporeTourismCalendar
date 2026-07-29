@@ -192,11 +192,15 @@
         color: var(--dim);
         border-bottom: 1px solid var(--line);
       }
-      /* Every day a scroll can land on carries the same breathing room, on top
-         of the pinned header's height (#73). Keyed off `data-day` — the handle
-         every view already labels its day nodes with — so a new view inherits it
-         rather than needing another selector here. */
-      [data-day] { scroll-margin-top: 0.75rem; }
+      /* Everything a **landing** can come to rest on carries the same breathing
+         room, on top of the pinned header's height (#73). Keyed off `data-day` —
+         the handle every view already labels its day nodes with — so a new view
+         inherits it rather than needing another selector here; and off the
+         surface, which is where Month and Week land by rule and where any view
+         falls back when the day is not on it (#107). One value, so a landing
+         clears the header by the same margin whichever of the two it hit. */
+      [data-day],
+      .calendar__surface { scroll-margin-top: 0.75rem; }
       /* A cell holds at most four chip rows (#80), and 6.75rem is exactly what a
          full one measures: the 1.55rem date row, four 1.1rem chips, the four
          0.1rem gaps between them and 0.4rem of padding. Sizing the floor to the
