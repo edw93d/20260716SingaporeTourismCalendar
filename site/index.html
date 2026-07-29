@@ -315,7 +315,12 @@
         background: var(--port);
         border-left-color: #0d9488;
       }
-      .calendar__entry-title { font-weight: 600; }
+      /* The name carries no weight of its own (#103). It is already the only
+         line at full colour and full size — the time, the where and the source
+         are all dimmed or smaller — so bold added nothing but noise once a
+         Week column or an Agenda day held more than a couple of entries. Left
+         plain, the Week's timed entry reads at the same weight as its own
+         all-day band. */
       .calendar__entry-where { color: var(--dim); }
       .calendar__source {
         font-size: 0.7rem;
