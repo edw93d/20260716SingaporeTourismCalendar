@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.site.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "pipeline": "tsx src/main.ts"
+    "pipeline": "tsx src/main.ts",
+    "prototype:landing": "node prototype/month-landing/serve.mjs"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
