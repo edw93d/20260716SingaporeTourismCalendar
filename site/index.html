@@ -575,16 +575,21 @@
         border-top: 1px solid color-mix(in srgb, currentColor 32%, transparent);
       }
       /* The bar carries its own look rather than the shared `.calendar__entry`
-         one, because it draws {@link renderSpineBar}'s two lines, not the four
-         a reading surface draws. The type colours are *not* restated here — the
-         bar is on the shared `[data-type]` selector above, so "the type is one
-         colour wherever it renders" stays one rule and one pair of hex values.
+         one, because it draws {@link renderSpineBar}'s single field — the name —
+         not the four lines a reading surface draws. The type colours are *not*
+         restated here — the bar is on the shared `[data-type]` selector above,
+         so "the type is one colour wherever it renders" stays one rule and one
+         pair of hex values.
 
-         The type scale is the constraint, not a preference: a one-date bar is
-         one `--spine-row` (28px) less the inset, and 0.72rem/1.2 with 0.1rem of
-         padding is what fits two lines in it. The reading-surface 0.8rem/1.3
-         with 0.25rem of padding fits exactly one — which is why the title used
-         to be clipped away entirely on every single-date entry.
+         The type scale is now a **preference, and a deliberate one** (#100): the
+         two-line shape it was sized for is gone, so the old "0.72rem/1.2 is what
+         fits two lines in 28px" reason no longer holds and this is not a dead
+         constraint to tidy back to 0.8rem. It is kept because the bar is the
+         narrowest surface in the product and the smaller face buys ~10% more
+         characters per line, plus a whole extra line on a tall bar: a 3-row bar
+         holds five lines at 13.8px against four at the reading-surface 16.6px.
+         The one-date bar is one line either way — 22.8px of content box — and
+         the name is the field that gets it.
 
          No `min-height`: the geometry carries the floor. `renderSpine` spans
          whole day rows, so the shortest bar is one `--spine-row` — and a floor
@@ -614,14 +619,26 @@
         left: calc(var(--spine-bar-left) + 1px);
         width: calc(var(--spine-bar-width) - 2px);
       }
-      /* The duration line, dimmed against the name below it — the same relation
-         `.calendar__entry-time` has to its title on the reading surfaces. It is
-         held to one line: the bar's content box is 22.8px, so a `2.3 days` that
-         wrapped in a narrow lane would push the name out of the clip box and
-         bring back the very bug this shape fixes (#98). */
-      .spine__len {
-        color: var(--dim);
-        white-space: nowrap;
+      /* The name fills every line the bar's height allows and ellipsises where
+         more remains — `--spine-bar-lines` is that count, published per bar by
+         `renderSpineBar` because only the renderer knows the span, and inherited
+         down to here. Clipping silently instead (what #99 did) leaves a cut title
+         and a short one looking identical.
+
+         It is an inner box and not the bar itself for a reason that is invisible
+         until it bites: the bar is absolutely positioned, and an out-of-flow box
+         is **blockified** — `display: -webkit-box` computes to `flow-root` and the
+         clamp is silently ignored. So the bar keeps the position, the geometry and
+         the clip, and this carries the clamp.
+
+         `anywhere` so a single long word in a narrow lane breaks rather than
+         vanishing past the clip edge. */
+      .spine__name {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: var(--spine-bar-lines);
+        overflow: hidden;
+        overflow-wrap: anywhere;
       }
 
       /* --- The entry-detail bubble (#75) ---------------------------------

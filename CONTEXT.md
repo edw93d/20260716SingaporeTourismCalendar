@@ -217,10 +217,12 @@ readings of it. #78.
 
 ### Bar
 
-How **Date-spine** draws a **CalendarEntry**: **two lines** — how long, then the name —
-spanning the whole date rows the entry occupies. Its height *is* its duration, which is
-the whole point of the view, so the height is not free to grow to fit text: a one-date
-entry is one row, and two lines at the spine's own type scale is what that row holds.
+How **Date-spine** draws a **CalendarEntry**: **the name alone**, spanning the whole date
+rows the entry occupies. Its height *is* its duration, which is the whole point of the
+view, so the height is not free to grow to fit text: a one-date entry is one row, and one
+line at the spine's own type scale is what that row holds. The name fills every line the
+bar's height allows and ellipsises where more remains — never a silent cut, which would
+leave a truncated title and a short one looking the same.
 
 So the **Bar** is the second exception to a reading surface drawing the entry in full
 (see **Chip**): the location and the source come off, and a port call's `Cruise: `
@@ -228,10 +230,13 @@ prefix with them, for the reasons the **Chip** drops the same three. A **third**
 narrowing of #38's "every entry is labelled with the source" — the attribution is on
 the tooltip and in the **Entry-detail bubble**, not lost.
 
-Length is on the **Bar** as words because the geometry cannot carry it: the height says
-*which dates*, the label says *how long*. That split is what lets the spine round to
-whole rows — the alternative, a bar drawn to the clock, makes a six-hour entry a sliver
-too small to name, starting part-way down a row it lines up with nothing on.
+**How long is not on the Bar at all.** The height says *which dates* and rounds to whole
+rows, so it cannot say whether one row is eight hours or twenty; the **Entry-detail
+bubble**'s `Length` is the only surface that answers that. The one readable line a
+one-date bar has goes to the name, because a reader scanning the spine needs to know
+*what* before *how long* — and the rounding is still worth its cost, since a bar drawn to
+the clock makes a six-hour entry a sliver too small to name, starting part-way down a row
+it lines up with nothing on.
 
 Concurrent entries are **lane-packed** side by side, and a **Bar** is inset by a
 hairline on all four edges. Both hairlines are load-bearing, not polish: without the
@@ -239,7 +244,7 @@ vertical one, consecutive days in one lane paint flush and read as one long entr
 without the horizontal one, so do two neighbouring lanes, which is how a cruise arrival
 and a venue event come to share an edge with no gutter between them.
 
-#98, ADR-0015.
+#98, #100, ADR-0015 and ADR-0016.
 
 ### Week-boundary line
 
@@ -273,6 +278,10 @@ tooltip — and invents none. Type in the reader's words ("Cruise arrival" / "Ve
 event"), When, Time, Where, Length, and a footer naming the entry's own source and how
 long ago it was confirmed, computed from the same `payload.sources` and injected clock
 the page's **Source health** disclosure reads.
+
+**Length** is the exception to "the bubble repeats what a surface truncated": no at-rest
+surface says how long any more (see **Bar**), so the bubble is not showing that field in
+full — it is the only place it is shown at all.
 
 Its **content** is a pure function of the entry and is covered at seam 3. Its
 **geometry** is deliberately not: the bubble is placed in viewport coordinates, flipping

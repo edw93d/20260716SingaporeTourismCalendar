@@ -1275,8 +1275,10 @@ export const mountCalendar = (root, payload, now, options) => {
     // painted height. ADR-0009 §3 still reads true at day resolution — one row
     // against a congress's five is a sliver — and what the floor costs, telling
     // a 3 hr fair from a 20 hr port call, is already the recorded
-    // cruise-magnitude hole (ADR-0009 Consequences). The **label** keeps the
-    // clock: the bar says which days, `spanText` says how long.
+    // cruise-magnitude hole (ADR-0009 Consequences). The bar used to keep the
+    // clock in a label above the name; #100 took that line for the name, so at
+    // rest the spine says **which days** and only the detail bubble says how
+    // long (ADR-0016).
     const track = el("div", "spine__track");
 
     // The **week-boundary line** (#74): a rule at the top of each Monday's row,
@@ -1311,7 +1313,7 @@ export const mountCalendar = (root, payload, now, options) => {
       // is why the height counts `end - start + 1` rows.
       const start = Math.max(item.startIndex, monthStart);
       const end = Math.min(item.endIndex, monthEnd - 1);
-      const node = renderSpineBar(item, spanText(item.endValue - item.startValue));
+      const node = renderSpineBar(item, spineBarLines(end - start + 1));
       // Both axes of geometry are published as percentages and the stylesheet
       // insets each by a hairline: vertically so two bars on consecutive days in
       // one lane stay two bars, horizontally so neighbouring lanes keep a gutter
@@ -1421,40 +1423,67 @@ export const mountCalendar = (root, payload, now, options) => {
   };
 
   /**
-   * **Date-spine's bar**: two lines — the duration, then the name. The second
-   * exception to "a reading surface draws the entry in full", and for the same
-   * kind of reason Week's **all-day band** is the first: the surface's own
-   * geometry decides how much text there is room for, and here that geometry is
-   * the point of the view.
+   * The px facts {@link spineBarLines} counts in, each the JS side of a value
+   * the stylesheet owns — `--spine-row`, `.spine__bar`'s hairline inset, its
+   * `0.1rem` block padding, and `0.72rem × 1.2`. A test asserts the stylesheet
+   * still declares these, because a silent drift here does not throw: it just
+   * clamps to a line count the bar no longer has, and the name goes back to
+   * being cut without an ellipsis.
+   */
+  const SPINE_ROW_PX = 28;
+  const SPINE_BAR_CHROME_PX = 2 + 3.2;
+  const SPINE_LINE_PX = 0.72 * 16 * 1.2;
+
+  /**
+   * How many lines of name a bar spanning `rows` date rows can show whole.
+   * Never less than one: the shortest bar is one row (see {@link renderSpine}),
+   * and a bar with no line for its name is the bug #100 reports.
+   * @param {number} rows @returns {number}
+   */
+  const spineBarLines = (rows) =>
+    Math.max(1, Math.floor((rows * SPINE_ROW_PX - SPINE_BAR_CHROME_PX) / SPINE_LINE_PX));
+
+  /**
+   * **Date-spine's bar**: one field — the name — over as many lines as the bar's
+   * own height allows, ellipsised where more remains. The second exception to "a
+   * reading surface draws the entry in full", and for the same kind of reason
+   * Week's **all-day band** is the first: the surface's own geometry decides how
+   * much text there is room for, and here that geometry is the point of the view.
    *
    * A one-date bar is exactly one `--spine-row` tall — 28px, less the hairline
    * inset — and that is not negotiable, because a bar's height *is* its
-   * duration (ADR-0009 §3). Two lines at 0.72rem/1.2 is what fits; the four
-   * lines {@link renderEntry} draws need more than twice it, which is why every
-   * single-date entry on this view rendered as a duration label with its title
-   * clipped away entirely. Buying the room by growing the row instead would put
-   * July's track past 1,900px and make the whole view unreadable to buy one
-   * line of text that is already one drill away.
+   * duration (ADR-0009 §3). What fits is 22.8px of content box: **one line** at
+   * 0.72rem/1.2. Two lines was the shape #99 shipped, and it spent that single
+   * readable line on the duration, so most of the month named a length and never
+   * an event (#100, ADR-0016). Buying room by growing the row instead would put
+   * July's track past 1,900px and make the whole view unreadable.
    *
-   * So the location and the source come off, exactly as they do on the **Month**
-   * chip — a third narrowing of #38's "every entry is labelled with the source",
-   * with the attribution still on the `title` and in the detail bubble (#75).
-   * The `Cruise: ` prefix goes for the chip's reason too: on a bar this narrow it
-   * is eight characters of constant crowding out the `vessel`.
+   * So the location, the source and now the duration come off. The first two go
+   * to the `title`, as they do on the **Month** chip — a third narrowing of #38's
+   * "every entry is labelled with the source". The duration goes to the detail
+   * bubble's **Length** row (#75) and not to the `title`: the bubble is the one
+   * surface that shows an entry in full, and the tooltip stays what it is, the
+   * place a *label* field lands when the surface cannot draw it. The `Cruise: `
+   * prefix goes for the chip's reason: on a bar this narrow it is eight
+   * characters of constant crowding out the `vessel`.
    *
-   * Its own builder rather than a branch inside {@link renderLeaf}: the lead line
-   * has to be classed to be dimmed, and a shared builder that names one surface's
-   * class — or takes it as a fourth parameter — is a worse trade than the three
-   * lines of preamble repeated here.
-   * @param {DayEntry} entry @param {string} lengthText @returns {HTMLElement}
+   * Its own builder rather than a branch inside {@link renderLeaf}: the clamp is
+   * per-bar geometry, and a shared builder that takes a line count is a worse
+   * trade than the three lines of preamble repeated here.
+   * @param {DayEntry} entry @param {number} lines @returns {HTMLElement}
    */
-  const renderSpineBar = (entry, lengthText) => {
+  const renderSpineBar = (entry, lines) => {
     const node = el("div", "spine__bar");
     node.dataset["type"] = entry.type;
-    // The bar's height says *which dates*; this says *how long*. The one number
-    // day-resolution geometry cannot carry (see {@link renderSpine}).
-    node.appendChild(el("div", "spine__len", lengthText));
-    node.appendChild(el("div", undefined, entry.summary.replace(/^Cruise: /, "")));
+    // The clamp the stylesheet reads. Published rather than inferred in CSS
+    // because the count is a function of the bar's span, which only the renderer
+    // knows — the same reason the row and lane geometry is published.
+    //
+    // The name goes in an inner box because the bar is absolutely positioned, and
+    // an out-of-flow box is blockified: `display: -webkit-box` on the bar itself
+    // computes to `flow-root` and the clamp is silently dropped.
+    node.style.setProperty("--spine-bar-lines", String(lines));
+    node.appendChild(el("div", "spine__name", entry.summary.replace(/^Cruise: /, "")));
     // Both fields the bar drops, in one hover: where with an em dash as the
     // reading surfaces punctuate it, then the source with the `·` the bubble's
     // foot uses (see {@link bubbleFootText}).
@@ -1471,10 +1500,11 @@ export const mountCalendar = (root, payload, now, options) => {
   };
 
   /**
-   * A human duration for Date-spine's label — hours under a day, else days to
-   * one decimal. The number the bar's height *cannot* carry: the spine draws
-   * whole day rows, so an 8 hr call and a 20 hr one are the same one row, and
-   * this label is where the clock survives.
+   * A human duration for the detail bubble's **Length** row — hours under a day,
+   * else days to one decimal. The number no at-rest surface carries: the spine
+   * draws whole day rows, so an 8 hr call and a 20 hr one are the same one row,
+   * and since #100 took the bar's lead line for the name, the bubble is where
+   * the clock survives (ADR-0016).
    * @param {number} days @returns {string}
    */
   const spanText = (days) => {
