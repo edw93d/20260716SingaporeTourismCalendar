@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-29T20:33:33Z",
+  "generatedAt": "2026-07-30T20:46:03Z",
   "venueEvents": [
     {
       "uid": "b84c6c47-5f4e-468b-9bcd-f2a6a3a69a9e@sg-tourism-calendar",
@@ -671,6 +671,14 @@
       "start": "2026-08-05T23:30:00Z",
       "end": "2026-08-06T03:30:00Z",
       "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "6ad1a304-cfa8-49d8-a829-eb62bcbe5252@sg-tourism-calendar",
+      "summary": "Bandai Spirits Ichiban Kuji B2B Conference",
+      "start": "2026-08-06T06:00:00Z",
+      "end": "2026-08-06T10:00:00Z",
+      "location": "Suntec Convention Centre, Level 3, Meeting Room 323",
       "source": "suntec"
     },
     {
@@ -2468,6 +2476,14 @@
       "source": "mbccs"
     },
     {
+      "uid": "4054df51-986c-498c-8efb-856f2e8dd002@sg-tourism-calendar",
+      "summary": "Cruise: VIKING SEA VIKING OCEAN CRUISES at Singapore Cruise Centre",
+      "start": "2026-10-30T00:00:00Z",
+      "end": "2026-10-30T09:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
       "uid": "b9c71fe0-edb6-41ce-ab3f-1a2214d41a88@sg-tourism-calendar",
       "summary": "Cruise: Genting Dream at MBCCS",
       "start": "2026-10-30T06:00:00Z",
@@ -2479,15 +2495,15 @@
   "sources": [
     {
       "source": "mbccs",
-      "lastConfirmed": "2026-07-29T20:33:33Z"
+      "lastConfirmed": "2026-07-30T20:46:03Z"
     },
     {
       "source": "scc",
-      "lastConfirmed": "2026-07-29T20:33:33Z"
+      "lastConfirmed": "2026-07-30T20:46:03Z"
     },
     {
       "source": "suntec",
-      "lastConfirmed": "2026-07-29T20:33:33Z"
+      "lastConfirmed": "2026-07-30T20:46:03Z"
     }
   ]
 }
