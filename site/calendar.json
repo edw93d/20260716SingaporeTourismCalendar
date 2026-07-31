@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-30T20:46:03Z",
+  "generatedAt": "2026-07-31T20:49:38Z",
   "venueEvents": [
     {
       "uid": "b84c6c47-5f4e-468b-9bcd-f2a6a3a69a9e@sg-tourism-calendar",
@@ -1900,6 +1900,14 @@
       "source": "mbccs"
     },
     {
+      "uid": "34908fbc-b401-4d69-b419-77e16c8544ad@sg-tourism-calendar",
+      "summary": "Cruise: ISLAND SKY NOBLE CALEDONIA at Singapore Cruise Centre",
+      "start": "2026-08-07T10:00:00Z",
+      "end": "2026-08-08T10:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
       "uid": "ee330a81-caba-48c1-bedc-87af7fbddc3e@sg-tourism-calendar",
       "summary": "Cruise: ISLAND SKY NOBLE CALEDONIA at Singapore Cruise Centre",
       "start": "2026-08-08T04:00:00Z",
@@ -2490,20 +2498,28 @@
       "end": "2026-10-30T12:00:00Z",
       "location": "MBCCS",
       "source": "mbccs"
+    },
+    {
+      "uid": "ecd8dc38-b906-428c-a3c2-e34a943080a1@sg-tourism-calendar",
+      "summary": "Cruise: VIKING VENUS VIKING OCEAN CRUISES at Singapore Cruise Centre",
+      "start": "2026-10-31T00:00:00Z",
+      "end": "2026-11-01T08:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
     }
   ],
   "sources": [
     {
       "source": "mbccs",
-      "lastConfirmed": "2026-07-30T20:46:03Z"
+      "lastConfirmed": "2026-07-31T20:49:38Z"
     },
     {
       "source": "scc",
-      "lastConfirmed": "2026-07-30T20:46:03Z"
+      "lastConfirmed": "2026-07-31T20:49:38Z"
     },
     {
       "source": "suntec",
-      "lastConfirmed": "2026-07-30T20:46:03Z"
+      "lastConfirmed": "2026-07-31T20:49:38Z"
     }
   ]
 }
