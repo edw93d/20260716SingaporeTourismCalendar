@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-31T20:49:38Z",
+  "generatedAt": "2026-08-01T20:30:24Z",
   "venueEvents": [
     {
       "uid": "b84c6c47-5f4e-468b-9bcd-f2a6a3a69a9e@sg-tourism-calendar",
@@ -1847,7 +1847,7 @@
       "uid": "befcd305-1504-4a6e-acee-f8eceb8570ef@sg-tourism-calendar",
       "summary": "Cruise: ODYSSEY VILLA VIE RESIDENCES at Singapore Cruise Centre",
       "start": "2026-07-30T00:00:00Z",
-      "end": "2026-08-01T11:00:00Z",
+      "end": "2026-08-07T06:00:00Z",
       "location": "Singapore Cruise Centre",
       "source": "scc"
     },
@@ -2515,11 +2515,11 @@
     },
     {
       "source": "scc",
-      "lastConfirmed": "2026-07-31T20:49:38Z"
+      "lastConfirmed": "2026-08-01T20:30:24Z"
     },
     {
       "source": "suntec",
-      "lastConfirmed": "2026-07-31T20:49:38Z"
+      "lastConfirmed": "2026-08-01T20:30:24Z"
     }
   ]
 }
