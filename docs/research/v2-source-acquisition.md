@@ -16,7 +16,7 @@ Resolves [#113](https://github.com/edw93d/20260716SingaporeTourismCalendar/issue
 |---|---|---|---|---|---|---|---|---|
 | 1 | **TTGmice trade calendar** | `ttgmice.com/trade-calendar/` | No — WP REST exposes `post`/`page` only | robots effectively open; ToU has **no** automation clause, but personal-use-only copyright clause | **Server-rendered** `<table>` | None (nginx) | **122 rows**, Jul 2026 → **Feb 2028**; pan-Asian, SG a minority | **http-scrape** |
 | 2 | **Suntec** *(v1 `suntec`)* | `suntecsingapore.com/visit-events` — **not** `/visit` | No — Squarespace JSON/iCal are robots-disallowed | robots disallows `?format=json`/`?format=ical`; **T&C forbid "automated queries of any sort"** — new | **Server-rendered**, 161 articles in 1 GET | None | **131 upcoming**, Jul → Oct 2026 (~3 mo) | **http-scrape**, permission question now open |
-| 3 | **Marina Bay Sands / Sands Expo** | candidates known, none retrievable | not established | **`robots.txt` and ToU unobtainable** | not established | **Akamai — silently drops every HTTP client** | not established | **none** 🚩 |
+| 3 | **Marina Bay Sands / Sands Expo** | `/expo-and-convention/event-directory.html` + `/entertainment/shows.html` | No | **robots.txt permits both listings; ToU bans "page-scrape", "robot", "spider" *and* "any similar or equivalent manual process"** — strongest clause on the list | **Server-rendered, but browser-only** | **Akamai — drops every scripted client; a real browser passes unchallenged** | Shows: **13**, to **Mar 2027**. Expo directory: **rolling 3 days**, room-level, no times | **browser**, ToS-blocked 🚩 |
 | 4 | **Sentosa** | `sentosa.com.sg/en/things-to-do/events/` | Sitecore API robots-**allowed** but **needs `sc_apikey`** (HTTP 400) | robots allows; **`/en/search-listing/*` (the listing's AJAX path) disallowed**; ToU: no automation clause, non-commercial reuse only | **Server-rendered** Sitecore JSS; detail pages carry ISO instants | Imperva, **passive** | **61 event pages**; windows reach Mar 2027 | **http-scrape** (sitemap + detail pages) |
 | 5 | **Resorts World Convention Centre** | **none exists** | No | n/a | `/en/meetings` is a JS sales page, **zero dates** | n/a | **0** | **none** 🚩 |
 | 5b | *(nearest: RWS resort events)* | `rwsentosa.com/en/events` | No | robots allows; **ToU indemnity names "software robots, spiders, crawlers"** | Server-rendered, but `startDate`/`endDate` are **`0001-01-01` null sentinels**; real dates only in free-text `[8 August 2026]` | None observed | **~15 dated** of 48 cards, Aug 2026 → Jan 2027 | **http-scrape**, low quality |
@@ -45,6 +45,8 @@ Route legend: `api` / `feed` / `http-scrape` / `browser` / `none`. 🚩 = flagge
 **1. The API hypothesis in #113 does not survive contact — the score is `api: 0`.** The ticket's premise was that large commercial platforms publish APIs cheaper than adapters. Both named candidates fail, for different reasons. **Eventbrite removed public event search** — `/v3/events/search/` returns 404 NOT_FOUND while every neighbouring path returns 401 NO_AUTH, so the path does not exist — *and* its ToS bans scraping by name. **Ticketmaster's Discovery API still has no Asian coverage**, and `ticketmaster.sg` is a separately-run property whose detail pages actively block bots. Two other endpoints do answer unauthenticated: Singapore EXPO's WordPress REST (which omits the dates) and VisitSingapore's AEM `.search.json` (whose ToU forbids exactly this). **v1's #4 finding holds across the wider list: there is no licensed feed to buy and no API to call.**
 
 **2. The technical work is far easier than v1 feared; the legal work is harder.** Fifteen sources are plain server-rendered HTML answering a single unauthenticated GET. Only **one** needs a browser — MBCCS, exactly as ADR-0005 scoped it — and only one refuses outright. But **six sources are barred by their own terms rather than by their technology**, and two of those are already in v1 production. The binding constraint on v2 ingestion is permission, not parsing.
+
+> **Updated 04 Aug 2026:** the browser count is **two**, not one. MBS was reachable after all — by a real browser, not a scripted client — and its pages, `robots.txt` and Terms of Use were all retrieved (see §3's Update). This does not weaken the headline, it strengthens it: MBS turns out to be a *fifth* terms-of-service block rather than a technical one, so **five of the six flagged sources are now blocked by a clause and only one (RWCC) by an absence of data**. ADR-0005's "headless is a one-source exception" no longer holds.
 
 **3. The horizon problem is solved, twice over.** v1 concluded no source reached beyond ~3 months. **EventsEye reaches May 2028** with 183 listed Singapore trade shows (89 firm-dated); **Changi Exhibition Centre and TTGmice both reach Feb 2028**; bigevent.io reaches Sep 2027; The Kallang and VisitSingapore reach Mar 2027. A calendar that only renders 3 months forward is now under-serving its own sources.
 
@@ -116,6 +118,15 @@ The clause's own definition is anchored to SEO rank-checking (`shall include but
 
 ## 3. Marina Bay Sands / Sands Expo and Convention Centre 🚩
 
+> **⚠️ SUPERSEDED IN PART — updated 04 Aug 2026, later the same day, from a real browser.**
+> This section originally concluded that MBS's pages, `robots.txt` and Terms of Use were **all**
+> unobtainable, and flagged the source on the grounds that *permission could not be established at
+> all*. A subsequent session drove a real Chrome instance at the host and **retrieved all four**.
+> The Akamai finding below stands unchanged and still binds the adapter's shape. What changes is
+> the *reason for the flag*: MBS is no longer an unknowable-permission case, it is a
+> **terms-of-service case**, alongside Eventbrite, Ticketmaster, VisitSingapore and Singapore EXPO.
+> The original text is kept below; the new findings follow it under **Update**.
+
 **This host cannot be reached by any HTTP client available here, and that is the finding.**
 
 DNS: `www.marinabaysands.com` → `CNAME san.booking.marinabaysands.com.edgekey.net` → `e9200.a.akamaiedge.net` → `23.15.249.40`. **Akamai.**
@@ -142,6 +153,79 @@ Over HTTP/1.1: `curl: (56) Recv failure: Operation timed out` after 30 s. Retrie
 **Partial mitigation.** Sands Expo / MBS events surface on three sources already in scope: **bigevent.io** (5 of its 13 entries), **EventsEye** (`Marina Bay Sands` appears as a venue value), and **TTGmice** (`ITB Asia — MBS`, `Travel Tech Asia — Sands Expo`). Any MBS coverage v2 gets will be second-hand and partial.
 
 **Route: `none` — flagged.**
+
+### Update — 04 Aug 2026, from a real browser
+
+Everything above about Akamai was re-confirmed first: both candidate listing URLs still return `HTTP 000, size=0` in ~50 ms over HTTP/2 (`INTERNAL_ERROR`), and time out after 20 s over HTTP/1.1, with a full Chrome UA. **A scripted HTTP client cannot reach this host, and that has not changed.** A real Chrome instance reached every page on the first attempt, with no challenge, no CAPTCHA and no interstitial.
+
+#### `robots.txt` — retrieved, and it permits both listings
+
+```
+User-Agent: SearchSG
+Disallow: /
+
+User-agent:*
+Disallow: /content/dam/…/sands-rewards-club/
+Disallow: /content/dam/…/casino/
+Disallow: /content/content-repository/en/site-configuration/
+Disallow: /*?offerCode=
+Disallow: /reservations/
+Disallow: /*promocode=
+Disallow: /mbs/booking/
+Disallow: /new-museum.html
+Disallow: /new-museum/*
+
+Sitemap: https://www.marinabaysands.com/content/sitemap.xml
+```
+
+The disallow list is **casino, loyalty, reservations, booking and promo-code paths**. Neither `/expo-and-convention/` nor `/entertainment/` appears. There is also a **sitemap**, previously unobtainable. On the crawl-directive question alone, MBS is permissive.
+
+#### Terms of Use — retrieved, and they are the clearest prohibition on the list
+
+`https://www.marinabaysands.com/terms-of-use.html`, under the heading ***Personal and Non-Commercial Use Limitation***:
+
+> *"You may not use any "deep-link", "page-scrape", "robot", "spider" or other automatic device, program, algorithm or methodology, **or any similar or equivalent manual process**, to access, acquire, copy or monitor any portion of the Sands Platform or any content, or in any way reproduce or circumvent the navigational structure or presentation of the Sands Platform or any content, to obtain or attempt to obtain any materials, documents or information through any means not purposely made available…"*
+
+> *"Unless otherwise specified, the Sands Platform is for your personal and non-commercial use. You may not modify, copy, distribute, transmit, display, perform, reproduce, publish, license, create derivative works from, transfer or sell any information, software, products or services obtained from the Sands Platform."*
+
+This is **stronger than Eventbrite's §13**, which is the benchmark for an explicit clause. It names page-scraping, names robots and spiders, and then closes the transcribe-it-by-hand door with *"or any similar or equivalent manual process"*. The second clause independently bars republication. **`robots.txt` says yes and the ToU says no; the ToU governs.**
+
+#### `/expo-and-convention/event-directory.html` — the 3-day window is confirmed
+
+The page states its own scope: *"Explore the full list of upcoming events happening at Marina Bay Sands Expo & Convention over the next 3 days."* On 04 Aug 2026 it carried exactly three date headings — 04, 05 and 06 Aug 2026 — and a freshness stamp, *"Event list is updated as of 4 Aug 2026 12:41 pm"*. **The indexed hint was right.**
+
+Content is **room-booking granularity, not calendar granularity**. Each event carries a title, a sub-activity label and a room: `SAP NOW AI TOUR SOUTHEAST ASIA 2026 / Executive Meeting Room 1 / L5 Sands A - 5102`. Roughly 15 titled entries per day, of which a minority are public: `SAP NOW AI TOUR SOUTHEAST ASIA 2026`, `BUILD WITH GEMINI SINGAPORE`, `2ND INTERNATIONAL CONFERENCE ON FUTURE OF AM 2026`, `PHARMAPACK ASIA INDUSTRY FORUM`. The majority are **not attendable events at all** — `MD STRATEGY MEETING`, `HOSPITALITY ORIENTATION`, `SSD TRAINING`, six separate `FOOD TASTING FOR …` rows, and `Prayer Room (Male)` / `Prayer Room (Female)` as line items. No times are published, only rooms.
+
+**Ruling (Ed, 04 Aug 2026): the 3-day window is a valuable primary source, and this map treats it as one.** The reasoning, recorded so it is not re-litigated:
+
+- It is **first-party**. Every other route to Sands Expo — bigevent.io, EventsEye, TTGmice — is second-hand, partial, and carries whatever the aggregator chose to list. This is the venue's own record of what is in its halls.
+- Captured daily, a rolling window **accumulates**. Three days visible is not three days of data; it is an unbounded forward-confirmed record built one run at a time.
+- It is a **verification source**. An aggregator claiming an MBS event that never appears in the venue's own directory is a claim worth doubting — which is exactly the input the moderation surface on this map needs.
+
+**The operational consequence, named — this is the second source of its kind.** A rolling window with no backfill means **the value only exists if capture starts before the data is needed**, and a dropped run loses those days permanently. That is precisely the property ruled on for Changi arrivals in [#28](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/28), and it makes [#126](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/126) — `daily.yml`'s now-wrong *"a dropped run costs nothing"* comment — bind a second source rather than one. It also sharpens the permission ask: **for MBS, waiting to ask costs history that cannot be recovered.**
+
+It also means the entries this source yields are **not the same shape as a VenueEvent**: no times, room-level location, and a majority that are internal operations rather than public events. Filtering and classification are an adapter concern here, not a moderation concern — the `Prayer Room` rows must never reach a human queue.
+
+#### `/entertainment/shows.html` — the genuinely calendar-shaped page
+
+**13 shows, 14 Aug 2026 → 14 Mar 2027** — seven months of horizon, comfortably past v1's 3-month ceiling. Clean date ranges in the rendered text (`14 – 16 Aug 2026`, `19 Aug – 6 Sep 2026`, `29 Aug 2026`, `16 Feb – 14 Mar 2027`), each with a category (`CONCERT`, `MUSICAL`, `BALLET`, `EXPERIENCE`, `FAMILY ENTERTAINMENT`) and a description. Sample: `BJÖRN AGAIN - THE ABBA FOREVER TOUR`, `JESUS CHRIST SUPERSTAR`, `CATS THE MUSICAL`, `THE NUTCRACKER BY STATE BALLET OF GEORGIA`, `MOULIN ROUGE! THE MUSICAL`.
+
+**This is the better of the two pages by every calendar measure** — public events only, real horizon, no filtering problem. Note the overlap with Ticketmaster SG (§20): several of these are the same concerts, and MBS publishes them with better date structure and no 401.
+
+`/museum/whats-on.html` (ArtScience Museum) was **not** retrieved in this session. Still open.
+
+#### What this changes
+
+| Claim in the original section | Status |
+|---|---|
+| Akamai drops every scripted client | **Stands.** Re-confirmed on both listing URLs |
+| `robots.txt` unobtainable | **Wrong.** Retrieved; permits both listings; publishes a sitemap |
+| Terms of Use unobtainable | **Wrong.** Retrieved; prohibits scraping in the strongest terms on the list |
+| "Permission cannot be established at all" | **Wrong, and the flag's reason is replaced.** Permission is established — and it is refused |
+| Event directory covers only 3 days — *unconfirmed* | **Confirmed**, and ruled valuable anyway (above) |
+| Route `none` | **Holds, on new grounds** — ToS, not unknowability. A permission ask is now a coherent thing to make, which it previously was not |
+
+**Route: `browser`, blocked by ToS — flagged, pending permission.** If permission is granted this becomes the **second** browser adapter after MBCCS, which is a real cost against ADR-0005's assumption that headless was a one-source exception. Both pages are worth having: `shows.html` for horizon, `event-directory.html` for first-party daily capture.
 
 ---
 
@@ -755,7 +839,7 @@ No Asian country named. v1 additionally read the *Supported Markets* list and fo
 
 | Source | Which constraint bites |
 |---|---|
-| **Marina Bay Sands / Sands Expo** | **Anti-bot, compounded by unreadable policy.** Akamai silently drops every HTTP client — plain `curl`, `curl` with a full Chrome header set, HTTP/1.1, HTTP/2, and a second client on separate infrastructure — after TLS completes. `sandsexpo.com.sg` does not resolve; `marinabaysands.com.sg` serves no A record. **`robots.txt` and the ToU are both unobtainable, so permission cannot be established at all.** Mitigated second-hand via bigevent.io, EventsEye and TTGmice. |
+| **Marina Bay Sands / Sands Expo** | ~~**Anti-bot, compounded by unreadable policy.**~~ **Updated 04 Aug 2026 — see §3's Update. ToS clause, plus browser-only access.** Akamai still drops every *scripted* client, but a real browser reaches everything. `robots.txt` **permits** both listings; the ToU does not: *"You may not use any "deep-link", "page-scrape", "robot", "spider" or other automatic device… or any similar or equivalent manual process, to access, acquire, copy or monitor any portion of the Sands Platform"*, plus a separate personal-and-non-commercial-use bar on republication. **Stronger than Eventbrite's §13.** Two real pages behind it: `shows.html` (13 shows to Mar 2027) and `event-directory.html` (rolling 3 days, first-party, **ruled valuable** — see §3). Mitigated second-hand meanwhile via bigevent.io, EventsEye and TTGmice. |
 | **Eventbrite** | **ToS clause.** §13, *"Scraping or Commercial Use of Site Content is Prohibited"* — *"You have no right to, and you agree not to, scrape, crawl, or employ any automated means to extract data from the Sites."* Compounded by the removal of public event search from the API (`/v3/events/search/` → 404 while all neighbouring paths → 401). Technically the easiest source on the list; contractually the clearest no. |
 | **Ticketmaster SG** | **ToS clause *and* anti-bot.** ToU bans robots and threatens civil/criminal action; detail pages return HTTP 401 `{"response":"identify"}`; the sanctioned Discovery API has no Asian market. Also the only source publishing dates with no times at all. |
 | **VisitSingapore MICE** | **ToS clause.** *"you will not … use any robot, spider, other automatic device, or manual process to monitor or copy any pages within the websites or the Content without STB's prior written permission."* `robots.txt` also disallows `/*json$`. Painful, because a clean unauthenticated JSON endpoint returning all 33 records in one call **does** exist and works. |
@@ -819,7 +903,8 @@ Concretely, **SCCS operates both MBCCS and SCC, so one email closes two of the t
 
 | Question | Why it could not be settled | What would settle it |
 |---|---|---|
-| **Does Marina Bay Sands publish a usable event listing, and what do its robots/terms say?** | Akamai drops every client tried, after TLS completes, on `/`, `/robots.txt` and `/sitemap.xml` alike. Candidate URLs are known from the search index (`/expo-and-convention/event-directory.html`, `/entertainment/shows.html`, `/museum/whats-on.html`) but **none was fetched**. The indexed description hints the event directory covers only the next 3 days — **unverified**. | A real browser from a residential IP would render it. But **the permission question is the one that matters**: a written approach to MBS. Reading the page without it changes nothing. |
+| ~~**Does Marina Bay Sands publish a usable event listing, and what do its robots/terms say?**~~ **RESOLVED 04 Aug 2026** | ~~Akamai drops every client tried…~~ The predicted fix was correct: a real browser rendered every page on the first attempt. **Both listings, `robots.txt` and the Terms of Use were retrieved** — see §3's Update. Answers: yes it publishes usable listings (13 shows to Mar 2027; a rolling 3-day expo directory); robots **permits** them; **the ToU prohibits scraping outright**. | Settled. What remains is the written approach to MBS — now a coherent ask, since their terms are finally readable. |
+| **Does ArtScience Museum's `/museum/whats-on.html` carry a usable listing?** | The one MBS candidate URL *not* retrieved in the 04 Aug 2026 browser session. | One browser visit. Same ToU governs it, so it is blocked on the same clause regardless of what it contains. |
 | **Would Sentosa issue a Sitecore `sc_apikey`?** | `/sitecore/api/graph/edge` → `400 "SSC API key is required"`. `robots.txt` explicitly *allows* `/sitecore/api`, a strong hint the endpoint is meant to be usable by someone. | An email to Sentosa Development Corporation. Would collapse a 62-request crawl into one GraphQL query. |
 | **Does the Ticketmaster Discovery API return any SG events?** | Requires a registered API key, which I did not obtain. Structural evidence (no SG market, no Asian country in the coverage prose, `ticketmaster.sg` on a wholly separate Yii stack) says no. **Carried over unresolved from v1.** | Register a free Discovery key; call `events.json?countryCode=SG`. Ten minutes. Since the ToU ban rules out scraping regardless, this is the *only* route that could keep Ticketmaster in scope. |
 | **Does Eventbrite's affiliate or partner programme carry a data feed?** | The developer portal (`/platform/api`, `/platform/docs/introduction`, `/platform/api-terms`) is client-rendered — every fetch returned only the page `<title>`. The public ToS §13 and the API Terms of Use were both readable; the *affiliate* terms were not located. | Read the developer/affiliate portal in a browser, or ask Eventbrite partnerships. The only thing that could unflag Eventbrite. |
@@ -851,3 +936,5 @@ Concretely, **SCCS operates both MBCCS and SCC, so one email closes two of the t
 **Unchanged from v1:** Suntec (`http-scrape`, permission ask), SCC (`http-scrape`, permission ask), MBCCS (`browser`).
 
 **Not built:** Marina Bay Sands, Eventbrite, Ticketmaster SG, VisitSingapore MICE, Singapore EXPO, Resorts World Convention Centre — pending, for the last three, a permission conversation that is worth having.
+
+> **Updated 04 Aug 2026 — Marina Bay Sands joins the permission-conversation group.** Now that its terms are readable, an ask is coherent, and MBS should be added to the list of sources worth one email — with **more urgency than the others**, because its expo directory is a rolling 3-day window with no backfill (§3). Every day without capture is history that cannot be recovered. When built, it is a **browser** adapter and slots after MBCCS in cost, not alongside the plain scrapes.
