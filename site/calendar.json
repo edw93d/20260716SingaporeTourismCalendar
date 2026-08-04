@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-03T20:47:04Z",
+  "generatedAt": "2026-08-04T20:53:32Z",
   "venueEvents": [
     {
       "uid": "b84c6c47-5f4e-468b-9bcd-f2a6a3a69a9e@sg-tourism-calendar",
@@ -2540,6 +2540,14 @@
       "source": "mbccs"
     },
     {
+      "uid": "6d100a1c-8b20-4563-b95e-8984086915fa@sg-tourism-calendar",
+      "summary": "Cruise: NAUTICA OCEANIA CRUISES at Singapore Cruise Centre",
+      "start": "2026-11-03T23:00:00Z",
+      "end": "2026-11-04T10:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
       "uid": "05f7e167-dc8a-4e53-81f1-09bf220cb456@sg-tourism-calendar",
       "summary": "Cruise: Disney Adventure at MBCCS",
       "start": "2026-11-04T21:30:00Z",
@@ -2799,15 +2807,15 @@
   "sources": [
     {
       "source": "mbccs",
-      "lastConfirmed": "2026-08-03T20:47:04Z"
+      "lastConfirmed": "2026-08-04T20:53:32Z"
     },
     {
       "source": "scc",
-      "lastConfirmed": "2026-08-03T20:47:04Z"
+      "lastConfirmed": "2026-08-04T20:53:32Z"
     },
     {
       "source": "suntec",
-      "lastConfirmed": "2026-08-03T20:47:04Z"
+      "lastConfirmed": "2026-08-04T20:53:32Z"
     }
   ]
 }
