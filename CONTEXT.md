@@ -12,7 +12,9 @@ refreshed daily.
 **Banned as a bare term.** "Event" was doing at least two incompatible jobs — a
 thing people attend, and a ship docking that nobody attends — and forcing them
 into one schema is what produced a `description` field that meant nothing.
-Say **VenueEvent** or **PortCall**. Never "event" unqualified.
+Say **VenueEvent**, **PortCall**, **FlightArrival** or **ArrivalsSummary**.
+Never "event" unqualified — and note that an `ArrivalsSummary` is not an event
+at all: nothing happens, a day is counted.
 
 ### VenueEvent
 
@@ -56,9 +58,72 @@ the audience is that it lands thousands of people nearby.
 multi-word, so no rule splits it reliably, and a bad split would silently corrupt
 `sourceKey`. MBCCS publishes no line at all.
 
+### FlightArrival
+
+One inbound passenger flight landing at Changi, on one date. **Never a calendar
+record**: it has no `uid`, never reaches `CalendarEntry`, and never enters a feed.
+It exists so an `ArrivalsSummary` can be recomputed, and so a country question
+asked later can still be answered — landed data has **no backfill** (#25), so a
+discarded row is gone permanently.
+
+| Field | Notes |
+|---|---|
+| `source`, `sourceKey` | As **VenueEvent**. `sourceKey` is `{date}\|{flightNumber}\|{scheduledTime}`. |
+| `flightNumber`, `airline` | As published. Codeshares are already collapsed by the source — a naive count is the aircraft count, not the marketing-flight count. |
+| `originAirport` | IATA code. |
+| `originCountry` | ISO-3166 alpha-2, published directly as `origin_dep_country`. **No airport→country table enters this project** (#25). |
+| `scheduledDate` | The SGT calendar day. **The tally key** — and the field the source lies about; see below. |
+| `scheduledAt` | Instant (UTC). |
+| `actualAt` | Instant (UTC). Null until it lands. |
+| `status` | `null` \| `Scheduled` \| `Landed` \| `Cancelled`. `null` beyond ~D+1 — the forward feed **cannot** filter on status. |
+| `aircraftType` | Kept solely because it is the only lever that could ever turn *flight count* into *rough capacity*. |
+| `firstSeenAt`, `lastSeenAt` | See **Seen-tracking**. |
+
+**Scheduled and landed are not two records.** The same row is first seen up to a
+month ahead with `status: Scheduled` and a null `actualAt`, and later gains both.
+Upsert by `(source, sourceKey)` already does this; no new mechanism is involved.
+
+**Deliberately not stored:** belt, gate, check-in row, baggage and off-block
+timestamps, arrival terminal. Airport operations, no tourism meaning.
+
+⚠️ **`scheduled_date` is a cursor, not a filter.** The source positions a scan at
+that date and spills past it; an out-of-range date returns unrelated later rows
+rather than nothing. Every row whose `scheduledDate` differs from the date
+requested **must be discarded in `parse`**. This fails silently — it yields a
+plausible number for the wrong day.
+
+### ArrivalsSummary
+
+One record per **calendar date**: how many inbound flights that day, and the top
+three origin countries. Not a thing at a place at a time — **a day, counted**. It
+is the only record in this project with a `date` and no instants (ADR-0019).
+
+| Field | Notes |
+|---|---|
+| `uid`, `sequence` | As **VenueEvent**. `sequence` bumps as the numbers firm up. |
+| `date` | The SGT calendar day. Exactly one summary per date. |
+| `scheduledCount`, `scheduledTop3` | Every `FlightArrival` for that date. |
+| `landedCount`, `landedTop3` | Those that reached `Landed`. |
+| `firstSeenAt`, `lastSeenAt` | See **Seen-tracking**. |
+
+**Every number is recomputed from `FlightArrival` rows on every run** — nothing is
+written once and trusted. So a tally bug is fixable retroactively, and the gap
+between scheduled and landed is real signal (cancellations, diversions, flights
+not yet published a month out), not error.
+
+Countries render as **ISO-2 codes, not names** — no country-name lookup table
+enters this project.
+
+**Magnitude is in scope for arrivals only.** Map #1 ruled magnitude out; #28
+reversed that **for flights and nothing else**. A `PortCall` still carries no
+passenger count, so a ~4,000-passenger ship still renders like a coffee popup —
+a known, accepted hole, now sitting on the same grid as a flight tally that does
+show magnitude.
+
 ### CalendarEntry
 
-The projection both types serialize through — named for its role, not its meaning.
+The projection every calendar-bearing type serializes through — named for its role,
+not its meaning.
 It is what the web calendar, the iCal feed, and (later) Excel render.
 
 ```
@@ -67,16 +132,37 @@ CalendarEntry { uid, summary, start, end, location, description, source }
 
 Projection rules:
 
-| | VenueEvent | PortCall |
-|---|---|---|
-| `summary` | `name` | `Cruise: {vessel} at {terminal}` |
-| `location` | `venue` (+ `hall`) | `terminal` — never the berth |
-| `description` | **generated** | **generated** (includes berth) |
+| | VenueEvent | PortCall | ArrivalsSummary |
+|---|---|---|---|
+| `summary` | `name` | `Cruise: {vessel} at {terminal}` | see below |
+| `location` | `venue` (+ `hall`) | `terminal` — never the berth | `Changi Airport` |
+| `description` | **generated** | **generated** (includes berth) | **generated** — both lines in full, plus the flights-not-passengers caveat |
+| `start`/`end` | instants | instants | **dates** — all-day, exclusive `DTEND` (ADR-0019) |
 
 `summary` carries the category as **prose** because `CATEGORIES` survives on only
-1 of 3 iCal clients (see ADR-0001, issue #6). The feed is split by type into two
-subscriptions (see **Feeds**, ADR-0008), but every entry still renders into one
-calendar grid — the split is a subscription boundary, not a schema difference.
+1 of 3 iCal clients (see ADR-0001, issue #6). The feed is split by type into
+separate subscriptions (see **Feeds**, ADR-0008), but every entry still renders into
+one calendar grid — the split is a subscription boundary, not a schema difference.
+
+**`ArrivalsSummary`'s summary is two lines on the web calendar and one in the feed.**
+Both measures always show; the landed line reads `-` until it is known:
+
+```
+Scheduled: 100, CN 20, ID 15, AE 10
+Landed: 85, CN 15, ID 10, AE 5
+```
+
+An entry title is a **single-line field**, and clients disagree on encoded line
+breaks — some render two lines, some run them together, some truncate everything
+after the first. So the feed joins them: `Scheduled: … | Landed: …`, with the
+two-line form in `description`. The website renders the two lines as written.
+
+The date is **not** repeated in the summary; the entry already sits on it.
+
+**`Landed: -` can be permanent, and that is deliberate.** Changi retains roughly 72
+hours of landed data with no backfill, so a pipeline outage past two runs leaves that
+day unknowable forever. The calendar says it doesn't know, rather than showing
+nothing.
 
 **CalendarEntry is a convenience, not a bottleneck.** It flattens away `vessel`,
 `hall` and `berth`. A serializer needing those (a future Excel export) reads the
@@ -84,13 +170,19 @@ domain types directly.
 
 ### Feeds
 
-The iCal subscription surface is **two feeds, split by type** — never a single
+The iCal subscription surface is **one feed per type** — never a single
 firehose, never split by source:
 
 | Feed | `X-WR-CALNAME` | URL | Contents |
 |---|---|---|---|
 | Port calls | SG Cruise Arrivals | `/feeds/port-calls.ics` | every `PortCall` |
 | Venue events | SG Venue Events | `/feeds/venue-events.ics` | every `VenueEvent` |
+| Flight arrivals | SG Flight Arrivals | `/feeds/flight-arrivals.ics` | every `ArrivalsSummary` |
+
+**Flight arrivals is its own feed for a reason beyond the rule.** It emits an entry
+**every single day, forever** — a permanent daily banner, where the other two fire
+only when something is actually happening. Folding it into either existing feed would
+contaminate a subscription someone relies on. As its own URL, taking it is a choice.
 
 Split by **type**, because the audience thinks in demand shapes, not scrapers — and
 `source` already rides inside every entry, so per-source feeds would only fragment
@@ -99,11 +191,12 @@ stream is not a subscription anyone should hold; the *everything* view is the we
 calendar, which filters client-side for free.
 
 Consequence: **the feed set grows with types, not sources.** A new source (e.g.
-ticketed events, #13) folds into `venue-events` and adds no feed. `CATEGORIES` cannot
+ticketed events, #13) folds into `venue-events` and adds no feed; a new *type*
+(`ArrivalsSummary`, #28) adds one. `CATEGORIES` cannot
 carry the split in-feed (ADR-0001, #6), which is why the split is baked into distinct
 URLs at generation time. See ADR-0008.
 
-The **subscription surface** — how a reader gets one of those two URLs — is a block on
+The **subscription surface** — how a reader gets one of those URLs — is a block on
 the **Web calendar**, below the methodology notes: the heading, one row per feed, and a
 Copy. Its URLs are **absolute**, on the page and on the button alike. The site's own
 links can be relative because a browser resolves them against the page, but a calendar
@@ -120,7 +213,7 @@ says iCal.
 ### Web calendar
 
 The *everything* view #11 made load-bearing (there is no `all` feed). It carries the
-full dataset — both types, all sources, duplicates labelled — in a **static** page,
+full dataset — every calendar-bearing type, all sources, duplicates labelled — in a **static** page,
 filtered client-side. It offers **four switchable views**; no single one is *the*
 view, and reading demand from multiple perspectives is the point:
 
