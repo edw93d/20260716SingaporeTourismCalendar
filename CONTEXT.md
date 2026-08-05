@@ -37,6 +37,7 @@ The honest common property is that something is scheduled at a venue.
 | `hall?` | e.g. `Level 4, Hall 404`. Nullable. |
 | `firstSeenAt`, `lastSeenAt` | See **Seen-tracking**. |
 | `hidden` | A person's judgement that this should not be on the calendar. See **Hidden**. |
+| `reviewed` | That a person has *looked* at it. Not a verdict. See **Reviewed**. |
 
 **No `description` field.** See **Facts-only extraction**.
 
@@ -171,6 +172,14 @@ domain types directly.
 
 ### Feeds
 
+⚠️ **v2 builds no feeds. This whole section describes v1, and returns in v3** (ADR-0025 §3).
+Nothing below is **reversed** — the two-type split, the no-`all` rule and their reasons are intact
+and correct; they simply bind nothing while v2 ships the **Web calendar** alone. What the deferral
+buys is that an iCal subscription is a **mirror**, so an entry dropped from a feed is *deleted* from
+a subscriber's calendar — which is what made retention hard, and is a question v2 no longer has.
+v1's published `.ics` files stop being updated; every minted **UID** is preserved across the store
+migration precisely so v3 can turn them back on without rebuilding anyone's calendar.
+
 The iCal subscription surface is **one feed per type** — never a single
 firehose, never split by source:
 
@@ -244,10 +253,18 @@ view, and reading demand from multiple perspectives is the point:
   day against its neighbours.
 
 Everything is **static-renderable** (ADR-0009, #10): the views, filter, week paging,
-the Today control and the **Landing** it asks for are client JS over data already on
-the page — no server. The UI
+the Today control and the **Landing** it asks for are client JS over data already in
+hand — no server round-trip renders anything. The UI
 library that implements this (if any) is gated by licensing (#14), not settled here.
 See ADR-0009.
+
+⚠️ **The page is static; its data is served.** v1 baked the dataset into the published artifact.
+The **Store** is now a hosted Postgres, so the payload comes live from the server that also runs
+the admin page — which is why hiding an entry takes effect at once rather than at tomorrow's run.
+ADR-0009 is about the **views** and is untouched. The payload stays **whole** and the filtering
+stays client-side: it grows by ~1,000 entries a year (~670 venue and cruise records plus 365
+**ArrivalsSummary** records), which is small for years, and windowing it would break the filtering
+and paging already built. ADR-0025 §4.
 
 ### Landing
 
@@ -501,6 +518,13 @@ breached at any price and for any purpose, and that class is irreducible.
 **Publishing v2 in any form voids this and requires a re-decision** — the clauses bite
 retroactively on the archive already built.
 
+⚠️ **The premise above is not true today, and this is a factual note, not a re-ruling.** The
+repository is **public**, GitHub Pages is **public**, and v1's feed serves **200** — found while
+working #117 (05 Aug 2026). ADR-0025 §3 stops the feeds being published, which removes the
+republication of scraped facts in ICS form; **the public repository and the public site remain**.
+So does everything that rests on non-publication, including **Hidden**'s visible-by-default. Raised
+on map #112 for a ruling; ADR-0021 is unchanged until it gets one.
+
 *Barred* is not *stopped*. Five **hard stops** are absolute and no accepted-MVP-risk
 ruling reaches them: a `robots.txt` `Disallow` on the path, any authentication wall, an
 explicit refusal once received, an active technical block aimed at us, and
@@ -613,7 +637,7 @@ against and no signal here can read it. See **Manual entry**.
 What an adapter can honestly return: **observation, not memory.**
 
 ```
-Scraped<T> = Omit<T, 'uid' | 'sequence' | 'firstSeenAt' | 'lastSeenAt' | 'hidden'>
+Scraped<T> = Omit<T, 'uid' | 'sequence' | 'firstSeenAt' | 'lastSeenAt' | 'hidden' | 'reviewed'>
 ```
 
 A parser reads a page. It knows `name`, `start`, `end`, `venue`, `hall`, and computes
@@ -626,9 +650,10 @@ A parser reads a page. It knows `name`, `start`, `end`, `venue`, `hall`, and com
 | `firstSeenAt` | A fact about our observation history, not about the page. |
 | `lastSeenAt` | Same. |
 | `hidden` | A judgement a person made, possibly weeks ago. Today's HTML cannot see it — and if `parse` returned it, the next upsert would silently un-hide everything ever judged. See **Hidden**. |
+| `reviewed` | Same shape of fact, same trap: an upsert that returned it would refill the review queue with work already done. See **Reviewed**. |
 
 **The adapter observes; the core remembers.** If `parse` returned a full **VenueEvent**
-it would have to fabricate those five — including minting a `uid` on *every scrape*,
+it would have to fabricate those six — including minting a `uid` on *every scrape*,
 which is precisely the recompute that **UID** forbids, and which duplicates a rescheduled
 conference instead of moving it. The type makes that bug unwritable rather than merely
 discouraged.
@@ -744,6 +769,67 @@ otherwise the next run's upsert would silently un-hide everything ever judged.
 and no serializer can forget to check it. The admin page reads **VenueEvent** directly.
 
 ADR-0024.
+
+### Reviewed
+
+That a person has **looked at** a **VenueEvent**. A second boolean beside **Hidden**, and
+deliberately not the same fact: `reviewed` says *seen*, `hidden` says *judged off the calendar*.
+
+It exists because with `hidden` alone a **visible record is ambiguous** — nobody has looked at it,
+or somebody looked and kept it, and nothing tells the two apart. A cleanup list built on that
+re-presents every record already approved, every day, forever, against a ~670-record backfill.
+
+| | |
+|---|---|
+| **Default** | `false`. A newly scraped record is unreviewed **and visible** — reviewing is not a gate; see **Hidden**. |
+| **Who sets it** | **Only a person**, for the same reason as **Hidden**: a machine-set flag would mean two things that cannot be told apart. |
+| **Why / when / by whom** | **Not recorded**, as with **Hidden**. |
+| **Where** | **VenueEvent only.** `PortCall` carries no relevance judgement, `ArrivalsSummary` is recomputed every run, `FlightArrival` never renders. |
+| **`manual` records** | Arrive `reviewed: true` — a person typed it. |
+
+The two flags are **independent**: the review queue reads `reviewed`, the calendar reads `hidden`.
+Reviewed-and-kept is the common case.
+
+**Remembered, not observed** — it sits with `uid`, `sequence`, `firstSeenAt`, `lastSeenAt` and
+`hidden` and is excluded from **Scraped**, and for the sharper of the two reasons: a scrape that
+returned it would refill the queue with work already done. Quieter than un-hiding, and just as
+silent.
+
+ADR-0025 §6, amending ADR-0024.
+
+### Store
+
+Where the core's memory lives — everything an adapter structurally cannot know (see **Scraped**).
+It is a **hosted Postgres**, reached over the network by both writers; ⚠️ *which host and which
+managed offering* is deliberately still open.
+
+It stopped being v1's `data/calendar.sqlite` committed to the repo for two reasons, and **neither is
+the size of the data**:
+
+- **There are two writers.** The daily scrape runs in CI and the admin page runs on a server, and
+  ADR-0024 has the second writing *while a scrape is in flight*. A file in git has one copy per
+  checkout and an undiffable binary has no merge, so one side's writes are lost. Broken on day one,
+  not at scale.
+- **Some data cannot be re-derived.** Landed **FlightArrival** rows have no backfill (#25), so
+  backups became a real job rather than a side-effect of committing to git.
+
+Volume is what breaks **git**, not the database: ~182k flight rows a year is unremarkable to any
+database, but a blob committed daily grows the repo by its full size every day.
+
+| | |
+|---|---|
+| **Writes** | **One transaction per source** — a broken source rolls back its own records and no others (ADR-0006's three outcomes, at the storage level). |
+| **The upsert** | Writes **only the fields of `Scraped<T>`**. ⚠️ Never `uid`, `sequence`, `firstSeenAt`, `hidden` or `reviewed` — a write path that touches those un-does every judgement ever made, silently and permanently. |
+| **Concurrency** | Nothing invented. Readers do not block writers; a moderator toggling `hidden` mid-scrape is an ordinary concurrent transaction. |
+| **Reads** | The **web calendar**'s data payload, served live, and the admin page's review queue reading **VenueEvent** directly. |
+| **Relations** | **None.** No join table, no merge lineage, no cluster membership, no negative-ruling store — ADR-0024 removed all of them. `(source, sourceKey)` is the whole of identity. |
+| **Retention** | Nothing is ever deleted, raw **FlightArrival** rows included and forever (~250MB a decade). |
+
+⚠️ **The daily run publishes nothing any more.** It scrapes and it upserts. ADR-0011's arrangement —
+the store blob and the `.ics` files committed together so the feed diff explained the blob — is gone,
+and with it the ability to read a day's change out of git history. Nothing replaces it.
+
+ADR-0025.
 
 ### Manual entry
 
