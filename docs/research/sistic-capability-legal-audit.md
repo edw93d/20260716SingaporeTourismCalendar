@@ -583,13 +583,61 @@ a private-use reading is a legal question this audit does not answer and should 
   373-record snapshot** and are internally consistent.
 - **Rate limits.** No `429`, no `Retry-After`, no `X-RateLimit-*` headers at 1 req/s across 18
   requests. Nothing established about the ceiling.
-- **Whether SISTIC's listing is complete for its own venues.** Esplanade's 94 rows were not checked
-  against Esplanade's own website — SISTIC may carry only what it ticket-sells. **This matters for
-  the recommendation in §8**: if Esplanade publishes its own listing, it belongs on the source list
-  as a first-hand source and SISTIC becomes the second-hand fallback rather than the only route.
+- **Whether SISTIC's listing is complete for its own venues.** SISTIC carries only what it
+  ticket-sells, so its Esplanade rows are a subset of Esplanade's programme. ✅ **Ruled 05 Aug 2026
+  (Ed): that subset is the wanted one — see §12.** What remains unestablished is the *size* of the
+  gap, which now matters only for completeness, not for the route.
 - **The 7 `Various Venues` rows.** Not resolved to locations.
 - **Coverage of `stixLite` / `culture_pass` flags.** Present on every record, meaning not
   investigated.
+
+---
+
+## 12. ⚖️ Esplanade does not become a first-hand source — ruled 05 Aug 2026
+
+§8 left this open as the largest gap in the audit. **Ed ruled it the same day, and the ruling stands
+on the free/ticketed line, not the arts/MICE line.**
+
+> *"Nobody travels to Singapore for small free art exhibitions (this is targeted at the domestic
+> Singapore market). However, people do buy tickets and travel for a big concert."*
+
+**Esplanade is not added to the source list.** Its own programme is dominated by free public
+programming aimed at residents — Concourse exhibitions, tours, talks — which carries no
+demand-landing signal for a hotelier. Adding it first-hand would import that noise. SISTIC lists only
+what it **ticket-sells**, so it already delivers the demand-relevant subset. **The 94 Esplanade rows
+are a point in SISTIC's favour, not a gap in it**, and §8's coverage argument is unchanged.
+
+⚠️ **This is not a ruling that arts events are out of scope, and it must not be read as one.**
+`CONTEXT.md` defines `VenueEvent` as *"A conference, an exhibition, a concert, a consumer festival"*
+and expressly rejects the name `MiceEvent` because consumer events belong. The test is **demand
+landing**, not event category. Read the other way — arts as such being irrelevant — this ruling would
+delete 144 Concert, 33 Theatre, 13 Dance, 12 Musical and 9 Orchestra rows and leave SISTIC with the
+**3** rows carrying the `MICE` genre. That reading was put to Ed and rejected.
+
+### The relevance call is the admin's, and SISTIC is the source that proves why
+
+> *"That is why I still need to have an admin who can manually check if the scraped event is relevant
+> or not to tourism/MICE demand."* — Ed, 05 Aug 2026
+
+Free-vs-ticketed is a **judgement about demand**, not a property any source publishes, so no scraper
+rule settles it. This is the map's human-in-the-loop moderation premise arriving as a concrete case,
+and **SISTIC is the source where the admin's call does the most work** — 284 discrete events, more
+than any other, spread across 123 venues of wildly varying pull.
+
+**But SISTIC hands the admin two machine-readable pre-filters that cut the load before a human sees
+anything** — worth handing to **#116** / **#120** as screen-design input:
+
+1. **`min_price` absence ≈ the domestic-market tail.** 37 of 367 live rows carry no `min_price`, and
+   they are *precisely* the class Ed described: `Esplanade Tour`, `Travel Sketching Workshop`,
+   `DuringMyTime.SG`, `Happy Sing Along (Zhongyuan Special)`, `Therukoothu 101`, and the free
+   *A Date With Friends* talk/film/workshop side-events. A default-reject on price-less rows removes
+   ~10% of the queue and is right far more often than not.
+2. **`min_price` magnitude is a demand proxy.** Median **S$48**; **40 rows ≥ S$100**; **17 ≥ S$150**.
+   Sorting the moderation queue by `min_price` descending puts the touring stadium acts — the ones
+   people actually fly in for — at the top, and the S$15 community recitals at the bottom.
+
+Neither is a rule the pipeline should apply silently — both are **defaults for a human to override**,
+which is exactly the shape #116's moderation states are for.
 
 ---
 
