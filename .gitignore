@@ -10,3 +10,8 @@
 node_modules/
 .DS_Store
 *.tsbuildinfo
+
+# SQLite WAL sidecars. The store itself (data/calendar.sqlite) is committed;
+# these two are transient journal state a running process owns.
+*.sqlite-shm
+*.sqlite-wal
