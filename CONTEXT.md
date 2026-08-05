@@ -618,6 +618,31 @@ The rate-limited client in `deps` is **required, never defaulted** — reaching 
 is something a caller says out loud, so no code touches the live internet by forgetting to
 pass a stub. See ADR-0010.
 
+### Provenance
+
+Whether a **Source** publishes its own events or reports someone else's.
+
+| | Meaning | Sources |
+|---|---|---|
+| **first-hand** | The venue or operator publishing what happens on its own premises. | Suntec, Marina Bay Sands, Singapore EXPO, Sentosa, The Kallang, The Star, RWS, Changi Exhibition Centre, MBCCS, SCC, Changi Airport |
+| **second-hand** | Reporting another party's events. | EventsEye, bigevent.io, TTGmice, JustRunLah!, SportPlus SG, VisitSingapore MICE, STB, Eventbrite, Ticketmaster SG, SISTIC |
+
+It exists for exactly one job: **breaking ties when the same event arrives from more than
+one source.** It is not a quality claim — maintenance quality varies per site and does not
+track provenance (RWS is first-hand and publishes `0001-01-01` null dates; bigevent.io is
+second-hand and publishes clean ISO instants). It says who *knows*, not who *typed it
+correctly*, so it orders a merge rather than picking a winning record.
+
+⚠️ It gives **no** tiebreak between two second-hand sources — the most common duplicate,
+since EventsEye, bigevent.io and TTGmice overlap heavily. See ADR-0020.
+
+Alongside it each source carries an **admin-facing description** — `event venue`, `event
+aggregator`, `ticketing platform`, `cruise terminal`, `airport` — which drives no behaviour
+and exists so a human reviewing entries can see where one came from.
+
+Both live in the **source manifest**, not in the **Source** contract: `fetch` and `parse`
+need neither. See ADR-0020.
+
 ### Timing
 
 `start`/`end`/`arrival`/`departure` are **UTC instants**. There is no all-day shape
