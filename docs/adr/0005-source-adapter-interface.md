@@ -237,3 +237,43 @@ One correction to Amendment 2's primitive table: it lists `totalPageCount` among
 reads. The app maps the API envelope down to just the records array before storing it, so **no page
 count is in React state**. The pager — bare `<div>`s with no `<button>`/`aria`/`name` — is the only
 source of truth, and its "next" chevron going `pointer-events-none` is the walk's terminator.
+
+### Amendment 4: the browser route owes the same politeness the HTTP client already enforces
+
+Recorded by [ADR-0021](0021-reading-sources-that-forbid-it.md) (#123), 05 Aug 2026. This ADR is
+**amended, not superseded** — Amendment 4 fulfils its own *Consequences* rather than reversing them.
+
+This ADR argued that **politeness is structural, not disciplinary**: an adapter has no route to the
+network except a client that already rate-limits, "so the well-behaved-reader posture that #3's
+facts-only legal position rests on cannot quietly lapse when a future source is added in a hurry."
+That argument was written when `http` was the only route. It is not: MBCCS drives a browser today,
+and #113 made Marina Bay Sands a second browser adapter, breaking this ADR's premise that headless
+was a one-source exception.
+
+**A headless browser obeys none of `src/pipeline/http.ts`.** It sends a browser User-Agent by
+definition, fires whatever subresource requests the page wants, and passes through no per-host gate.
+So the two most legally exposed sources on the list were the two least governed — exactly backwards,
+since MBS is the source whose ToU closes even the transcribe-it-by-hand door.
+
+ADR-0021 §2 therefore binds the browser route to the same five obligations:
+
+1. **An identifying, non-browser User-Agent** — overriding Chrome's default, not accepting it.
+2. **One page load per host per run, and no crawling.** Navigate to the known listing URL; never
+   follow links.
+3. **Never retry a refusal.** 401/403/404 mean *not ever*.
+4. **Block subresources** — images, fonts, analytics, advertising.
+5. **Honour `Crawl-delay`** as a floor over the 1s default.
+
+**And the seam this ADR's *Decision* §3 already implies: the core owns the browser driver, and an
+adapter never constructs one.** "The core owns policy (UA, rate limit, retries, timeouts, clock,
+browser lifecycle)" was already the rule; the User-Agent and subresource policy are simply the parts
+of it nobody had written down for the browser. An adapter importing Playwright directly would breach
+this ADR as originally written.
+
+⚠️ **This may cost Marina Bay Sands, and possibly MBCCS.** MBS is reachable only because a real
+Chrome was driven at it — Akamai drops every scripted client at TLS, even with full Chrome headers.
+Whether it still serves a Chrome that honestly announces itself as `sg-tourism-calendar` is
+**untested**. If it does not, ADR-0021 §4 rules that the source drops rather than the identification:
+an adapter that works only while pretending to be a person is the one fact that would poison the
+facts-only argument for every other source. The same question is open for `mbccs.com.sg`, which is
+in production today.

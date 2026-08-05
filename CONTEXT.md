@@ -480,6 +480,41 @@ as prose **we** generate — attribution and category, 100% populated, 0% scrape
 
 Extraction beyond facts requires a fresh legal read.
 
+### Barred source
+
+A source whose own terms forbid automated access, storage, or republication. Six of
+twenty are barred, including two of the three v1 adapters in production.
+
+**v2 reads a barred source anyway** — politely, taking facts only — and seeks written
+permission in parallel. It stops on refusal. The rule covers **access, storage and
+republication as one**, because permission to merely *scrape* would still leave us in
+breach of the clauses that bar archiving and publishing.
+
+**v2 exercises two of those three limbs: it reads and it stores, and it does not
+publish.** The repository is private, the calendar is personal, and there is no revenue
+of any kind. Publishing was assumed to be how the MVP demonstrates itself and is not —
+the thing running demonstrates it. That distinction clears four clauses, including the
+one we had no answer to (SCC's "internal"). It clears **no access clause**: scraping is
+breached at any price and for any purpose, and that class is irreducible.
+
+**Publishing v2 in any form voids this and requires a re-decision** — the clauses bite
+retroactively on the archive already built.
+
+*Barred* is not *stopped*. Five **hard stops** are absolute and no accepted-MVP-risk
+ruling reaches them: a `robots.txt` `Disallow` on the path, any authentication wall, an
+explicit refusal once received, an active technical block aimed at us, and
+impersonation. The asymmetry is deliberate — `robots.txt` is the one instrument
+addressed specifically to automated readers, and honouring it absolutely costs nothing
+today, since no source on the list blocks us there.
+
+**Silence is null.** A permission notice that goes unanswered is neither consent nor
+refusal; the source stays exactly where it was.
+
+ADR-0021 holds the rule and its reasons. [`docs/source-register.md`](docs/source-register.md)
+holds the per-source facts — clause, route, `robots.txt` verdict, permission state, and
+the date the terms were last read — and is re-read annually and whenever an adapter is
+touched.
+
 ### sourceKey
 
 An **opaque** string each adapter computes to identify a record within its own
