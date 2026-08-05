@@ -542,8 +542,14 @@ send the fullest, most honest form including a live repository URL.
 ⚠️ **This audit's own scripted fetches used a Chrome User-Agent**, following
 `docs/research/v2-source-acquisition.md`'s method, which predates ADR-0021 §2.1. Recorded plainly
 rather than quietly corrected. It changed nothing — the honest strings return byte-identical
-responses — but the method doc now conflicts with the ADR and **should be amended before the next
-source audit**, or the next one will repeat it against a host where it does matter.
+responses — but the method doc conflicted with the ADR, and left alone the next audit would have
+repeated it against a host where it does matter.
+
+✅ **Amended 05 Aug 2026** (`ca10ad0` on `research/v2-source-acquisition`). The 04 Aug method text is
+left standing as the record of what was done; above it now sits the rule that supersedes it —
+**probe honest-first**, with a browser string permitted only as the *control arm* of a User-Agent
+matrix, never as a route in, and never after a refusal aimed at us. A finding reached only through
+the control arm is *not established* until an honest arm reproduces it.
 
 ### §2.2 *Rate*: satisfied comfortably
 
