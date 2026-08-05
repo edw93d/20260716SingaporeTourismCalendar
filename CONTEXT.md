@@ -29,7 +29,7 @@ The honest common property is that something is scheduled at a venue.
 |---|---|
 | `uid` | Durable. Minted once, never recomputed. See **UID**. |
 | `sequence` | Bumped when content changes under a stable key. Named for RFC 5545 `SEQUENCE` but **not serialized into the feeds** — see ADR-0008 §5. |
-| `source` | Which adapter produced it. Duplicates are accepted and labelled by source. |
+| `source` | Which adapter produced it. ⚠️ **In v1 duplicates were accepted and labelled by source. In v2 they are grouped** — see **Cluster**, **Matching**, ADR-0023. |
 | `sourceKey` | See **sourceKey**. |
 | `name` | The event's name, as published. |
 | `start`, `end` | **Instants** (UTC). See **Timing**. |
@@ -692,6 +692,13 @@ steps 5–6, not by provenance. See ADR-0020, ADR-0022.
 the idea cannot resurface as a second axis. Credibility/authority is deliberately not
 modelled — see ADR-0020.
 
+Alongside it each source carries an **admin-facing description** — `event venue`, `event
+aggregator`, `ticketing platform`, `cruise terminal`, `airport` — which drives no behaviour
+and exists so a human reviewing entries can see where one came from.
+
+Both live in the **source manifest**, not in the **Source** contract: `fetch` and `parse`
+need neither. See ADR-0020.
+
 ### Cluster
 
 A set of **Scraped** records believed to describe the same real-world event. The calendar
@@ -713,6 +720,7 @@ stopping where one record is left:
 | 4 | First-hand | See **Provenance**. |
 | 5 | Earliest `firstSeenAt` | |
 | 6 | Alphabetical by source key | Arbitrary, deterministic, written down. |
+| 7 | Lowest `sourceKey` | Step 6 cannot separate two records from the *same* source, which **Matching** makes routine. ADR-0023 §8. |
 
 Step 1 makes the merge **self-healing**: when the record holding a field stops appearing, the
 field falls through to a live record, and returns if it comes back. That reads an observation,
@@ -730,16 +738,60 @@ whichever side still holds that record; on a join the older UID survives. ⚠️
 retires a UID and a subscriber loses that entry: iCal has no merge, so the rule can only
 choose which survives. See **UID**, ADR-0004, ADR-0022 §8.
 
-**How records come to be in one cluster is not settled here** — that is the matching rule,
-owned by [#115](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/115).
-ADR-0022 defines what a cluster is and what follows once records are in one.
+**How records come to be in one cluster is Matching**, below. ADR-0022 defines what a cluster is
+and what follows once records are in one; ADR-0023 defines how records enter one.
 
-Alongside it each source carries an **admin-facing description** — `event venue`, `event
-aggregator`, `ticketing platform`, `cruise terminal`, `airport` — which drives no behaviour
-and exists so a human reviewing entries can see where one came from.
+### Matching
 
-Both live in the **source manifest**, not in the **Source** contract: `fetch` and `parse`
-need neither. See ADR-0020.
+The rule that puts two **Scraped** records into one **Cluster**. It is **source-blind** — two
+records from one source join on exactly the terms two records from different sources do.
+
+⚠️ **No firm date, no cluster.** Both records must carry one. A record whose source gives a month
+but no day — EventsEye's `Sept. 2027 (?)` — joins nothing, and publishes alone until the source
+firms it. This is what stops next year's edition of an annual show being joined to this year's:
+identical title, identical venue, and no date to disagree on. **61 of EventsEye's 79 soft-dated
+rows are exactly that pair.** ADR-0023 §1.
+
+Titles are compared after **conservative normalisation**: accents stripped, quotes straightened,
+case-folded, any four-digit year removed, non-alphanumerics collapsed. ⚠️ **Domain words are not
+stopwords** — stripping `asia`, `expo`, `week`, `singapore` merges `TECH WEEK SINGAPORE` into
+`ASIA TECH X SINGAPORE`, and merges four of the six shows co-located at MBS on a given date. Here
+those words *are* the title.
+
+| Outcome | Test |
+|---|---|
+| **Join, automatically** | Titles identical, dates overlap |
+| **Ask the admin** | Titles similar but not identical, dates overlap |
+| **Ask the admin** | Titles identical, both dated, dates do not overlap, starts within ~60 days |
+| **Nothing, silently** | Everything else — including titles identical and starts months apart, which is the next edition |
+
+Ambiguous matches go to the admin on **#120's existing surface**, never a second one. ⚠️ The
+thresholds are calibrated against one corpus with one similarity function, and are meaningless
+without it — see [`docs/research/aggregator-overlap.md`](docs/research/aggregator-overlap.md) §9.
+
+**A join is permanent until a human splits it.** Matching only ever *creates* a cluster; nothing
+dissolves one. Two sources drifting apart on a date does not break a join — that is a field
+disagreement, and the **field ladder** already settles it. Were it otherwise, routine drift would
+retire a UID and flap entries in and out of subscribers' calendars. ⚠️ A *wrong* join is equally
+sticky: automatic matching never corrects itself.
+
+**Chained matches make one cluster.** A cluster is a set, not a graph of links: if A joins B and B
+joins C, all three are one entry even where A and C would not have matched. ⚠️ At 21 sources this
+will occasionally over-group — which shows as one entry where there should be two, and is
+correctable by a split. That is the tolerable direction.
+
+**A human's *not the same* is permanent**, stored against the pair of `(source, sourceKey)`
+identities — the only identity that survives cluster reshapes and UID retirement. Without it the
+whole ambiguous queue returns every run. ⚠️ **It silences a suggestion; it never breaks a
+cluster.** Breaking one is a split, and a split is only ever a human action.
+
+⚠️ **There is no undo.** A split is a new forward action, not a reversal: the side that lost its
+UID at the join gets a *fresh* one, not its old one back (see **UID**, ADR-0022 §8). No data is
+ever lost — every record survives as scraped and only the grouping changes — but a bad join costs
+subscribers churn that splitting does not refund.
+
+**This reverses v1.** Duplicates were *accepted and labelled by source*; they are now *grouped*.
+See ADR-0023.
 
 ### Timing
 
