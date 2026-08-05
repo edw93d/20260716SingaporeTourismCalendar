@@ -70,11 +70,31 @@ Resolves [#113](https://github.com/edw93d/20260716SingaporeTourismCalendar/issue
 | 19 | **Singapore Cruise Centre** *(v1 `scc`)* | `singaporecruise.com.sg/schedule/cruise/` | No | robots `Disallow:` (all allowed); **ToU §2.1.1 grants use for "internal, non-commercial, informational purposes only"** — new | **Server-rendered** `<table>` | Imperva, **passive** | **19 sailings**, 30 Jul → 01 Nov 2026 | **http-scrape**, permission question now open |
 | 20 | **Ticketmaster SG** | `ticketmaster.sg/activity` | Discovery API exists — **no Asian market coverage** | **ToU bans robots**; robots disallows `*startDate=*` | Listing server-rendered; **detail pages HTTP 401** | **`{"response":"identify"}` bot block, still live** | ~30 dated rows, Aug → Sep 2026, **dates only, no times** | **none** 🚩 |
 
+| 21 | **SISTIC** | `sistic.com.sg/events` | **YES — `cms.sistic.com.sg/sistic/docroot/api/events`, genuinely unauthenticated JSON (tested: answers with no `Authorization` header)** | **No `robots.txt` (404)**; Conditions of Access: access ban **qualified** by interference, republication ban **unqualified**, names scraping + storage | **Client-rendered**, but the API makes it moot; **detail pages browser-only** | Cloudflare, **passive** | **284 discrete events / 367 live**, to **Jul 2027** | **api** 🚩 (terms → #123) |
+
 Route legend: `api` / `feed` / `http-scrape` / `browser` / `none`. 🚩 = flagged, see below.
+
+> **Row 21 added 05 Aug 2026** from [#131's SISTIC audit](sistic-capability-legal-audit.md), which
+> #112 commissioned after this survey closed. Rows 1–20 are as established on 04 Aug and are
+> unchanged. SISTIC was not on #113's list at all — it is a ticketing aggregator rather than a venue,
+> which is exactly why twenty passes over venue websites never reached it.
 
 ---
 
 ### Three headlines
+
+> ⚠️ **Amended 05 Aug 2026 — the score is `api: 1`.** The headline below held across the twenty
+> sources it was drawn from, and every sentence of it is still true of those twenty. It does not hold
+> at twenty-one: [#131's SISTIC audit](sistic-capability-legal-audit.md) found a genuinely
+> unauthenticated JSON endpoint — no login, no token, no browser, the full catalogue in 13 requests —
+> carrying **284 discrete events to Jul 2027, 88% of them at venues v2 reaches nowhere else**. It is
+> undocumented, so it carries no stability promise, but nothing has to be lifted from a bundle to call
+> it.
+>
+> **The instructive part is where the survey was looking.** `api: 0` was a finding about *venue
+> websites and the two aggregators #113 happened to name*. SISTIC is a ticketing aggregator nobody had
+> put on the list, and it answered the question #113 asked on the first try. The premise was sound;
+> the sample was the problem.
 
 **1. The API hypothesis in #113 does not survive contact — the score is `api: 0`.** The ticket's premise was that large commercial platforms publish APIs cheaper than adapters. Both named candidates fail, for different reasons. **Eventbrite removed public event search** — `/v3/events/search/` returns 404 NOT_FOUND while every neighbouring path returns 401 NO_AUTH, so the path does not exist — *and* its ToS bans scraping by name. **Ticketmaster's Discovery API still has no Asian coverage**, and `ticketmaster.sg` is a separately-run property whose detail pages actively block bots. Two other endpoints do answer unauthenticated: Singapore EXPO's WordPress REST (which omits the dates) and VisitSingapore's AEM `.search.json` (whose ToU forbids exactly this). **v1's #4 finding holds across the wider list: there is no licensed feed to buy and no API to call.**
 
