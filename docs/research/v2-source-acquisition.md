@@ -4,6 +4,40 @@ Resolves [#113](https://github.com/edw93d/20260716SingaporeTourismCalendar/issue
 
 **Method.** Every claim below was established on **04 Aug 2026** by fetching the live source with `curl` (browser User-Agent, `--http1.1 -L`, a handful of requests per host) and reading the returned bytes — markup, response headers, JS bundles, `robots.txt`, terms pages, and JSON endpoints — or, where a hosted developer portal was involved, by reading that portal's own documentation. **Rendering verdicts are grounded in whether the listing content is present in the raw HTML of a plain GET**, and every one says which. Nothing here is inferred from secondary write-ups. Anything that could not be settled without a credential, an account, or a real browser is in the **Not established** section rather than guessed.
 
+> ⚠️ **Amended 05 Aug 2026 — the browser User-Agent above is superseded by [ADR-0021](../adr/0021-reading-sources-that-forbid-it.md) §2.1 and §4.5.** This document predates the ADR by one day. It is **left as written**, because what was actually done on 04 Aug is the record; the rule replacing it is stated below and binds every audit from here.
+>
+> **The rule for future source audits: probe honest-first.** Scripted fetches identify as
+> `sg-tourism-calendar`, never as a browser. ADR-0021 §4.5 makes impersonation a hard stop, and §2.1
+> gives the reason: a browser string is what a reader sends when it expects to be unwelcome, and it is
+> the first fact anyone would hold against a scrape whose whole defence is that it takes only facts and
+> behaves itself. That defence is shared across all twenty sources, so one audit's convenience spends
+> it for every other row in the table.
+>
+> **The one permitted use of a browser string is as a control, never as a route in.** Where a host
+> refuses an honest reader, a User-Agent matrix — honest forms *first*, on a cold client, with Chrome's
+> own string as the comparison arm — is how you establish *why* it refused. That is diagnosis, not
+> disguise: the browser string is there to be compared against, and no data is taken through it. Three
+> limits make the difference real, and all three come from how this went wrong the first time:
+>
+> 1. **Honest first, on a cold client.** The 04 Aug MBS test ran the honest string fourth and left
+>    rate-based blocking unexcluded, which is what let one negative result be read as a property of the
+>    whole class.
+> 2. **Findings are attributed to the arm that produced them.** A claim reached only through the
+>    control arm is *not established* until an honest arm reproduces it.
+> 3. **Never after a refusal aimed at us.** ADR-0021 §4.3 and §4.4 — an explicit refusal or a block
+>    aimed at this project ends the probing; you do not go back with a different string.
+>
+> **This is not a rule that costs anything at present.** Re-tested as a matrix on 05 Aug, MBS returns
+> **byte-identical** responses to `Mozilla/5.0 (compatible; sg-tourism-calendar/0.1)` and to Chrome's
+> own string, and SISTIC does the same across four strings. What MBS actually refuses is a UA carrying a
+> hostname-shaped token or whitespace in its comment field — the block was never about honesty, and the
+> ruling that it was nearly dropped 60% of Singapore's listed trade shows. **The assumption that honest
+> identification costs you access is the thing this document got wrong, and it is worth not repeating.**
+>
+> One question stays open and owner-held: §2.1 obliges a User-Agent *linking the repository*, and every
+> form carrying a resolvable URL is precisely what MBS refuses. See `docs/source-register.md` →
+> *Open risks*.
+
 **Ethics note.** No anti-bot measure was defeated, no `robots.txt` directive was violated, and no credential was used. Requests were single and polite. Where a host refused, the refusal *is* the finding.
 
 **Scope note.** #113 lists ~20 entries, several of them venues or brands rather than pages. Establishing whether each publishes a listing *at all* is part of the answer — and two of them do not.
