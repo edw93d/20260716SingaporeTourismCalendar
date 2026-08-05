@@ -29,13 +29,14 @@ The honest common property is that something is scheduled at a venue.
 |---|---|
 | `uid` | Durable. Minted once, never recomputed. See **UID**. |
 | `sequence` | Bumped when content changes under a stable key. Named for RFC 5545 `SEQUENCE` but **not serialized into the feeds** — see ADR-0008 §5. |
-| `source` | Which adapter produced it. ⚠️ **In v1 duplicates were accepted and labelled by source. In v2 they are grouped** — see **Cluster**, **Matching**, ADR-0023. |
+| `source` | Which adapter produced it. **Duplicates are accepted and labelled by source** — nothing groups them; a person hides the copies. See **Hidden**, ADR-0024. |
 | `sourceKey` | See **sourceKey**. |
 | `name` | The event's name, as published. |
 | `start`, `end` | **Instants** (UTC). See **Timing**. |
 | `venue` | e.g. Suntec Convention Centre. |
 | `hall?` | e.g. `Level 4, Hall 404`. Nullable. |
 | `firstSeenAt`, `lastSeenAt` | See **Seen-tracking**. |
+| `hidden` | A person's judgement that this should not be on the calendar. See **Hidden**. |
 
 **No `description` field.** See **Facts-only extraction**.
 
@@ -561,10 +562,8 @@ event; hash the start date and a *rescheduled* conference duplicates rather than
 moves — precisely the change subscribers most need delivered as an update. Same key
 + changed content = same UID, bump `sequence`.
 
-**In v2 the UID is held by the Cluster**, minted against its founding record — the one with
-the earliest `firstSeenAt` — and follows that record if the cluster is later split. This is
-what lets a first-hand record arrive months late without the entry vanishing and reappearing.
-See **Cluster**, ADR-0022.
+**The UID is held by the record**, and nothing ever retires one. Hiding an entry does not
+retire its UID — unhiding restores the same entry to the same subscriber. ADR-0024 §7.
 
 ### Seen-tracking
 
@@ -606,12 +605,15 @@ one in, net zero, while a dead selector takes rows away and puts nothing back.
 is no `status: broken` field. **Seen-tracking** refuses to resolve absence into a status
 the source never stated, and detecting breakage does not reverse that. See ADR-0007.
 
+⚠️ **`manual` is exempt by name** — it is never fetched, so it has no previous run to compare
+against and no signal here can read it. See **Manual entry**.
+
 ### Scraped
 
 What an adapter can honestly return: **observation, not memory.**
 
 ```
-Scraped<T> = Omit<T, 'uid' | 'sequence' | 'firstSeenAt' | 'lastSeenAt'>
+Scraped<T> = Omit<T, 'uid' | 'sequence' | 'firstSeenAt' | 'lastSeenAt' | 'hidden'>
 ```
 
 A parser reads a page. It knows `name`, `start`, `end`, `venue`, `hall`, and computes
@@ -623,9 +625,10 @@ A parser reads a page. It knows `name`, `start`, `end`, `venue`, `hall`, and com
 | `sequence` | A comparison against stored state the parser has never seen. |
 | `firstSeenAt` | A fact about our observation history, not about the page. |
 | `lastSeenAt` | Same. |
+| `hidden` | A judgement a person made, possibly weeks ago. Today's HTML cannot see it — and if `parse` returned it, the next upsert would silently un-hide everything ever judged. See **Hidden**. |
 
 **The adapter observes; the core remembers.** If `parse` returned a full **VenueEvent**
-it would have to fabricate those four — including minting a `uid` on *every scrape*,
+it would have to fabricate those five — including minting a `uid` on *every scrape*,
 which is precisely the recompute that **UID** forbids, and which duplicates a rescheduled
 conference instead of moving it. The type makes that bug unwritable rather than merely
 discouraged.
@@ -667,26 +670,19 @@ Whether a **Source** publishes its own events or reports someone else's.
 | **first-hand** | The venue or operator publishing what happens on its own premises. | Suntec, Marina Bay Sands, Singapore EXPO, Sentosa, The Kallang, The Star, RWS, Changi Exhibition Centre, MBCCS, SCC, Changi Airport |
 | **second-hand** | Reporting another party's events. | EventsEye, bigevent.io, TTGmice, JustRunLah!, SportPlus SG, VisitSingapore MICE, STB, Eventbrite, Ticketmaster SG, SISTIC |
 
-It exists for exactly one job: **breaking ties when the same event arrives from more than
-one source.** It is not a quality claim — maintenance quality varies per site and does not
-track provenance (RWS is first-hand and publishes `0001-01-01` null dates; bigevent.io is
-second-hand and publishes clean ISO instants). It says who *knows*, not who *typed it
-correctly*, so it orders a merge rather than picking a winning record.
-
-**Precisely: it is step 4 of the field ladder, and nothing else** (see **Cluster**). It does
-not decide whether an entry exists — a cluster with no first-hand record publishes on its own
-— and it does not decide whether an entry belongs on this calendar, which is the relevance
-verdict. It loses outright to a more specific value, so it separates only two records that
-are already equally specific and equally firm. ADR-0022 §6.
+It is not a quality claim — maintenance quality varies per site and does not track provenance
+(RWS is first-hand and publishes `0001-01-01` null dates; bigevent.io is second-hand and
+publishes clean ISO instants). It says who *knows*, not who *typed it correctly*.
 
 **A flat property of the source**, applying to everything it publishes: Sentosa is first-hand
 for the whole island, including events run by other operators on it. Not derived per record
 from the venue — that field is blank too often to key a rule off (bare `Singapore` on 4 of 13
-bigevent.io rows and 2 of 96 EventsEye rows). ADR-0022 §3.
+bigevent.io rows and 2 of 96 EventsEye rows).
 
-⚠️ It gives **no** tiebreak between two second-hand sources — the most common duplicate,
-since EventsEye, bigevent.io and TTGmice overlap heavily. That gap is closed by the ladder's
-steps 5–6, not by provenance. See ADR-0020, ADR-0022.
+⚠️ **It drives no behaviour.** Its one job was breaking ties when the same event arrived from
+more than one source — step 4 of a field ladder that the MVP does not build (ADR-0024). With no
+merging, nothing consults it. It survives because the admin-facing description below is useful
+and because the tiebreak returns with matching; see ADR-0024's *Reopen trigger*.
 
 **"Primary" and "secondary" are retired.** They named this same property and were dropped so
 the idea cannot resurface as a second axis. Credibility/authority is deliberately not
@@ -697,101 +693,86 @@ aggregator`, `ticketing platform`, `cruise terminal`, `airport` — which drives
 and exists so a human reviewing entries can see where one came from.
 
 Both live in the **source manifest**, not in the **Source** contract: `fetch` and `parse`
-need neither. See ADR-0020.
+need neither. See ADR-0020, ADR-0024.
 
-### Cluster
+### Hidden
 
-A set of **Scraped** records believed to describe the same real-world event. The calendar
-renders **one entry per cluster**, and the cluster holds the entry's `uid` and `sequence`.
+A person's judgement that a **VenueEvent** should not be on the calendar. A single boolean on
+the record, and the only moderation state in the model.
 
-Nothing is ever dropped as a duplicate. Every record stays under `(source, sourceKey)`;
-duplicates are *grouped*. Dropping them would blind every per-source signal in
-**Source health** — a source going quiet would look identical to a source being deduplicated
-away.
+**It is a property, not a lifecycle.** There is no state set, no intermediate state and no
+transition worth naming — which is worth saying, because #116 asked for a state machine and
+this is not one.
 
-**The field ladder.** Each field of the rendered entry is taken by running down this list and
-stopping where one record is left:
-
-| | Step | |
-|---|---|---|
-| 1 | Seen in the latest run | If none was, all records are eligible — else a quiet cluster renders empty. |
-| 2 | Has a real value | `0001-01-01` and an empty `dates[]` are not values. |
-| 3 | More specific | `Sands Expo, Hall D` beats a bare `Singapore`. |
-| 4 | First-hand | See **Provenance**. |
-| 5 | Earliest `firstSeenAt` | |
-| 6 | Alphabetical by source key | Arbitrary, deterministic, written down. |
-| 7 | Lowest `sourceKey` | Step 6 cannot separate two records from the *same* source, which **Matching** makes routine. ADR-0023 §8. |
-
-Step 1 makes the merge **self-healing**: when the record holding a field stops appearing, the
-field falls through to a live record, and returns if it comes back. That reads an observation,
-not a status — **Seen-tracking** still refuses to infer why a record is absent. ⚠️ A flickering
-row therefore flips a value and bumps `sequence`. A visible flap beats a frozen value.
-
-Reaching step 5 means the model had no substantive reason to prefer either value. So an
-**equal-rank clash** — equally specific, equally firm, equal provenance, and disagreeing — is
-**surfaced to the admin** while the earlier-seen value holds. The flag never blocks
-publication, and only an equal-rank clash raises one: a disagreement the ladder settles at
-step 3 or 4 is resolved silently, including one a first-hand record loses.
-
-**The UID follows the founding record** — the earliest `firstSeenAt`. On a split it stays with
-whichever side still holds that record; on a join the older UID survives. ⚠️ A join therefore
-retires a UID and a subscriber loses that entry: iCal has no merge, so the rule can only
-choose which survives. See **UID**, ADR-0004, ADR-0022 §8.
-
-**How records come to be in one cluster is Matching**, below. ADR-0022 defines what a cluster is
-and what follows once records are in one; ADR-0023 defines how records enter one.
-
-### Matching
-
-The rule that puts two **Scraped** records into one **Cluster**. It is **source-blind** — two
-records from one source join on exactly the terms two records from different sources do.
-
-⚠️ **No firm date, no cluster.** Both records must carry one. A record whose source gives a month
-but no day — EventsEye's `Sept. 2027 (?)` — joins nothing, and publishes alone until the source
-firms it. This is what stops next year's edition of an annual show being joined to this year's:
-identical title, identical venue, and no date to disagree on. **61 of EventsEye's 79 soft-dated
-rows are exactly that pair.** ADR-0023 §1.
-
-Titles are compared after **conservative normalisation**: accents stripped, quotes straightened,
-case-folded, any four-digit year removed, non-alphanumerics collapsed. ⚠️ **Domain words are not
-stopwords** — stripping `asia`, `expo`, `week`, `singapore` merges `TECH WEEK SINGAPORE` into
-`ASIA TECH X SINGAPORE`, and merges four of the six shows co-located at MBS on a given date. Here
-those words *are* the title.
-
-| Outcome | Test |
+| | |
 |---|---|
-| **Join, automatically** | Titles identical, dates overlap |
-| **Ask the admin** | Titles similar but not identical, dates overlap |
-| **Ask the admin** | Titles identical, both dated, dates do not overlap, starts within ~60 days |
-| **Nothing, silently** | Everything else — including titles identical and starts months apart, which is the next edition |
+| **Default** | **Visible.** Nothing waits for approval; a newly scraped record renders at once. The admin page is a cleanup list, not a gate. |
+| **Effect** | Absent from the web calendar **and from every feed**. One word, one meaning. |
+| **Who sets it** | **Only a person.** Never a rule, an adapter or a pipeline step. |
+| **Why** | **Not recorded.** The flag says *that*, never *why*, *when* or *by whom*. |
+| **Where** | **VenueEvent only.** |
+| **Reversible** | Yes, completely — see below. |
 
-Ambiguous matches go to the admin on **#120's existing surface**, never a second one. ⚠️ The
-thresholds are calibrated against one corpus with one similarity function, and are meaningless
-without it — see [`docs/research/aggregator-overlap.md`](docs/research/aggregator-overlap.md) §9.
+Three reasons to hide exist in practice — not tourism or MICE, the same show as another row,
+and unusable data — and none of them changes what happens, so none is stored. ⚠️ Accepted
+cost: how much of a source is being hidden as irrelevant cannot be counted afterwards.
 
-**A join is permanent until a human splits it.** Matching only ever *creates* a cluster; nothing
-dissolves one. Two sources drifting apart on a date does not break a join — that is a field
-disagreement, and the **field ladder** already settles it. Were it otherwise, routine drift would
-retire a UID and flap entries in and out of subscribers' calendars. ⚠️ A *wrong* join is equally
-sticky: automatic matching never corrects itself.
+**Only a person sets it, because otherwise the flag means two things that cannot be told
+apart** — *I judged this* and *the software found this odd*. A row that cannot be parsed into
+a usable event (RWS's `0001-01-01` dates) is a broken row under **Source health** and never
+becomes a **VenueEvent**, so there is nothing for a machine to hide. Sweeping a scraper fault
+off the calendar would turn a problem into a tidy-looking answer.
 
-**Chained matches make one cluster.** A cluster is a set, not a graph of links: if A joins B and B
-joins C, all three are one entry even where A and C would not have matched. ⚠️ At 21 sources this
-will occasionally over-group — which shows as one entry where there should be two, and is
-correctable by a split. That is the tolerable direction.
+**`PortCall` does not carry it.** There are two terminals, both first-hand, no aggregator
+reports them — a duplicate is near-impossible and a ship docking is never irrelevant. A broken
+cruise row is a *parser* fault and belongs in `failures[]` where it is visible.
+**`ArrivalsSummary` does not carry it** — recomputed every run, one per date by construction,
+nothing to judge. **`FlightArrival`** has no `uid` and never renders.
 
-**A human's *not the same* is permanent**, stored against the pair of `(source, sourceKey)`
-identities — the only identity that survives cluster reshapes and UID retirement. Without it the
-whole ambiguous queue returns every run. ⚠️ **It silences a suggestion; it never breaks a
-cluster.** Breaking one is a split, and a split is only ever a human action.
+⚠️ **This is not the absence Seen-tracking governs.** A record that stops being scraped keeps
+rendering: the model refuses to resolve absence into a status the source never stated, and
+`lastSeenAt` simply stops advancing. Only a person's judgement takes an entry off the calendar.
 
-⚠️ **There is no undo.** A split is a new forward action, not a reversal: the side that lost its
-UID at the join gets a *fresh* one, not its old one back (see **UID**, ADR-0022 §8). No data is
-ever lost — every record survives as scraped and only the grouping changes — but a bad join costs
-subscribers churn that splitting does not refund.
+**Hiding is genuinely reversible.** Nothing is retired and nothing is minted, so unhiding
+restores the same entry, with the same `uid`, to the same subscriber.
 
-**This reverses v1.** Duplicates were *accepted and labelled by source*; they are now *grouped*.
-See ADR-0023.
+**Remembered, not observed.** `hidden` sits with `uid`, `sequence`, `firstSeenAt` and
+`lastSeenAt` on the core side of the observe/remember line and is excluded from **Scraped** —
+otherwise the next run's upsert would silently un-hide everything ever judged.
+
+**Hidden records are dropped before projection**, so **CalendarEntry** never carries the flag
+and no serializer can forget to check it. The admin page reads **VenueEvent** directly.
+
+ADR-0024.
+
+### Manual entry
+
+A human can type in an event no source published. It is modelled as a **Source** named
+`manual` rather than as a new shape, so `(source, sourceKey)` stays the universal identity:
+`sourceKey` is minted by the admin page, `firstSeenAt` is when it was typed, and `lastSeenAt`
+is the same instant and never advances.
+
+⚠️ **`manual` is exempt from Source health by name.** The net-drop test compares against a
+previous run's cohort; `manual` is never fetched, so it has no runs and the signal has nothing
+to read. Without the exemption a frozen `lastSeenAt` would look like a source going quiet.
+
+⚠️ It is the **only** exception to *every record comes from an adapter* — a second write path
+into the store. ADR-0024 §9.
+
+### ⛔ Cluster and Matching — not in the MVP
+
+**Grouping duplicate records into one entry is not built.** Nothing joins anything: every
+record stands alone under `(source, sourceKey)` and renders as its own entry, and a person
+**hides** the copies. Cross-source overlap was measured at **5 duplicates in 194 rows**, which
+is a handful of decisions rather than a job.
+
+⚠️ **Accepted cost:** with no merging there is no best-field-wins. Where one source publishes
+`Sands Expo, Hall D` and another bare `Singapore`, hiding one keeps whatever the survivor says.
+
+ADR-0022 and ADR-0023 define the cluster, the field ladder and the matching rule in full, and
+are the shape to return to — see ADR-0024's *Reopen trigger*. They are not wrong; they are
+unaffordable for the MVP. Nothing about them is repeated here, because a domain document that
+describes two models at once cannot be read.
 
 ### Timing
 
