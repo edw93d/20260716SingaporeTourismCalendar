@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-04T20:53:32Z",
+  "generatedAt": "2026-08-05T20:46:14Z",
   "venueEvents": [
     {
       "uid": "b84c6c47-5f4e-468b-9bcd-f2a6a3a69a9e@sg-tourism-calendar",
@@ -2807,15 +2807,15 @@
   "sources": [
     {
       "source": "mbccs",
-      "lastConfirmed": "2026-08-04T20:53:32Z"
+      "lastConfirmed": "2026-08-05T20:46:14Z"
     },
     {
       "source": "scc",
-      "lastConfirmed": "2026-08-04T20:53:32Z"
+      "lastConfirmed": "2026-08-05T20:46:14Z"
     },
     {
       "source": "suntec",
-      "lastConfirmed": "2026-08-04T20:53:32Z"
+      "lastConfirmed": "2026-08-05T20:46:14Z"
     }
   ]
 }
