@@ -52,3 +52,17 @@ postdate every audit above. Where a research doc states a legal verdict, the reg
 3. When something later supersedes it, change the banner to `⚠️ Superseded by <doc/ADR> on <date> —
    kept for the record, because it records what was read on <date>`, update this table, and **change
    nothing else in the file**.
+
+There is a third form, and it is not a hedge. **`⚠️ Superseded in part` is correct whenever a flat
+⚠️ would point someone away from the only record of something.** Use it when a wider document
+replaced this one's *conclusions* but never re-derived some part of its *detail* — and when you do,
+say in the banner exactly which sections still stand and why, so the reader knows what to trust
+without reading both documents.
+
+[`source-capability-audit.md`](source-capability-audit.md) is the worked example. #113 superseded it
+as a source survey, but never re-derived which bytes to parse for `suntec`, `mbccs` and `scc` — the
+three adapters in production. A flat ⚠️ would have retired the only record of how they read their
+sources.
+
+**Do not reach for it to avoid a judgement call.** If a document is wholly superseded, say so; the
+whole point of keeping it is that being wrong on the record is useful.
