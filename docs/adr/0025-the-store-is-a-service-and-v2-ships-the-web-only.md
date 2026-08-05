@@ -242,7 +242,10 @@ entry. The schema is v1's two tables plus the flight tables plus two booleans �
   from *"the repository is private, the calendar is personal… it reads and it stores, and it does not
   publish."* The repository is **public**, Pages is **public**, and the feed serves **200**. Retiring
   the feeds removes the republication of scraped facts in ICS form; **the public repository and the
-  public site remain.** That is not #117's to rule on. Raised on map #112.
+  public site remain** — and §4 adds one more, since the web calendar is now *served* and **who may
+  reach it is undecided** (#118 covers the admin page only). That is not #117's to rule on: sharpened
+  into **[#144](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/144)**, which can
+  reopen ADR-0021, ADR-0024 §5 and `docs/source-register.md` at once.
 - **`src/store/store.ts` is rewritten and `better-sqlite3` leaves the dependency list.** The 253-line
   module's *shape* survives — one upsert path, minting and seen-tracking in the core, written once
   rather than once per type — which is what ADR-0005 asked of it. Its comment naming git-as-database

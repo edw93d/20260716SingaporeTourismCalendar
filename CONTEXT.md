@@ -522,8 +522,10 @@ retroactively on the archive already built.
 repository is **public**, GitHub Pages is **public**, and v1's feed serves **200** — found while
 working #117 (05 Aug 2026). ADR-0025 §3 stops the feeds being published, which removes the
 republication of scraped facts in ICS form; **the public repository and the public site remain**.
-So does everything that rests on non-publication, including **Hidden**'s visible-by-default. Raised
-on map #112 for a ruling; ADR-0021 is unchanged until it gets one.
+So does everything that rests on non-publication, including **Hidden**'s visible-by-default — and
+ADR-0025 added a surface nobody has ruled on, since the **Web calendar** is now *served* and who may
+reach it is undecided. **[#144](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/144)**
+holds the question; ADR-0021, ADR-0024 and `docs/source-register.md` are unchanged until it rules.
 
 *Barred* is not *stopped*. Five **hard stops** are absolute and no accepted-MVP-risk
 ruling reaches them: a `robots.txt` `Disallow` on the path, any authentication wall, an
