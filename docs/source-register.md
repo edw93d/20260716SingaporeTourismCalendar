@@ -142,29 +142,54 @@ near-certain *no* that converts *not pursued* into *formally refused*, for nothi
 
 ## Open risks
 
-- ⚠️ **Marina Bay Sands blocks the honest User-Agent — tested 05 Aug 2026, one confound unexcluded.**
-  Playwright, four configurations, crossing engine against User-Agent:
+- ✅ **Marina Bay Sands serves an honestly-identified reader — risk reduced, 05 Aug 2026 ([#135](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/135)).**
+  The earlier finding below it was drawn from **one** honest User-Agent, which conflated *honesty*
+  with *string shape*. Re-run as a matrix, real Chrome headed, **honest-first**, ≥10 s apart:
 
-  | Configuration | Result |
+  | User-Agent sent | Result |
   |---|---|
-  | Bundled Chromium (headless), default UA | `ERR_HTTP2_PROTOCOL_ERROR` |
-  | Bundled Chromium (headless), honest UA | `ERR_HTTP2_PROTOCOL_ERROR` |
-  | **Real Chrome (headed), default UA** | **HTTP 200** |
-  | **Real Chrome (headed), honest UA** | **`ERR_HTTP2_PROTOCOL_ERROR`** |
+  | `Mozilla/5.0 (compatible; sg-tourism-calendar/0.1; +https://github.com/edw93d/…)` | `ERR_HTTP2_PROTOCOL_ERROR` |
+  | `Mozilla/5.0 (compatible; sg-tourism-calendar/0.1; +github.com/edw93d/…)` | `ERR_HTTP2_PROTOCOL_ERROR` |
+  | `Mozilla/5.0 (compatible; sg-tourism-calendar/0.1; github.com/edw93d/…)` | `ERR_HTTP2_PROTOCOL_ERROR` |
+  | `Mozilla/5.0 (compatible; sg-tourism-calendar/0.1; +https://example.com/bot)` | `ERR_HTTP2_PROTOCOL_ERROR` |
+  | `Mozilla/5.0 (compatible; sg-tourism-calendar/0.1; contact via GitHub issues)` | `ERR_HTTP2_PROTOCOL_ERROR` |
+  | `sg-tourism-calendar/0.1 (+https://github.com/edw93d/…)` *(the string #113 tested)* | `ERR_HTTP2_PROTOCOL_ERROR` |
+  | **`Mozilla/5.0 (compatible; sg-tourism-calendar/0.1)`** | **HTTP 200, 2442 bytes, marker matched** |
+  | **`Mozilla/5.0 (compatible; sg-tourism-calendar/0.1; +edw93d/20260716SingaporeTourismCalendar)`** | **HTTP 200, 2442 bytes, marker matched** |
+  | Real Chrome, its own default UA *(control)* | HTTP 200, 2442 bytes, marker matched |
 
-  So **two** filters sit in front of MBS: an automation-fingerprint check that headless fails under
-  any User-Agent, and — apparently — a User-Agent check that a real Chrome fails once it stops
-  claiming to be Chrome. The block signature is identical to plain `curl` (`http=000` in ~50 ms).
+  **The discriminator is not honesty and not the `Mozilla/5.0` token.** Both served forms declare
+  themselves a bot by name; the blocked forms include one that declares nothing beyond the same name.
+  What separates them is the *comment field*: every string carrying a **hostname-shaped token or
+  whitespace** in the third field is refused, and the two without one are served — byte-identical to
+  what Chrome's own User-Agent receives, room-level content included.
 
-  ⚠️ **Confound, stated rather than buried:** the honest-UA case ran fourth, so rate-based blocking
-  after three prior loads is not excluded. Re-running with the honest case first would settle it,
-  and **#121 gets that for free** when it prices the MBS adapter, since it must drive a browser at
-  the host anyway.
+  ✅ **Route 1's confound is settled at the same time.** The leading candidate ran **first**, on a
+  cold browser, and was still blocked in ~50 ms. Rate-based blocking after prior loads is excluded;
+  the filter is User-Agent-string-based. The repeat of that same string later in the run reproduced
+  the block exactly, and the served form reproduced 200 three times.
 
-  **The confound affects confidence, not the ruling.** Even the one passing configuration passed only
-  by sending Chrome's *default* User-Agent, which ADR-0021 §2 forbids. On today's evidence MBS is
-  reachable only by impersonating a browser, and §4 rules that the source drops rather than the
-  identification. Recorded as **blocked pending #121's confirmation**, not yet as `stopped`.
+  ⚠️ **This does not clear §2.1 by itself.** §2.1 obliges a User-Agent *"naming the project and
+  **linking the repository**"* — and every form carrying a resolvable URL is exactly what MBS
+  refuses. `+edw93d/20260716SingaporeTourismCalendar` names the repository as an owner/repo path
+  without a scheme or host. **Whether that counts as *linking* is an ADR reading, not a test result,
+  and it is owner-held.** Two questions go with it: whether `Mozilla/5.0 (compatible; …)` is a
+  "browser string" under §2.1's *never a browser string* (it carries the token but claims to be a
+  bot, and §4.5 bars only claiming to be *a human's browser*), and whether a UA the host will not
+  accept a contact URL in still discharges the *identify* obligation in substance.
+
+  ⚠️ **Methodology note, because it produced a false negative once.** `waitUntil: "networkidle"`
+  **never settles on this page even under Chrome's own User-Agent** — the first pass timed out on
+  the known-good control and would have been read as a block. The directory is client-rendered; the
+  correct settle is `domcontentloaded` then poll `document.body.innerText` for `/next 3 days/i`.
+  Block signature remains `ERR_HTTP2_PROTOCOL_ERROR` in ~50 ms, distinguishable from a timeout.
+
+  Headless remains blocked under every User-Agent, so the real-Chrome route stands (#121).
+- ⚠️ *Superseded, kept for the record —* **MBS was recorded as blocking the honest User-Agent, 05 Aug
+  2026 (#113).** Four configurations crossing engine against User-Agent: headless was refused under
+  both the default and the honest UA; real Chrome was served under the default UA and refused under
+  `sg-tourism-calendar/0.1 (+https://github.com/edw93d/…)`. The engine finding holds. The User-Agent
+  finding was **true of that string and generalised too far** — see the entry above.
 - ✅ **MBCCS is clear — risk closed, 05 Aug 2026.** All four configurations returned HTTP 200 with
   the expected content, **including headless with the honest User-Agent** (177–1527 ms). The
   production adapter can adopt ADR-0021 §2 with no reachability cost, and needs no real-Chrome

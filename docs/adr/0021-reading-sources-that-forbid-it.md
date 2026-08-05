@@ -149,21 +149,47 @@ zero-effort refusal, and us a defensible answer to *"did you give them any way t
    defeat a filter, no IP rotation or residential proxies to look like different people. This is
    the principle underneath (4), named separately because the whole facts-only defence stands on it.
 
-**Honest identification wins even when it costs a source — and on current evidence it does.** MBS is
-reachable only because #113's amendment drove a *real Chrome instance* at it; Akamai drops every
-scripted client at TLS, even with full Chrome headers. That was the predicted failure mode, and it
-was **tested on 05 Aug 2026: a real Chrome sending `sg-tourism-calendar/0.1` is blocked, while the
-same browser sending Chrome's default User-Agent is served.** One confound is unexcluded — the honest
-case ran fourth, so rate-based blocking is not ruled out, and #121 will settle it — but the ruling
-does not turn on it: **the only configuration that reached MBS did so by claiming to be Chrome**,
-which §2 forbids.
+**Honest identification wins even when it costs a source.** That principle is unchanged. What has
+changed is that it does not, in fact, cost us MBS.
 
-So MBS is, today, a source we cannot reach without impersonating a person, and **MBS drops** rather
-than the identification. An adapter that works only while pretending to be human is the single worst
-fact this project could hold — it is precisely what MBS's "or any similar or equivalent manual
-process" clause anticipates, and it would poison the facts-only argument for all nineteen other
-sources. Losing MBS is a real cost: seven months of clean horizon on the shows page, and a 3-day
-directory where delay destroys history permanently. It is the cost this rule was written to accept.
+> **Amended 05 Aug 2026 on [#135](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/135).
+> The ruling below — that MBS drops — is reversed on evidence.** MBS **serves** an honestly-identified
+> reader. The original test ran **one** honest string and generalised from it, conflating the string's
+> *honesty* with its *shape*. Re-run as a matrix, real Chrome headed, honest-first, MBS returns HTTP
+> 200 to `Mozilla/5.0 (compatible; sg-tourism-calendar/0.1)` and to
+> `Mozilla/5.0 (compatible; sg-tourism-calendar/0.1; +edw93d/20260716SingaporeTourismCalendar)` —
+> byte-identical to what Chrome's own User-Agent receives. Both declare themselves a bot by name and
+> impersonate nothing. What MBS refuses is any User-Agent carrying a **hostname-shaped token or
+> whitespace** in its comment field, whatever it claims to be. **The block was never about honesty.**
+>
+> Two things survive the reversal. **The engine finding holds** — headless is refused under every
+> User-Agent, so the real-Chrome route stands. And **§2.1 is not automatically satisfied**: it obliges
+> a User-Agent *linking the repository*, and every form carrying a resolvable URL is precisely what
+> MBS refuses. The served form names the repository as a scheme-less `owner/repo` path. Whether that
+> discharges *linking* is a reading of §2.1, not a test result, and is owner-held — see
+> `docs/source-register.md` → *Open risks*, which carries the full matrix and the two adjacent
+> readings it raises.
+>
+> **The confound in the original test is also settled**: the winning candidate ran first, on a cold
+> browser, and was still refused in ~50 ms, so rate-based blocking is excluded. #121 no longer owes it.
+
+*Superseded, kept because the reasoning is instructive:* MBS is reachable only because #113's
+amendment drove a *real Chrome instance* at it; Akamai drops every scripted client at TLS, even with
+full Chrome headers. That was the predicted failure mode, and it was tested on 05 Aug 2026: a real
+Chrome sending `sg-tourism-calendar/0.1` is blocked, while the same browser sending Chrome's default
+User-Agent is served. One confound is unexcluded — the honest case ran fourth, so rate-based blocking
+is not ruled out. The ruling drawn from it was that **the only configuration that reached MBS did so
+by claiming to be Chrome**, so MBS is a source we cannot reach without impersonating a person, and
+**MBS drops** rather than the identification — an adapter that works only while pretending to be
+human being the single worst fact this project could hold, precisely what MBS's "or any similar or
+equivalent manual process" clause anticipates, and poison for the facts-only argument across all
+nineteen other sources. Losing MBS was accepted as a real cost: seven months of clean horizon on the
+shows page, and a 3-day directory where delay destroys history permanently.
+
+**The instructive part is the failure mode, not the conclusion.** One negative test was read as a
+property of the whole class it belonged to. The cost of that error was nearly the largest venue on
+the list — 60% of Singapore's listed trade shows — and it was caught only because the ruling was
+written down explicitly enough to be argued with.
 
 **MBCCS, tested identically, is clear** — all four configurations served it, including headless with
 the honest User-Agent. The rule costs nothing in production.
