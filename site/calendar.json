@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-29T03:09:00Z",
+  "generatedAt": "2026-08-04T20:53:32Z",
   "venueEvents": [
     {
       "uid": "b84c6c47-5f4e-468b-9bcd-f2a6a3a69a9e@sg-tourism-calendar",
@@ -674,6 +674,14 @@
       "source": "suntec"
     },
     {
+      "uid": "6ad1a304-cfa8-49d8-a829-eb62bcbe5252@sg-tourism-calendar",
+      "summary": "Bandai Spirits Ichiban Kuji B2B Conference",
+      "start": "2026-08-06T06:00:00Z",
+      "end": "2026-08-06T10:00:00Z",
+      "location": "Suntec Convention Centre, Level 3, Meeting Room 323",
+      "source": "suntec"
+    },
+    {
       "uid": "425a7ba8-8f87-4ead-ad55-9d16fa929432@sg-tourism-calendar",
       "summary": "BNI-Lighthouse(7/8/2026)",
       "start": "2026-08-06T23:30:00Z",
@@ -802,6 +810,14 @@
       "source": "suntec"
     },
     {
+      "uid": "73ec3be7-716c-4dd6-af3d-8c68b8317af8@sg-tourism-calendar",
+      "summary": "The 5th China Dragon Coin Exchange Conference",
+      "start": "2026-08-15T06:00:00Z",
+      "end": "2026-08-15T10:00:00Z",
+      "location": "Suntec Convention Centre, Level 3, Meeting Room 323",
+      "source": "suntec"
+    },
+    {
       "uid": "b12a1f36-5080-4c19-a839-30c15ee9b574@sg-tourism-calendar",
       "summary": "CHC Weekend Services",
       "start": "2026-08-15T09:00:00Z",
@@ -839,6 +855,14 @@
       "start": "2026-08-16T02:00:00Z",
       "end": "2026-08-16T04:00:00Z",
       "location": "Suntec Convention Centre",
+      "source": "suntec"
+    },
+    {
+      "uid": "0dec7da5-00b3-46d0-8db5-b898dda8c466@sg-tourism-calendar",
+      "summary": "MONETARIUM AUCTION 40",
+      "start": "2026-08-17T02:00:00Z",
+      "end": "2026-08-17T10:00:00Z",
+      "location": "Suntec Convention Centre, Level 3, Meeting Room 323",
       "source": "suntec"
     },
     {
@@ -1823,7 +1847,7 @@
       "uid": "befcd305-1504-4a6e-acee-f8eceb8570ef@sg-tourism-calendar",
       "summary": "Cruise: ODYSSEY VILLA VIE RESIDENCES at Singapore Cruise Centre",
       "start": "2026-07-30T00:00:00Z",
-      "end": "2026-08-01T11:00:00Z",
+      "end": "2026-08-07T06:00:00Z",
       "location": "Singapore Cruise Centre",
       "source": "scc"
     },
@@ -1874,6 +1898,14 @@
       "end": "2026-08-07T12:00:00Z",
       "location": "MBCCS",
       "source": "mbccs"
+    },
+    {
+      "uid": "34908fbc-b401-4d69-b419-77e16c8544ad@sg-tourism-calendar",
+      "summary": "Cruise: ISLAND SKY NOBLE CALEDONIA at Singapore Cruise Centre",
+      "start": "2026-08-07T10:00:00Z",
+      "end": "2026-08-08T10:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
     },
     {
       "uid": "ee330a81-caba-48c1-bedc-87af7fbddc3e@sg-tourism-calendar",
@@ -2452,10 +2484,322 @@
       "source": "mbccs"
     },
     {
+      "uid": "4054df51-986c-498c-8efb-856f2e8dd002@sg-tourism-calendar",
+      "summary": "Cruise: VIKING SEA VIKING OCEAN CRUISES at Singapore Cruise Centre",
+      "start": "2026-10-30T00:00:00Z",
+      "end": "2026-10-30T09:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
       "uid": "b9c71fe0-edb6-41ce-ab3f-1a2214d41a88@sg-tourism-calendar",
       "summary": "Cruise: Genting Dream at MBCCS",
       "start": "2026-10-30T06:00:00Z",
       "end": "2026-10-30T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "ecd8dc38-b906-428c-a3c2-e34a943080a1@sg-tourism-calendar",
+      "summary": "Cruise: VIKING VENUS VIKING OCEAN CRUISES at Singapore Cruise Centre",
+      "start": "2026-10-31T00:00:00Z",
+      "end": "2026-11-01T08:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "102be886-caac-43c7-8891-4f4bac07c005@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-11-01T06:00:00Z",
+      "end": "2026-11-01T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "0308dee5-fbd1-44c9-b9e5-f7dd32f5bec3@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-11-01T21:30:00Z",
+      "end": "2026-11-02T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "4cd8cc42-8e39-4441-97f4-2c8e93604215@sg-tourism-calendar",
+      "summary": "Cruise: Navigator of the Seas at MBCCS",
+      "start": "2026-11-01T23:00:00Z",
+      "end": "2026-11-02T08:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "03b25a8f-153e-41c3-a24e-71251de631af@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-11-02T23:00:00Z",
+      "end": "2026-11-03T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "6d100a1c-8b20-4563-b95e-8984086915fa@sg-tourism-calendar",
+      "summary": "Cruise: NAUTICA OCEANIA CRUISES at Singapore Cruise Centre",
+      "start": "2026-11-03T23:00:00Z",
+      "end": "2026-11-04T10:00:00Z",
+      "location": "Singapore Cruise Centre",
+      "source": "scc"
+    },
+    {
+      "uid": "05f7e167-dc8a-4e53-81f1-09bf220cb456@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-11-04T21:30:00Z",
+      "end": "2026-11-05T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "0c1061f7-44d4-4aa9-854f-a68e82189582@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-11-06T06:00:00Z",
+      "end": "2026-11-06T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "59f9b9e7-cbb9-4659-9953-f40af558cb6f@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-11-08T06:00:00Z",
+      "end": "2026-11-08T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "c43ce1c6-6d23-4e57-8904-57fa3985f61e@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-11-08T21:30:00Z",
+      "end": "2026-11-09T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "91db21fb-e7f6-4ea4-bd2b-54a6e7016ea7@sg-tourism-calendar",
+      "summary": "Cruise: Navigator of the Seas at MBCCS",
+      "start": "2026-11-08T23:00:00Z",
+      "end": "2026-11-09T08:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "1574c4d3-c795-4e63-8543-ccd5f0888dfa@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-11-09T23:00:00Z",
+      "end": "2026-11-10T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "15df81dd-31fb-46fb-9983-3466dd9230be@sg-tourism-calendar",
+      "summary": "Cruise: Royal Princess at MBCCS",
+      "start": "2026-11-09T23:00:00Z",
+      "end": "2026-11-10T08:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "bb86c1d5-4400-4511-8442-a606cb2cbda4@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-11-11T21:30:00Z",
+      "end": "2026-11-12T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "18a3dea6-6963-461f-bb06-802eba285fe5@sg-tourism-calendar",
+      "summary": "Cruise: Navigator of the Seas at MBCCS",
+      "start": "2026-11-11T23:00:00Z",
+      "end": "2026-11-12T08:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "6adad313-65b8-463c-a2c5-6c10913d4d1d@sg-tourism-calendar",
+      "summary": "Cruise: Carnival Luminosa at MBCCS",
+      "start": "2026-11-13T00:00:00Z",
+      "end": "2026-11-13T10:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "6e64fcfe-013a-4993-b719-0f321bb1dade@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-11-13T06:00:00Z",
+      "end": "2026-11-13T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "17e45b3a-113e-44de-9521-53d8093b3f31@sg-tourism-calendar",
+      "summary": "Cruise: Adora Mediterranea at MBCCS",
+      "start": "2026-11-14T04:00:00Z",
+      "end": "2026-11-14T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "2fe0337b-e00d-4af2-b1fb-8a9e30ed25e0@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-11-15T06:00:00Z",
+      "end": "2026-11-15T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "9c5b98a5-3031-49d2-bf79-8e3c8b47034c@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-11-15T21:30:00Z",
+      "end": "2026-11-16T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "2ec67a9a-97ff-43e7-9f8c-7f120adf53b1@sg-tourism-calendar",
+      "summary": "Cruise: Navigator of the Seas at MBCCS",
+      "start": "2026-11-15T23:00:00Z",
+      "end": "2026-11-16T08:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "17868524-0942-4d2e-bebb-68db2ab5da18@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-11-16T23:00:00Z",
+      "end": "2026-11-17T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "046e3bcd-1f1b-4379-b8f5-390a7209c67a@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-11-18T21:30:00Z",
+      "end": "2026-11-19T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "f97b5b75-0719-4988-9144-110789942798@sg-tourism-calendar",
+      "summary": "Cruise: Navigator of the Seas at MBCCS",
+      "start": "2026-11-18T23:00:00Z",
+      "end": "2026-11-19T08:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "2515dc65-eba5-4bd4-9b88-dfcb6fb656f8@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-11-20T06:00:00Z",
+      "end": "2026-11-20T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "4d345e0d-89f9-45b0-acfb-f484ef1d07d8@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-11-22T06:00:00Z",
+      "end": "2026-11-22T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "18927cd4-b180-48e1-9a2a-a3e6b25a85b0@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-11-22T21:30:00Z",
+      "end": "2026-11-23T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "704917d5-2de2-44a2-b41f-5e87d2a5b39c@sg-tourism-calendar",
+      "summary": "Cruise: Navigator of the Seas at MBCCS",
+      "start": "2026-11-23T23:00:00Z",
+      "end": "2026-11-24T08:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "71257068-622f-4ad2-bba7-fa4739bd53b9@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-11-23T23:00:00Z",
+      "end": "2026-11-24T05:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "6b9b9d4b-fc3c-4a8b-834d-714e970be758@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-11-25T21:30:00Z",
+      "end": "2026-11-26T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "8b46ef46-9e72-49a3-a287-6c55f28877cf@sg-tourism-calendar",
+      "summary": "Cruise: Celebrity Millennium at MBCCS",
+      "start": "2026-11-25T23:00:00Z",
+      "end": "2026-11-26T10:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "42e07baa-b71a-4b43-9b9e-ac858d92ddd4@sg-tourism-calendar",
+      "summary": "Cruise: Navigator of the Seas at MBCCS",
+      "start": "2026-11-26T23:00:00Z",
+      "end": "2026-11-27T08:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "37fdeb6e-4467-4665-a43f-6cb79e546234@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-11-27T06:00:00Z",
+      "end": "2026-11-27T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "7426876e-aa93-4baf-a1b9-a95a9a30ee6b@sg-tourism-calendar",
+      "summary": "Cruise: Navigator of the Seas at MBCCS",
+      "start": "2026-11-28T23:00:00Z",
+      "end": "2026-11-29T08:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "f1ca3a20-bdaa-494d-9dc9-c48da6fdcd19@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-11-29T06:00:00Z",
+      "end": "2026-11-29T12:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "5063349b-b376-4f96-8f76-9d23d58defa7@sg-tourism-calendar",
+      "summary": "Cruise: Disney Adventure at MBCCS",
+      "start": "2026-11-29T21:30:00Z",
+      "end": "2026-11-30T09:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "dc633592-0165-4897-9568-ac27eaf0bcf7@sg-tourism-calendar",
+      "summary": "Cruise: Carnival Luminosa at MBCCS",
+      "start": "2026-11-29T23:00:00Z",
+      "end": "2026-11-30T10:00:00Z",
+      "location": "MBCCS",
+      "source": "mbccs"
+    },
+    {
+      "uid": "cd6f99e7-0d92-4524-b3fd-d9178873f0d1@sg-tourism-calendar",
+      "summary": "Cruise: Genting Dream at MBCCS",
+      "start": "2026-11-30T23:00:00Z",
+      "end": "2026-12-01T05:00:00Z",
       "location": "MBCCS",
       "source": "mbccs"
     }
@@ -2463,15 +2807,15 @@
   "sources": [
     {
       "source": "mbccs",
-      "lastConfirmed": "2026-07-29T03:09:00Z"
+      "lastConfirmed": "2026-08-04T20:53:32Z"
     },
     {
       "source": "scc",
-      "lastConfirmed": "2026-07-29T03:09:00Z"
+      "lastConfirmed": "2026-08-04T20:53:32Z"
     },
     {
       "source": "suntec",
-      "lastConfirmed": "2026-07-29T03:09:00Z"
+      "lastConfirmed": "2026-08-04T20:53:32Z"
     }
   ]
 }

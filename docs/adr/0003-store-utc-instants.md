@@ -1,6 +1,6 @@
 # ADR-0003: Store UTC instants; retire the inclusive-end-date rule
 
-- **Status:** Accepted
+- **Status:** Accepted; **superseded in part** by [ADR-0019](./0019-arrivals-summary-is-an-all-day-record.md) — the "no all-day shape" clause, for `ArrivalsSummary` only
 - **Date:** 2026-07-16
 - **Ticket:** [#7](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/7)
 - **Amends:** the map's "store inclusive end dates; serializer does `DTEND`'s +1" note
@@ -48,6 +48,9 @@ literal and no timezone library is needed at serialization.
 - One record still maps to exactly one VEVENT and one Excel row, so Excel stays
   un-foreclosed at no cost.
 - A future date-only source would need this reopened. None is in scope.
+  **This trigger fired on 04 Aug 2026** — see [ADR-0019](./0019-arrivals-summary-is-an-all-day-record.md).
+  `ArrivalsSummary` is a date-only record by construction; `VenueEvent` and `PortCall`
+  are unaffected and everything else in this ADR stands.
 
 ## Alternatives rejected
 
