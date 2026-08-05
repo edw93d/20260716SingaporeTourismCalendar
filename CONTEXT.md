@@ -561,6 +561,11 @@ event; hash the start date and a *rescheduled* conference duplicates rather than
 moves — precisely the change subscribers most need delivered as an update. Same key
 + changed content = same UID, bump `sequence`.
 
+**In v2 the UID is held by the Cluster**, minted against its founding record — the one with
+the earliest `firstSeenAt` — and follows that record if the cluster is later split. This is
+what lets a first-hand record arrive months late without the entry vanishing and reappearing.
+See **Cluster**, ADR-0022.
+
 ### Seen-tracking
 
 Records are **never hard-deleted**. Each carries `firstSeenAt` / `lastSeenAt`; a
@@ -668,8 +673,66 @@ track provenance (RWS is first-hand and publishes `0001-01-01` null dates; bigev
 second-hand and publishes clean ISO instants). It says who *knows*, not who *typed it
 correctly*, so it orders a merge rather than picking a winning record.
 
+**Precisely: it is step 4 of the field ladder, and nothing else** (see **Cluster**). It does
+not decide whether an entry exists — a cluster with no first-hand record publishes on its own
+— and it does not decide whether an entry belongs on this calendar, which is the relevance
+verdict. It loses outright to a more specific value, so it separates only two records that
+are already equally specific and equally firm. ADR-0022 §6.
+
+**A flat property of the source**, applying to everything it publishes: Sentosa is first-hand
+for the whole island, including events run by other operators on it. Not derived per record
+from the venue — that field is blank too often to key a rule off (bare `Singapore` on 4 of 13
+bigevent.io rows and 2 of 96 EventsEye rows). ADR-0022 §3.
+
 ⚠️ It gives **no** tiebreak between two second-hand sources — the most common duplicate,
-since EventsEye, bigevent.io and TTGmice overlap heavily. See ADR-0020.
+since EventsEye, bigevent.io and TTGmice overlap heavily. That gap is closed by the ladder's
+steps 5–6, not by provenance. See ADR-0020, ADR-0022.
+
+**"Primary" and "secondary" are retired.** They named this same property and were dropped so
+the idea cannot resurface as a second axis. Credibility/authority is deliberately not
+modelled — see ADR-0020.
+
+### Cluster
+
+A set of **Scraped** records believed to describe the same real-world event. The calendar
+renders **one entry per cluster**, and the cluster holds the entry's `uid` and `sequence`.
+
+Nothing is ever dropped as a duplicate. Every record stays under `(source, sourceKey)`;
+duplicates are *grouped*. Dropping them would blind every per-source signal in
+**Source health** — a source going quiet would look identical to a source being deduplicated
+away.
+
+**The field ladder.** Each field of the rendered entry is taken by running down this list and
+stopping where one record is left:
+
+| | Step | |
+|---|---|---|
+| 1 | Seen in the latest run | If none was, all records are eligible — else a quiet cluster renders empty. |
+| 2 | Has a real value | `0001-01-01` and an empty `dates[]` are not values. |
+| 3 | More specific | `Sands Expo, Hall D` beats a bare `Singapore`. |
+| 4 | First-hand | See **Provenance**. |
+| 5 | Earliest `firstSeenAt` | |
+| 6 | Alphabetical by source key | Arbitrary, deterministic, written down. |
+
+Step 1 makes the merge **self-healing**: when the record holding a field stops appearing, the
+field falls through to a live record, and returns if it comes back. That reads an observation,
+not a status — **Seen-tracking** still refuses to infer why a record is absent. ⚠️ A flickering
+row therefore flips a value and bumps `sequence`. A visible flap beats a frozen value.
+
+Reaching step 5 means the model had no substantive reason to prefer either value. So an
+**equal-rank clash** — equally specific, equally firm, equal provenance, and disagreeing — is
+**surfaced to the admin** while the earlier-seen value holds. The flag never blocks
+publication, and only an equal-rank clash raises one: a disagreement the ladder settles at
+step 3 or 4 is resolved silently, including one a first-hand record loses.
+
+**The UID follows the founding record** — the earliest `firstSeenAt`. On a split it stays with
+whichever side still holds that record; on a join the older UID survives. ⚠️ A join therefore
+retires a UID and a subscriber loses that entry: iCal has no merge, so the rule can only
+choose which survives. See **UID**, ADR-0004, ADR-0022 §8.
+
+**How records come to be in one cluster is not settled here** — that is the matching rule,
+owned by [#115](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/115).
+ADR-0022 defines what a cluster is and what follows once records are in one.
 
 Alongside it each source carries an **admin-facing description** — `event venue`, `event
 aggregator`, `ticketing platform`, `cruise terminal`, `airport` — which drives no behaviour
