@@ -90,6 +90,13 @@ each checkable in review:
    browser string: impersonating Chrome is what a reader does when it expects to be unwelcome, and
    it is the first thing that would be held against a scrape whose defence is that it takes only
    facts and behaves itself.
+   > **Loosened by [ADR-0027](0027-the-source-contract-survives-twenty-sources.md) (#121,
+   > 06 Aug 2026).** A scheme-less `owner/repo` identifier — `+edw93d/20260716SingaporeTourismCalendar`,
+   > no `github.com` — **discharges *linking***. The obligation exists so a human reading a log can
+   > find who is reading them and how to object, which that path does unambiguously; a resolvable
+   > URL is not required, and #135 found it is exactly what Marina Bay Sands' WAF refuses. *Never a
+   > browser string* is untouched. This is the reading §4's #135 amendment left owner-held, now
+   > settled, and it fixes the one core-owned User-Agent for the whole list (ADR-0027 §4).
 2. **One request per host per second**, per-host so one source never pays another's debt. On the
    browser route: **one page load per host per run, and no crawling** — navigate to the known
    listing URL, never follow links.
@@ -171,7 +178,9 @@ changed is that it does not, in fact, cost us MBS.
 > MBS refuses. The served form names the repository as a scheme-less `owner/repo` path. Whether that
 > discharges *linking* is a reading of §2.1, not a test result, and is owner-held — see
 > `docs/source-register.md` → *Open risks*, which carries the full matrix and the two adjacent
-> readings it raises.
+> readings it raises. **Resolved by [ADR-0027](0027-the-source-contract-survives-twenty-sources.md)
+> (#121, 06 Aug 2026): it discharges *linking*, and the scheme-less form is fixed as the one
+> core-owned User-Agent — see §2.1's amendment note above.**
 >
 > **The confound in the original test is also settled**: the winning candidate ran first, on a cold
 > browser, and was still refused in ~50 ms, so rate-based blocking is excluded. #121 no longer owes it.

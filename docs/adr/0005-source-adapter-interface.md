@@ -277,3 +277,29 @@ Whether it still serves a Chrome that honestly announces itself as `sg-tourism-c
 an adapter that works only while pretending to be a person is the one fact that would poison the
 facts-only argument for every other source. The same question is open for `mbccs.com.sg`, which is
 in production today.
+
+### Amendment 5: the contract survives twenty sources — one core User-Agent, and `manual` lives outside `Source`
+
+- **Date:** 2026-08-06
+- **Ticket:** [#121](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/121)
+
+Recorded by [ADR-0027](0027-the-source-contract-survives-twenty-sources.md). This ADR is
+**amended, not superseded** — #121 ruled that `Source<T, Raw>`, `FetchDeps`, `HttpClient`,
+`BrowserSession` and the registry array all survive the concrete v2 source list **unchanged in
+shape**, and the three existing adapters do not change. An API (SISTIC, Changi) is an ordinary
+`fetch -> Raw` because `Raw` is opaque; multi-request acquisition is navigation inside `fetch`;
+`sourceKey` stays opaque; credentials and store-aware incremental fetch are **declined as
+not-needed-by-the-list**, each with a reopen trigger. Two things this ADR did not spell out are
+now settled:
+
+1. **The core-owned User-Agent stays one constant — there is no per-source override.** #135
+   found one honest string (`Mozilla/5.0 (compatible; sg-tourism-calendar/0.1; +edw93d/20260716SingaporeTourismCalendar)`)
+   that Marina Bay Sands, SISTIC and every tested source serve, so "the core owns policy (UA,
+   rate limit, …)" needs no seam letting a WAF vary it. ADR-0027 §4, which also loosens
+   ADR-0021 §2.1 to accept the scheme-less `owner/repo` form.
+
+2. **`manual` (ADR-0024's hand-entry source) is not a `Source`.** It is absent from the
+   registry array and implements neither `fetch` nor `parse`; it is an admin-page→store write
+   path sharing only the `(source, sourceKey)` identity, which lives in the store schema rather
+   than in this interface. Stubbing the two methods to throw was rejected — an interface member
+   that lies. ADR-0027 §5.
