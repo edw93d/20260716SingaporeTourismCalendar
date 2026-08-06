@@ -248,14 +248,14 @@ near-certain *no* that converts *not pursued* into *formally refused*, for nothi
   on publication*; publication arrived, and had in fact preceded the filing. The project is
   `AGPL-3.0-or-later`, and a public repository carrying `data/calendar.sqlite`, `site/calendar.json`
   and the generated `.ics` feeds reads as granting redistribution rights over data obtained under
-  terms forbidding exactly that. **ADR-0026 §4 removes all three from the tip — executed on #147, not
-  yet landed**, after which no data artefact falls under the grant going forward. ⚠️ **Live until
-  then**, and it survives against history regardless, which ADR-0026 §7 keeps deliberately. AGPL is
-  retained on ADR-0021's own reasoning.
-- ⚠️ **Removing the files from git does not un-publish them.** GitHub Pages with
-  `build_type: workflow` serves the **last deployed artefact**, not the branch. The feeds and the
-  full payload keep returning 200 until the Pages site is deleted. **That deletion is owner-held and
-  outstanding** — it is the only part of ADR-0026 that is not effective on merge.
+  terms forbidding exactly that. **ADR-0026 §4 removes all three from the tip — landed 06 Aug 2026
+  (#147)**, so no data artefact falls under the grant going forward. ⚠️ It survives against history
+  regardless, which ADR-0026 §7 keeps deliberately. AGPL is retained on ADR-0021's own reasoning.
+- ✅ **Closed 06 Aug 2026 — the Pages site is deleted.** Removing the files from git did not
+  un-publish them: GitHub Pages with `build_type: workflow` serves the **last deployed artefact**,
+  not the branch, so the feeds and the full payload kept returning 200 until the site itself was
+  deleted (`DELETE /repos/:owner/:repo/pages`). Done now, so they stop being served once the CDN
+  cache drains. This was the only part of ADR-0026 that was not effective on #147's merge.
 - ✅ **Closed — ADR-0011's deployment target.** It was conditional on a private repository requiring
   a paid Pages plan. The repository stays public and ADR-0026 §3 retires Pages outright, so the
   question no longer exists: v2's calendar is served by the server (ADR-0025 §4).
