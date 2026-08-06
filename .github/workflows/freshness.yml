@@ -14,17 +14,22 @@
 name: Freshness alarm
 
 on:
-  # 03:47 UTC = 11:47 SGT — about eight hours after the daily pipeline's 19:37,
-  # which leaves room for a slow run and the Pages CDN, and lands mid-morning in
-  # Singapore where an alarm can actually be acted on. Off the top of the hour
-  # for the same reason `daily.yml` is: GitHub drops scheduled runs under load,
-  # and load concentrates on the minute everybody picked.
+  # ⚠️ **Schedule retired (ADR-0026 §4, #147). DO NOT re-add a `schedule:`
+  # trigger on v1.** With the daily run stopped, the published calendar is stale
+  # by design, so a scheduled watcher would raise a staleness issue every morning
+  # forever — and an alarm that always fires trains the operator to ignore it,
+  # which is exactly the silence ADR-0013 built this to prevent.
   #
-  # **The gap between this and the pipeline's cron is load-bearing** — it sets
-  # the age the watcher observes, and so what STALE_AFTER_HOURS has to be.
-  # `tests/workflow.test.ts` holds the three values in the right relationship.
-  schedule:
-    - cron: "47 3 * * *"
+  # **Retired, not deleted.** v2 needs this watcher again, pointed at whatever the
+  # server serves, and its independence property (checks nothing out, runs no
+  # project code) is unchanged and still wanted.
+  #
+  # The retired cron fired at `47 3 * * *` — 03:47 UTC = 11:47 SGT, ~8h10m after
+  # the daily pipeline's retired 19:37 UTC. **That gap is load-bearing**: it sets
+  # the age the watcher observes and so what `STALE_AFTER_HOURS` has to be.
+  # `tests/workflow.test.ts` keeps the three values in the right relationship
+  # against those retired constants, and traps a revival that comes back on the
+  # top of the hour.
   workflow_dispatch:
 
 concurrency:

@@ -46,7 +46,12 @@ type Step = {
 };
 
 type Workflow = {
-  on?: { schedule?: { cron?: string }[]; pull_request?: unknown; push?: { branches?: string[] } };
+  on?: {
+    schedule?: { cron?: string }[];
+    workflow_dispatch?: unknown;
+    pull_request?: unknown;
+    push?: { branches?: string[] };
+  };
   concurrency?: { group?: string; "cancel-in-progress"?: boolean };
   permissions?: Record<string, string> | string;
   // A job's `env` values are `string | number` because YAML says so: quoting is
@@ -60,13 +65,33 @@ const daily = parse(text(DAILY)) as Workflow;
 
 const steps = Object.values(daily.jobs ?? {}).flatMap((job) => job.steps ?? []);
 
-const crons = (daily.on?.schedule ?? []).map((entry) => entry.cron ?? "");
+/** The cron expressions of a workflow's schedule, or `[]` when it has none. */
+const cronsOf = (workflow: Workflow): string[] =>
+  (workflow.on?.schedule ?? []).map((entry) => entry.cron ?? "");
 
-/** The five cron fields of the single schedule, named. */
-const schedule = () => {
-  const [minute, hour, dayOfMonth, month, dayOfWeek] = crons[0]!.split(/\s+/);
-  return { minute: Number(minute), hour: Number(hour), dayOfMonth, month, dayOfWeek };
+/**
+ * The revival trap shared by both retired schedules. Empty while the schedule is
+ * retired, so it asserts nothing today; when v2 restores a cron it must be a
+ * single daily one, off the top of the hour — the property removing the cron
+ * would otherwise silently erase (GitHub drops top-of-the-hour runs under load).
+ */
+const expectRevivedScheduleRunsDailyOffHour = (crons: string[]): void => {
+  // At most one, like the schedules these replace: a revival that re-adds two is
+  // as much a regression as one on the hour, and the trap should catch it too.
+  expect(crons.length).toBeLessThanOrEqual(1);
+  for (const cron of crons) {
+    const [minute, , dayOfMonth, month, dayOfWeek] = cron.split(/\s+/);
+    expect({ dayOfMonth, month, dayOfWeek }).toEqual({
+      dayOfMonth: "*",
+      month: "*",
+      dayOfWeek: "*",
+    });
+    expect(Number(minute)).toBeGreaterThan(5);
+    expect(Number(minute)).toBeLessThan(55);
+  }
 };
+
+const crons = cronsOf(daily);
 
 describe("the daily workflow", () => {
   it("exists and is the workflow the guards below are reading", () => {
@@ -74,23 +99,35 @@ describe("the daily workflow", () => {
     expect(workflowFiles).toContain(DAILY);
   });
 
-  it("runs once a day, every day", () => {
-    expect(crons).toHaveLength(1);
+  it("has retired its scheduled trigger, keeping only manual dispatch", () => {
+    // ADR-0026 §4 (decided #144, executed #147): the repository publishes the
+    // code and not the harvest, and this job scrapes, commits the harvest back
+    // and publishes it. Left scheduled it re-adds the removed artefacts at 03:37
+    // SGT the next morning, so a half-landed removal is worse than none — the
+    // schedule is retired as part of the same change.
+    //
+    // **Removed, not commented.** A commented `schedule:` under an active `on:`
+    // is one careless uncomment from a public republication, so the guard is that
+    // no scheduled trigger exists at all.
+    expect(crons).toEqual([]);
+    expect(daily.on?.schedule).toBeUndefined();
 
-    const { dayOfMonth, month, dayOfWeek } = schedule();
-    expect({ dayOfMonth, month, dayOfWeek }).toEqual({
-      dayOfMonth: "*",
-      month: "*",
-      dayOfWeek: "*",
-    });
+    // **Disabled, not deleted.** v2's daily run is this same job against Postgres
+    // (ADR-0025), so `workflow_dispatch` is kept and the commit-back/Pages steps
+    // stay reachable by hand. That a manual run republishes is the hazard the
+    // file now calls out explicitly.
+    expect(daily.on).toHaveProperty("workflow_dispatch");
   });
 
-  it("is scheduled off the top of the hour", () => {
-    // GitHub documents that scheduled runs may be dropped when the platform is
-    // under load, and load concentrates on the minute everybody picked. A run we
-    // never get is the failure this whole ticket is trying not to have.
-    expect(schedule().minute).toBeGreaterThan(5);
-    expect(schedule().minute).toBeLessThan(55);
+  it("if revived, runs once a day off the top of the hour", () => {
+    // A trap for the revival, not a check on today: `crons` is empty while the
+    // schedule is retired, so this asserts nothing yet. When v2 restores a cron
+    // it must land daily and off the top of the hour — GitHub drops scheduled
+    // runs under load, and load concentrates on the minute everybody picked; the
+    // retired cron fired at :37 (19:37 UTC = 03:37 SGT) for exactly that reason.
+    // Without this a revival can silently come back on the hour, the one property
+    // its removal would otherwise erase.
+    expectRevivedScheduleRunsDailyOffHour(crons);
   });
 
   it("carries a concurrency group that queues rather than cancels", () => {
@@ -181,11 +218,23 @@ const freshnessJobs = Object.values(freshness.jobs ?? {});
 
 const freshnessSteps = freshnessJobs.flatMap((job) => job.steps ?? []);
 
-/** A cron's fire time as minutes past midnight UTC. */
-const fireMinute = (workflow: Workflow): number => {
-  const [minute, hour] = (workflow.on?.schedule ?? [])[0]!.cron!.split(/\s+/);
+/** A cron expression's fire time as minutes past midnight UTC. */
+const fireMinute = (cron: string): number => {
+  const [minute, hour] = cron.split(/\s+/);
   return Number(hour) * 60 + Number(minute);
 };
+
+/**
+ * The retired schedules, kept as constants so the relationship they encoded
+ * survives their removal (ADR-0026 §4, #147). The daily pipeline fired at
+ * `37 19 * * *` (19:37 UTC = 03:37 SGT) and the watcher at `47 3 * * *`
+ * (03:47 UTC = 11:47 SGT) — an 8h10m offset — and `STALE_AFTER_HOURS: 48` sat
+ * between one missed run (~32h old) and two (~56h). Both crons are gone from the
+ * files; the numbers live here so a v2 revival restores the three-value
+ * relationship rather than silently re-guessing one of its legs.
+ */
+const RETIRED_DAILY_CRON = "37 19 * * *";
+const RETIRED_FRESHNESS_CRON = "47 3 * * *";
 
 describe("the freshness watcher", () => {
   it("exists and is the workflow the guards below are reading", () => {
@@ -193,20 +242,24 @@ describe("the freshness watcher", () => {
     expect(workflowFiles).toContain(FRESHNESS);
   });
 
-  it("runs once a day, off the top of the hour", () => {
-    // Off the hour for the same reason `daily.yml` is: GitHub drops scheduled
-    // runs under load, and load concentrates on the minute everybody picked.
-    const crons = (freshness.on?.schedule ?? []).map((entry) => entry.cron ?? "");
-    expect(crons).toHaveLength(1);
+  it("has retired its scheduled trigger, keeping only manual dispatch", () => {
+    // With the daily run stopped (ADR-0026 §4), the staleness this watcher
+    // reports becomes the *intended* state — left scheduled it would open an
+    // issue every morning forever, and an alarm that always fires is the very
+    // silence ADR-0013 built it to prevent. Removed, not commented, for the same
+    // reason as `daily.yml`; disabled, not deleted, because v2 needs this watcher
+    // again pointed at whatever the server serves.
+    expect(cronsOf(freshness)).toEqual([]);
+    expect(freshness.on?.schedule).toBeUndefined();
+    expect(freshness.on).toHaveProperty("workflow_dispatch");
+  });
 
-    const [minute, , dayOfMonth, month, dayOfWeek] = crons[0]!.split(/\s+/);
-    expect({ dayOfMonth, month, dayOfWeek }).toEqual({
-      dayOfMonth: "*",
-      month: "*",
-      dayOfWeek: "*",
-    });
-    expect(Number(minute)).toBeGreaterThan(5);
-    expect(Number(minute)).toBeLessThan(55);
+  it("if revived, runs once a day off the top of the hour", () => {
+    // The revival trap #147 asked for. Both crons are gone, so their 8h10m offset
+    // is no longer in the files and a careless revival could bring the watcher
+    // back on the top of the hour, where GitHub drops runs under load. Any
+    // restored cron must land daily and off the hour, like the retired 03:47 UTC.
+    expectRevivedScheduleRunsDailyOffHour(cronsOf(freshness));
   });
 
   it("grants itself the right to write an issue and nothing else", () => {
@@ -315,20 +368,26 @@ describe("the freshness watcher", () => {
     });
   });
 
-  it("tolerates exactly one missed daily run, and alarms on the second", () => {
-    // **This holds the reasoning behind the threshold, not the number.**
+  it("keeps the threshold between one missed daily run and two", () => {
+    // **This holds the reasoning behind the threshold, not the number** — and it
+    // outlives the schedules being retired, because the relationship is what a v2
+    // revival has to restore, not the crons themselves.
     //
-    // `daily.yml`'s cron comment explicitly tolerates a dropped run — "a dropped
-    // run costs a day of freshness and nothing else (the store is upserted, so
-    // the next run heals it)". An alarm that fires on one miss therefore alarms
-    // on something the design already accepted, and gets ignored.
+    // `daily.yml`'s cron tolerated a dropped run — "a dropped run costs a day of
+    // freshness and nothing else (the store is upserted, so the next run heals
+    // it)". An alarm that fires on one miss therefore alarms on something the
+    // design already accepted, and gets ignored.
     //
     // The watcher fires a fixed offset after the pipeline, so the age it observes
     // is offset + 24h per missed run. The threshold has to separate one miss from
-    // two — and that is a relationship between *three* values (both crons and the
-    // threshold), which is exactly the kind of thing that silently stops holding
-    // when someone moves one of them. Moving either cron now fails here.
-    const offsetHours = (((fireMinute(freshness) - fireMinute(daily) + 1440) % 1440) / 60);
+    // two — a relationship between *three* values (both crons and the threshold)
+    // that silently stops holding when one of them moves. Both crons are gone
+    // from the files, so the retired constants stand in unless a revival has
+    // restored a live schedule; either way `STALE_AFTER_HOURS` must sit between.
+    const dailyCron = (daily.on?.schedule ?? [])[0]?.cron ?? RETIRED_DAILY_CRON;
+    const freshnessCron = (freshness.on?.schedule ?? [])[0]?.cron ?? RETIRED_FRESHNESS_CRON;
+
+    const offsetHours = (((fireMinute(freshnessCron) - fireMinute(dailyCron) + 1440) % 1440) / 60);
 
     // **The offset must clear the pipeline itself**, or every number below is
     // wrong by a day. The pipeline scrapes three sources — one through a real

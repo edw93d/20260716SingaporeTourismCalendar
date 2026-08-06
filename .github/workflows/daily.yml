@@ -1,5 +1,19 @@
-# The daily run. Unattended by design: nobody is present when this fires, so
-# every property it needs has to be structural rather than operational.
+# The daily run — **retired, not deleted** (ADR-0026 §4, #144/#147).
+#
+# ⚠️ **DO NOT re-add a `schedule:` trigger.** This job scrapes, commits the
+# harvest back to the repository and publishes it, and ADR-0026 §4 rules that the
+# repository publishes **the code and not the harvest**. The store blob, the
+# payload and the feeds were removed at the tip on #147; a scheduled run re-adds
+# them at 03:37 SGT the next morning, republishing scraped data to a public repo.
+# The schedule was removed rather than commented out precisely so it cannot be
+# brought back by a careless uncomment. `tests/workflow.test.ts` holds that it is
+# gone, and that any future revival lands off the top of the hour.
+#
+# **Kept for v2.** v2's daily run is this same job against Postgres (ADR-0025),
+# and the concurrency group, the single push retry and the reason a push to a
+# protected branch succeeds at all were paid for by #45/#46/#60 over three days
+# of failures — so the file stays, disabled, rather than being deleted and
+# rediscovered.
 #
 # Zero credentials end to end. `GITHUB_TOKEN` is minted by Actions for this run
 # and expires with it; there is no secret, PAT or connection string anywhere in
@@ -7,16 +21,12 @@
 name: Daily pipeline
 
 on:
-  # 19:37 UTC = 03:37 SGT — overnight in Singapore, and **off the top of the
-  # hour on purpose**: GitHub documents that scheduled runs may be dropped when
-  # the platform is under load, and load concentrates on the minute everybody
-  # picked. A dropped run costs a day of freshness and nothing else (the store
-  # is upserted, so the next run heals it), but it is still the failure worth
-  # not courting.
-  schedule:
-    - cron: "37 19 * * *"
-  # The only way to run this on demand. Kept because the first thing anyone will
-  # want after merging is to watch it run once.
+  # ⚠️ **`workflow_dispatch` is the only trigger, and running it republishes.**
+  # A manual dispatch still executes the commit-back and Pages-deploy steps below,
+  # so it commits the scraped store, payload and feeds and pushes them to the
+  # public repository — the exact thing ADR-0026 §4 stops. Kept, not stripped,
+  # because v2 revives this job and those steps carry the #45/#46/#60 reasoning;
+  # do not dispatch it on v1 unless you intend to republish.
   workflow_dispatch:
 
 # **Two runs must never overlap.** The store is a single SQLite blob committed
