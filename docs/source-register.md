@@ -1,6 +1,7 @@
 # Source register
 
-The per-source legal facts behind [ADR-0021](adr/0021-reading-sources-that-forbid-it.md).
+The per-source legal facts behind [ADR-0021](adr/0021-reading-sources-that-forbid-it.md), as
+re-priced by [ADR-0026](adr/0026-v2-publishes-the-code-and-the-calendar-are-public-the-data-leaves-the-repository.md).
 
 **This file is the record of what was read.** v1's audit was indefensible not because it reached the
 wrong conclusion but because it checked `robots.txt`, stopped, and left no record — so there was
@@ -26,12 +27,30 @@ Where a fact was not established, the cell says so. A blank or a guess would def
 | **Created** | 05 Aug 2026 (#123) |
 | **Last full re-read** | 05 Aug 2026 |
 | **Next scheduled re-read** | 05 Aug 2027 |
+| **Last re-priced** | 06 Aug 2026 (#144, ADR-0026) |
 
 Also re-read on: any objection from any source (re-read **all** rows).
 
-⚠️ **Publishing v2 in any form — making the repository public, deploying the site, sharing a feed
-URL — voids ADR-0021 §5 and every *cleared by private use* verdict in this file.** That is a
-re-decision, not a re-read.
+⚠️ **Re-read and re-priced are different, and the dates are kept apart on purpose.** Nobody has
+re-read a terms document since 05 Aug 2026. What changed on 06 Aug 2026 is the *footing* every
+clause is judged against. Collapsing the two would make this file look fresher than it is, which is
+the exact staleness it exists to prevent.
+
+### ⚠️ v2 publishes. This happened on 06 Aug 2026, and it was already true before then
+
+ADR-0021 §5 held that v2 did not publish, on the stated fact that *"the repository is private and
+the calendar is used by its owner."* **That was never true.** The repository has been public since
+16 Jul 2026, GitHub Pages has been public, and the feeds, the served payload and the committed store
+blob all returned 200.
+
+**ADR-0026 rules that v2 publishes, deliberately:** the repository stays public (code only, no
+scraped rows), and the calendar is public to read with credentials required only to change it. Every
+*cleared by private use* verdict in the version of this file dated 05 Aug 2026 was therefore
+**wrong on the day it was written**, and every one has been re-run below.
+
+**What survives:** v2 still carries no revenue of any kind. That clears exactly **one** clause on
+this list — Constellar §4.7 — which is what ADR-0021 §5 predicted non-commercial would be worth
+alone.
 
 ---
 
@@ -49,10 +68,13 @@ re-decision, not a re-read.
 - `granted` — written permission held. The source is lawful, permanently.
 - `refused` — hard stop. Reading, storing and publishing all cease.
 
-**Cleared by private use?** — whether ADR-0021 §5 (private repository, personal use, non-commercial)
-switches the clause off. *Non-commercial alone* would clear only one clause on the whole list;
-adding *personal and private* clears four more, because most reuse clauses pair *non-commercial*
-with *personal* or *internal*. Marked `n/a` where the source bars nothing.
+**Cleared by non-commercial use?** — whether v2's no-revenue-of-any-kind position switches the
+clause off. It clears **one clause on this entire list**. Every other reuse clause pairs
+*non-commercial* with *personal* or *internal*, and a published calendar fails those at any price.
+Marked `n/a` where the source bars nothing.
+
+⚠️ **This column replaces *Cleared by private use?*, which described a state that never existed.**
+The four extra clauses that column switched off are all back. See the re-priced note above.
 
 ⚠️ **No access clause is ever cleared by this.** Scraping is breached at any price and for any
 purpose — that class is irreducible while the project exists, and it is the class the MVP is about.
@@ -61,33 +83,56 @@ purpose — that class is irreducible while the project exists, and it is the cl
 
 ## Sources bound by a clause
 
-Every row here is read and stored under accepted MVP risk. **None is republished** — ADR-0021 §5
-keeps the repository private and the calendar personal. None trips a hard stop.
+Every row here is read, stored **and republished** under accepted MVP risk. None trips a hard stop.
 
-| Source | Route | `robots.txt` | Operative clause | Cleared by private use? | Permission | Terms last read |
+⚠️ **The previous version of this line said "None is republished."** It was false when written —
+see the re-priced note above. It is corrected rather than quietly amended because this file's whole
+job is to be the record of what was actually true.
+
+| Source | Route | `robots.txt` | Operative clause | Cleared by non-commercial use? | Permission | Terms last read |
 |---|---|---|---|---|---|---|
-| **Suntec** *(v1, production)* | `http-scrape` | Allows the page to every agent | T&C forbid "automated queries of any sort"; use limited to personal / non-commercial | **Reuse limb yes**; the automation clause survives | `not-asked` | 04 Aug 2026 |
-| **SCC** *(v1, production)* | `http-scrape` | Not established | ToU §2.1.1 grants use for "internal, non-commercial, informational purposes only" | **Yes** — see ⚠️ below | `not-asked` | 04 Aug 2026 |
-| **MBCCS** *(v1, production)* | `browser` | Not established | ToU bans reproduction "for any commercial **or any other purposes**" | **No** — an all-purposes ban | `not-asked` | 04 Aug 2026 |
-| **Singapore EXPO / Constellar** | `http-scrape` | Disallows only `/wp-admin/` — listing **explicitly allowed** | §3.1(b)(vi) and §4.8(d) bar robots / scrapers / extraction; **§3.1(b)(i) bars archive, reproduce, distribute, publish**; §4.5 all content copyrighted; §4.7 bars commercial reuse | **Partly** — §4.7 and §3.1(b)(i)'s *publish* limb fall away; *archive*, *reproduce* and both robot clauses survive | `not-asked` | 05 Aug 2026 |
-| **Marina Bay Sands** | `browser` | **Allowed by omission** — 17 `Disallow` lines covering casino, rewards-club, team-member, `/reservations/`, `/mbs/booking/`, `*?offerCode=`, `*promocode=`; **expo and the event directory are never mentioned**. `SearchSG` alone gets a blanket `Disallow: /`. ⚠️ The file itself is unreachable except from a browser | `terms-of-use.html`: ToU bars "deep-link", "page-scrape", "robot", "spider" **"or any similar or equivalent manual process"** to "access, acquire, copy or monitor"; separate **Personal and Non-Commercial Use Limitation** barring reproduce / publish / distribute. Scope is "all associated sites linked to www.marinabaysands.com" — the event directory is squarely inside it | **Reuse limb yes**; the scraping clause survives — and it is the strictest on the list | `not-asked` | **05 Aug 2026** — re-verified live |
-| **Changi / CAG** *(arrivals)* | `http-scrape` | Not established | Conditions of Use limit content to "your own **personal** and non-commercial use"; forbid storing it "in any information retrieval system" without written permission | **Partly** — the personal/non-commercial limb yes; the retrieval-system ban is unconditional and survives | `not-asked` — held deliberately, [#127](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/127) | 04 Aug 2026 |
+| **Suntec** *(v1, production)* | `http-scrape` | Allows the page to every agent | T&C forbid "automated queries of any sort"; use limited to personal / non-commercial | **No** — *personal* fails on a public calendar, and the automation clause never depended on money | `not-asked` | 04 Aug 2026 |
+| **SCC** *(v1, production)* | `http-scrape` | Not established | ToU §2.1.1 grants use for "internal, non-commercial, informational purposes only" | **No** — *internal* fails outright. See ⚠️ below | `not-asked` | 04 Aug 2026 |
+| **MBCCS** *(v1, production)* | `browser` | Not established | ToU bans reproduction "for any commercial **or any other purposes**" | **No** — an all-purposes ban. **Never cleared by any version of this project** | `not-asked` | 04 Aug 2026 |
+| **Singapore EXPO / Constellar** | `http-scrape` | Disallows only `/wp-admin/` — listing **explicitly allowed** | §3.1(b)(vi) and §4.8(d) bar robots / scrapers / extraction; **§3.1(b)(i) bars archive, reproduce, distribute, publish**; §4.5 all content copyrighted; §4.7 bars commercial reuse | **§4.7 only** — the one clause on this whole list that non-commercial clears. §3.1(b)(i) now bites in **all three** limbs, and both robot clauses survive | `not-asked` | 05 Aug 2026 |
+| **Marina Bay Sands** | `browser` | **Allowed by omission** — 17 `Disallow` lines covering casino, rewards-club, team-member, `/reservations/`, `/mbs/booking/`, `*?offerCode=`, `*promocode=`; **expo and the event directory are never mentioned**. `SearchSG` alone gets a blanket `Disallow: /`. ⚠️ The file itself is unreachable except from a browser | `terms-of-use.html`: ToU bars "deep-link", "page-scrape", "robot", "spider" **"or any similar or equivalent manual process"** to "access, acquire, copy or monitor"; separate **Personal and Non-Commercial Use Limitation** barring reproduce / publish / distribute. Scope is "all associated sites linked to www.marinabaysands.com" — the event directory is squarely inside it | **No** — the Personal limb fails, and the scraping clause was never money-conditional. Both limbs now live | `not-asked` | **05 Aug 2026** — re-verified live |
+| **Changi / CAG** *(arrivals)* | `http-scrape` | Not established | Conditions of Use limit content to "your own **personal** and non-commercial use"; forbid storing it "in any information retrieval system" without written permission | **No** — *personal* fails; the retrieval-system ban was unconditional and is unchanged | `not-asked` — held deliberately, [#127](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/127) | 04 Aug 2026 |
 | **VisitSingapore MICE** | not built | Not established | ToU bars "any robot, spider, other automatic device" | **No** — an access clause | `not-asked` | 04 Aug 2026 |
 
-⚠️ **SCC was the weakest clause held, and private use clears it.** Its "internal" limb barred the
-*distribution* regardless of method or money, and facts-only had no answer to it — the one clause on
-the list with no defence. Not republishing removes it. Recorded because it is the single largest
-change private use makes, and it reverses on the day anything is published.
+⚠️ **SCC is the weakest clause held, and it runs in production anyway** (ADR-0026 §6). Its "internal"
+limb bars *distribution* regardless of method or money, and a public calendar is the opposite of
+internal. It was briefly recorded as cleared, on 05 Aug 2026, on a private-use position that was
+never true.
 
-⚠️ **Constellar §3.1(b)(i) still shapes every email.** Our store *archives* even when it does not
-publish, and the clause bars *archive* and *reproduce* independently of *publish*. Every notice
-still names automated access **and** storage **and** republication together — asking narrowly now
-would mean renegotiating later. Only §3.1 is explicitly curable: everything in it is prefaced
-"without our prior written consent", while §4.8 carries no carve-out.
+**The "no defence" wording is narrowed rather than repeated.** ADR-0021 §1's actual argument is that
+reuse clauses are **contract claims needing assent never given** — no click-through, no account — and
+that reaches SCC exactly as it reaches Suntec, MBS and Constellar. What is specifically true of SCC is
+narrower: **facts-only does not help it**, because *internal* bars distribution whether or not the
+thing distributed is copyrightable. A real weakness; not an empty hand.
 
-⚠️ **Marina Bay Sands is now the strictest live clause**, having inherited the position SCC vacated.
-Its ToU bars page-scraping "or any similar or equivalent manual process" — closing even the
-transcribe-it-by-hand door — and that is an access clause, so private use does nothing for it.
+**Why it keeps running:** MBCCS bars reproduction "for any commercial **or any other purposes**" —
+broader than SCC's clause, never cleared by any version of this project, and in production throughout.
+SCC now sits in the bucket MBCCS has occupied alone from the start. Dropping one while running the
+other would be incoherent. ⚠️ SCC is nonetheless the likeliest source of a complaint, and cruise
+terminals are two-of-two for `PortCall` supply.
+
+⚠️ **Constellar §3.1(b)(i) now bites in all three limbs.** It bars *archive*, *reproduce* and
+*publish* independently; the *publish* limb was recorded as cleared and is not. Every notice names
+automated access **and** storage **and** republication together — asking narrowly now would mean
+renegotiating later. Only §3.1 is explicitly curable: everything in it is prefaced "without our prior
+written consent", while §4.8 carries no carve-out.
+
+⚠️ **Marina Bay Sands carries the strictest *access* clause on the list** — page-scraping "or any
+similar or equivalent manual process", closing even the transcribe-it-by-hand door, and never
+money-conditional. Its Personal and Non-Commercial Use Limitation is now live alongside it, so both
+of its limbs bite rather than one.
+
+⚠️ **Every `not-asked` above is a live owner-held choice, not an unexamined gap** (ADR-0026 §9).
+Permission asks are handled outside this project (Ed, 06 Aug 2026). Publication cuts both ways and
+settles neither: asking is the **only** mechanism by which a source can be lost (ADR-0021, *Alternatives
+rejected*), while ADR-0021 §6's defence of silence-is-null rests on a disclosure that has never been
+sent. ⚠️ The easier version of that conversation — *"we have built this privately, may we publish
+it"* — has been spent.
 
 ---
 
@@ -199,11 +244,23 @@ near-certain *no* that converts *not pursued* into *formally refused*, for nothi
   the list regardless of how unlikely a *yes* is.
 - ⚠️ **A credential is exposed in a source's own public bundle.** Our adapter has never touched it
   and ADR-0005 permanently bans it. Disclosure is owner-held. **The value is never recorded here.**
-- **Conditional — returns on publication: the AGPL / committed-feeds overlap.** The project is
-  `AGPL-3.0-or-later` and ADR-0011 commits generated `.ics` feeds to the branch. In a *public*
-  repository that reads as granting redistribution rights over data obtained under terms forbidding
-  exactly that. Dormant while private — no recipients, no grant, no appearance of one — and AGPL is
-  kept regardless, since it costs nothing dormant and preserves the option to open the repository
-  without relicensing. **Reinstate this row the day anything is published.**
-- **Conditional — ADR-0011's deployment target is unresolved under a private repository.** Pages
-  from a private repository requires a paid plan. Not a legal risk; a live practical one.
+- ⚠️ **Reinstated 06 Aug 2026 — the AGPL / committed-data overlap.** Filed as *conditional, returns
+  on publication*; publication arrived, and had in fact preceded the filing. The project is
+  `AGPL-3.0-or-later`, and a public repository carrying `data/calendar.sqlite`, `site/calendar.json`
+  and the generated `.ics` feeds reads as granting redistribution rights over data obtained under
+  terms forbidding exactly that. **ADR-0026 §4 removes all three from the tip — executed on #147, not
+  yet landed**, after which no data artefact falls under the grant going forward. ⚠️ **Live until
+  then**, and it survives against history regardless, which ADR-0026 §7 keeps deliberately. AGPL is
+  retained on ADR-0021's own reasoning.
+- ⚠️ **Removing the files from git does not un-publish them.** GitHub Pages with
+  `build_type: workflow` serves the **last deployed artefact**, not the branch. The feeds and the
+  full payload keep returning 200 until the Pages site is deleted. **That deletion is owner-held and
+  outstanding** — it is the only part of ADR-0026 that is not effective on merge.
+- ✅ **Closed — ADR-0011's deployment target.** It was conditional on a private repository requiring
+  a paid Pages plan. The repository stays public and ADR-0026 §3 retires Pages outright, so the
+  question no longer exists: v2's calendar is served by the server (ADR-0025 §4).
+- ⚠️ **ADR-0021 §1's *with attribution* limb is live for the first time.** Dormant under
+  non-publication. #38 labels every entry with its source id; whether a bare id discharges
+  *attribution*, or whether it needs a link to the venue's own listing, is unresolved and ticketed.
+  ⚠️ Relevant to every row in this file, since attribution is part of what the surviving facts-only
+  position is built from.
