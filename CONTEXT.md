@@ -694,6 +694,20 @@ The rate-limited client in `deps` is **required, never defaulted** — reaching 
 is something a caller says out loud, so no code touches the live internet by forgetting to
 pass a stub. See ADR-0010.
 
+⚠️ **The contract survives the ~20-source list unchanged in shape (ADR-0027, #121).** An API
+is an ordinary `fetch -> Raw` because `Raw` is opaque (SISTIC, Changi); multi-request
+acquisition is navigation inside `fetch`; `sourceKey` stays opaque. **No secret rides in
+`deps`** and **`fetch` never reads the store** — no source on the list needs either, each
+declined with a reopen trigger. The **User-Agent is one core-owned constant**, not per-source:
+one honest string serves every source, including Marina Bay Sands' fussy WAF (ADR-0027 §4,
+loosening ADR-0021 §2.1).
+
+⚠️ **`manual` is not a Source.** The hand-entry source (ADR-0024) is absent from the registry
+array and implements neither `fetch` nor `parse` — the registry means *what the pipeline goes
+and reads*, and `manual` is never read. It is an admin-page→store write path sharing only the
+`(source, sourceKey)` identity, which lives in the store schema, not in this interface.
+See ADR-0027.
+
 ### Provenance
 
 Whether a **Source** publishes its own events or reports someone else's.
