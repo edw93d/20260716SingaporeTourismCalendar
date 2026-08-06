@@ -1,12 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { PortCall, Scraped } from "../src/domain/types.js";
 import { runPipeline } from "../src/pipeline/run.js";
 import { scc } from "../src/sources/scc.js";
 import type { FetchDeps, ParseResult } from "../src/sources/types.js";
+import { openStore } from "../src/store/store.js";
+import { freshSchema } from "./support/postgres.js";
 
 /**
  * **Seam 2 — pure `parse` over saved fixture HTML, with an injected clock.**
@@ -296,39 +296,40 @@ describe("through the pipeline", () => {
   /**
    * The registered adapter, driven end to end over the bytes SCC really served —
    * only the network is substituted. `fetch` calls the injected client, `parse`
-   * reads the real markup, the store mints uids, and the feed is written from
-   * the store.
+   * reads the real markup, and the store mints uids. v2's pipeline is a pure
+   * store writer (ADR-0025 §4) — no feed, no payload — so the end of the chain
+   * this asserts is the stored record, read back from a real ephemeral Postgres.
    */
   const runOverFixture = async (name = "schedule.html") => {
-    const workspace = mkdtempSync(join(tmpdir(), "scc-"));
+    const schema = await freshSchema();
     const requested: string[] = [];
-
-    const { outcomes } = await runPipeline({
-      sources: [scc],
-      db: join(workspace, "calendar.sqlite"),
-      feedsDir: join(workspace, "feeds"),
-      payloadPath: join(workspace, "calendar.json"),
-      now: () => NOW,
-      http: {
-        get: async (url) => {
-          requested.push(url);
-          return fixture(name);
+    try {
+      const { outcomes } = await runPipeline({
+        sources: [scc],
+        connectionString: schema.connectionString,
+        now: () => NOW,
+        http: {
+          get: async (url) => {
+            requested.push(url);
+            return fixture(name);
+          },
         },
-      },
-    });
+      });
 
-    const feeds = join(workspace, "feeds");
-    const read = (file: string) => readFileSync(join(feeds, file), "utf8");
-    const result = {
-      ics: read("port-calls.ics"),
-      venueIcs: read("venue-events.ics"),
-      hasAllFeed: existsSync(join(feeds, "all.ics")),
-      outcomes,
-      requested,
-    };
-
-    rmSync(workspace, { recursive: true, force: true });
-    return result;
+      const store = await openStore(schema.connectionString);
+      try {
+        return {
+          portCalls: await store.readPortCalls(),
+          venueEvents: await store.readVenueEvents(),
+          outcomes,
+          requested,
+        };
+      } finally {
+        await store.close();
+      }
+    } finally {
+      await schema.drop();
+    }
   };
 
   it("reads the schedule through the injected client and reports a clean outcome", async () => {
@@ -338,45 +339,32 @@ describe("through the pipeline", () => {
     expect(outcomes).toEqual([{ source: "scc", ok: true, records: 17, failures: [] }]);
   });
 
-  it("writes every real sailing into port-calls.ics, and nothing into the other feed", async () => {
-    const { ics, venueIcs } = await runOverFixture();
+  it("writes every real sailing into the store as a port call, and no venue event", async () => {
+    const { portCalls, venueEvents } = await runOverFixture();
 
-    expect(ics).toContain("X-WR-CALNAME:SG Cruise Arrivals");
-    expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(17);
-    expect(venueIcs.match(/BEGIN:VEVENT/g)).toBeNull();
-    expect(venueIcs).not.toContain("ODYSSEY");
+    expect(portCalls).toHaveLength(17);
+    expect(portCalls.every((call) => call.terminal === "Singapore Cruise Centre")).toBe(true);
+    expect(portCalls.some((call) => call.vessel.includes("ODYSSEY"))).toBe(true);
+    // The two types stay two: a cruise sailing never lands as a venue event.
+    expect(venueEvents).toEqual([]);
   });
 
-  it("offers no all feed", async () => {
-    // The unfiltered, duplicate-heavy stream is not a subscription anyone should
-    // hold. The everything-view is the web calendar (ADR-0008).
-    expect((await runOverFixture()).hasAllFeed).toBe(false);
-  });
+  it("carries the published clock times into the store", async () => {
+    // The end of the chain the gcal decision exists for: real published instants,
+    // not midnight. `20260730T000000Z` was 08:00 SGT.
+    const { portCalls } = await runOverFixture();
 
-  it("projects the summary as prose carrying the category, vessel and terminal", async () => {
-    const { ics } = await runOverFixture();
-    expect(ics).toContain(
-      "SUMMARY:Cruise: ODYSSEY VILLA VIE RESIDENCES at Singapore Cruise Centre",
-    );
-  });
-
-  it("projects the location as the terminal", async () => {
-    expect((await runOverFixture()).ics).toContain("LOCATION:Singapore Cruise Centre");
-  });
-
-  it("carries the published clock times into the feed", async () => {
-    const { ics } = await runOverFixture();
-    expect(ics).toContain("DTSTART:20260730T000000Z");
-    expect(ics).toContain("DTEND:20260801T110000Z");
+    const sailing = portCalls.find((call) => call.arrival === "2026-07-30T00:00:00Z");
+    expect(sailing?.departure).toBe("2026-08-01T11:00:00Z");
   });
 
   it("writes nothing when the challenge page is served", async () => {
     // Nothing upserted, so no `lastSeenAt` advances and every record this source
     // owns is left exactly as the last real reading left it.
-    const { ics, outcomes } = await runOverFixture("imperva-challenge.html");
+    const { portCalls, outcomes } = await runOverFixture("imperva-challenge.html");
 
     expect(outcomes[0]).toMatchObject({ source: "scc", ok: false });
-    expect(ics).not.toContain("BEGIN:VEVENT");
+    expect(portCalls).toEqual([]);
   });
 });
 

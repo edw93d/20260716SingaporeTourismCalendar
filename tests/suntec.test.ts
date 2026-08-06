@@ -1,12 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { Scraped, VenueEvent } from "../src/domain/types.js";
 import { runPipeline } from "../src/pipeline/run.js";
 import { suntec } from "../src/sources/suntec.js";
 import type { FetchDeps, ParseResult } from "../src/sources/types.js";
+import { openStore } from "../src/store/store.js";
+import { freshSchema } from "./support/postgres.js";
 
 /**
  * **Seam 2 — pure `parse` over saved fixture HTML, with an injected clock.**
@@ -325,26 +325,30 @@ describe("through the pipeline", () => {
    * store mints uids, and the feed is written from the store.
    */
   const runOverFixture = async () => {
-    const workspace = mkdtempSync(join(tmpdir(), "suntec-"));
+    const schema = await freshSchema();
     const requested: string[] = [];
-
-    const { outcomes } = await runPipeline({
-      sources: [suntec],
-      db: join(workspace, "calendar.sqlite"),
-      feedsDir: join(workspace, "feeds"),
-      payloadPath: join(workspace, "calendar.json"),
-      now: () => NOW,
-      http: {
-        get: async (url) => {
-          requested.push(url);
-          return fixture("listing.html");
+    try {
+      const { outcomes } = await runPipeline({
+        sources: [suntec],
+        connectionString: schema.connectionString,
+        now: () => NOW,
+        http: {
+          get: async (url) => {
+            requested.push(url);
+            return fixture("listing.html");
+          },
         },
-      },
-    });
+      });
 
-    const ics = readFileSync(join(workspace, "feeds", "venue-events.ics"), "utf8");
-    rmSync(workspace, { recursive: true, force: true });
-    return { ics, outcomes, requested };
+      const store = await openStore(schema.connectionString);
+      try {
+        return { venueEvents: await store.readVenueEvents(), outcomes, requested };
+      } finally {
+        await store.close();
+      }
+    } finally {
+      await schema.drop();
+    }
   };
 
   it("reads the listing through the injected client and reports a clean outcome", async () => {
@@ -356,33 +360,38 @@ describe("through the pipeline", () => {
     ]);
   });
 
-  it("writes real Suntec entries into venue-events.ics", async () => {
-    const { ics } = await runOverFixture();
+  it("writes real Suntec entries into the store", async () => {
+    const { venueEvents } = await runOverFixture();
 
-    expect(ics).toContain("X-WR-CALNAME:SG Venue Events");
-    expect(ics).toContain("SUMMARY:Cellar Fiesta 2026");
-    expect(ics).toContain("LOCATION:Suntec Convention Centre\\, Level 4\\, Hall 404");
-    expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(6);
+    expect(venueEvents).toHaveLength(6);
+    expect(venueEvents.map((record) => record.name)).toContain("Cellar Fiesta 2026");
+    const fiesta = venueEvents.find((record) => record.name === "Cellar Fiesta 2026");
+    expect(fiesta?.venue).toBe("Suntec Convention Centre");
+    expect(fiesta?.hall).toBe("Level 4, Hall 404");
   });
 
-  it("carries true clock times into the feed, not midnight", async () => {
-    // The end of the chain the gcal decision exists for. `20260717T040000Z` is
-    // 12:00 SGT; the date-only attribute would have put `20260717T000000Z` here
-    // and every one of these assertions would still have looked reasonable.
-    const { ics } = await runOverFixture();
+  it("carries true clock times into the store, not midnight", async () => {
+    // The end of the chain the gcal decision exists for. `2026-07-17T04:00:00Z`
+    // is 12:00 SGT; a date-only attribute would have stored `...T00:00:00Z` and
+    // every one of these assertions would still have looked reasonable.
+    const { venueEvents } = await runOverFixture();
 
-    expect(ics).toContain("DTSTART:20260717T040000Z");
-    expect(ics).toContain("DTEND:20260718T140000Z");
+    const fiesta = venueEvents.find((record) => record.name === "Cellar Fiesta 2026");
+    expect(fiesta?.start).toBe("2026-07-17T04:00:00Z");
+    expect(fiesta?.end).toBe("2026-07-18T14:00:00Z");
 
-    const starts = [...ics.matchAll(/DTSTART:(\d{8}T\d{6})Z/g)].map((m) => m[1]!);
-    expect(starts).toHaveLength(6);
-    expect(starts.every((s) => s.endsWith("000000"))).toBe(false);
+    const starts = venueEvents.map((record) => record.start);
+    expect(starts.every((start) => start.endsWith("T00:00:00Z"))).toBe(false);
   });
 
-  it("puts no scraped prose in the feed", async () => {
-    const { ics } = await runOverFixture();
-    expect(ics).not.toContain("free sampli");
-    expect(ics).not.toContain("largest alcohol festival");
+  it("stores no scraped prose", async () => {
+    // Facts-only extraction: the blurb the listing carries never reaches the
+    // store, because VenueEvent has no field for it. Asserted over the whole
+    // stored payload, so a description field growing back anywhere would fail.
+    const { venueEvents } = await runOverFixture();
+    const serialized = JSON.stringify(venueEvents);
+    expect(serialized).not.toContain("free sampli");
+    expect(serialized).not.toContain("largest alcohol festival");
   });
 });
 

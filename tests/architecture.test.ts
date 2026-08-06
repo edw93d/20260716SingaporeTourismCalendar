@@ -86,12 +86,16 @@ describe("the source tree", () => {
     expect(identifiersOnly('const url = "/visit-events"; let event = 1;')).toMatch(/\bevent\b/);
   });
 
-  it("reads no environment variables", () => {
-    // v1 has zero credentials end to end — everything authenticates with
-    // GITHUB_TOKEN inside the workflow and nothing else. A process.env read is
-    // the first step of walking that property back.
+  it("reads the environment in exactly one place — the entry point", () => {
+    // v1 read no environment at all: everything authenticated with GITHUB_TOKEN
+    // inside the workflow. ADR-0025 spends that zero-credentials property — v2
+    // holds a Postgres connection string — but keeps its *shape*: the credential
+    // is named once, out loud, at the injection site, exactly as `createHttpClient`
+    // is constructed in exactly one place below. A second `process.env` read is
+    // how a default this rule removed grows back — some module deciding for its
+    // callers which database they meant to reach.
     const offenders = files
-      .filter(({ code }) => /process\.env/.test(code))
+      .filter(({ path, code }) => path !== "main.ts" && /process\.env/.test(code))
       .map(({ path }) => path);
 
     expect(offenders).toEqual([]);
