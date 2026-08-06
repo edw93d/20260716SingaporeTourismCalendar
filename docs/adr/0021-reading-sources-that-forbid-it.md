@@ -3,6 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-08-05
 - **Ticket:** [#123](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/123)
+- ⛔ **§5 is superseded in whole by [ADR-0026](0026-v2-publishes-the-code-and-the-calendar-are-public-the-data-leaves-the-repository.md)
+  ([#144](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/144), 06 Aug 2026) — its
+  premise was never true, and v2 publishes.** Everything else here still binds. See the note at §5.
 - **Supersedes no ADR.** It formalises a rule already applied three times — [#28](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/28) (Changi), [#113](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/113) (Marina Bay Sands), [#128](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/128) (Singapore EXPO) — and never written down.
 - **Amends [ADR-0005](0005-source-adapter-interface.md)** by extending its core-owned politeness policy to the browser route (Amendment 4). See *Consequences*.
 - **Constrains [ADR-0011](0011-pages-from-an-artifact-feeds-committed-to-the-branch.md)** without resolving it: §5 makes the repository private, and Pages from a private repository is not free. See *Consequences*.
@@ -195,6 +198,27 @@ written down explicitly enough to be argued with.
 the honest User-Agent. The rule costs nothing in production.
 
 ### 5. v2 runs privately, for personal use, non-commercially
+
+> ⛔ **Superseded in whole by [ADR-0026](0026-v2-publishes-the-code-and-the-calendar-are-public-the-data-leaves-the-repository.md)
+> ([#144](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/144), 06 Aug 2026).
+> Do not rely on anything in this section — its premise was never true.**
+>
+> This section argues from *"the repository is private"* as a **stated fact**, not as a decision to
+> implement. The repository has been public since 16 Jul 2026, Pages has been public, and the feeds,
+> the payload and the committed store blob all served 200. **The four clauses the table below
+> switches off were never actually clear**, including SCC's — and `docs/source-register.md` carried
+> them as cleared for a day on that basis.
+>
+> **ADR-0026 rules that v2 publishes, deliberately**: the repository is public *on purpose* and
+> carries the code and not the harvest, and the calendar is public to read with credentials required
+> only to hide an entry. Non-commercial survives and clears **one** clause on the whole list —
+> exactly as this section predicts it would alone.
+>
+> **The rest of this ADR is untouched and still binding**: §1's one rule, §2's politeness, §3's
+> `robots.txt` asymmetry, §4's five hard stops, §6's silence-is-null, §7's owner-held asks and §8's
+> register. Only §5 falls, and the section is kept rather than deleted because **the failure is the
+> instructive part** — a fact that one `curl` would have settled was asserted instead, one day after
+> §4 wrote two pages on generalising from a single unchecked test.
 
 **v2 is not published.** The repository is private and the calendar is used by its owner. This is a
 reversal made the same day the ADR was drafted (owner, 05 Aug 2026), and the reasoning is recorded

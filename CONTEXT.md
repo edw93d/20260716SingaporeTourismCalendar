@@ -508,24 +508,30 @@ permission in parallel. It stops on refusal. The rule covers **access, storage a
 republication as one**, because permission to merely *scrape* would still leave us in
 breach of the clauses that bar archiving and publishing.
 
-**v2 exercises two of those three limbs: it reads and it stores, and it does not
-publish.** The repository is private, the calendar is personal, and there is no revenue
-of any kind. Publishing was assumed to be how the MVP demonstrates itself and is not —
-the thing running demonstrates it. That distinction clears four clauses, including the
-one we had no answer to (SCC's "internal"). It clears **no access clause**: scraping is
-breached at any price and for any purpose, and that class is irreducible.
+**v2 exercises all three limbs: it reads, it stores, and it publishes** (ADR-0026, #144,
+06 Aug 2026). The repository is public **on purpose** and carries the code and not the
+harvest; the **Web calendar** is public to read, with credentials required only to hide
+an entry. There is **no revenue of any kind**, and that is now the only clause-level
+defence left — it clears exactly **one** clause on the whole list (Constellar §4.7).
 
-**Publishing v2 in any form voids this and requires a re-decision** — the clauses bite
-retroactively on the archive already built.
+⚠️ **ADR-0021 §5 said the opposite, on a premise that was never true.** It argued from
+*"the repository is private"* — as a stated fact, not a decision to implement. The
+repository has been public since 16 Jul 2026. **Four clauses were switched off in
+`docs/source-register.md` on a fact nobody checked**, and all four are back: SCC's
+"internal", Suntec's and MBS's *personal*, Changi's *personal*, and Constellar
+§3.1(b)(i)'s *publish* limb.
 
-⚠️ **The premise above is not true today, and this is a factual note, not a re-ruling.** The
-repository is **public**, GitHub Pages is **public**, and v1's feed serves **200** — found while
-working #117 (05 Aug 2026). ADR-0025 §3 stops the feeds being published, which removes the
-republication of scraped facts in ICS form; **the public repository and the public site remain**.
-So does everything that rests on non-publication, including **Hidden**'s visible-by-default — and
-ADR-0025 added a surface nobody has ruled on, since the **Web calendar** is now *served* and who may
-reach it is undecided. **[#144](https://github.com/edw93d/20260716SingaporeTourismCalendar/issues/144)**
-holds the question; ADR-0021, ADR-0024 and `docs/source-register.md` are unchanged until it rules.
+**SCC keeps running at accepted risk** — not evasion but consistency: MBCCS's "any other
+purposes" ban is broader, was never cleared by any version of this project, and has been
+in production throughout.
+
+**What survives is conduct, not clauses:** facts-only extraction, politeness, honest
+identification, `robots.txt` as a hard stop, and attribution — which ADR-0021 §1 makes
+binding for the first time (#145). It clears **no access clause**: scraping is breached
+at any price and for any purpose, and that class is irreducible.
+
+⚠️ **Any revenue voids this and requires a re-decision** — the clauses bite retroactively
+on the archive already built.
 
 *Barred* is not *stopped*. Five **hard stops** are absolute and no accepted-MVP-risk
 ruling reaches them: a `robots.txt` `Disallow` on the path, any authentication wall, an
@@ -740,9 +746,20 @@ this is not one.
 | **Where** | **VenueEvent only.** |
 | **Reversible** | Yes, completely — see below. |
 
+⚠️ **Visible-by-default survived publication, on replaced reasoning** (ADR-0026 §8, #144). ADR-0024
+argued it partly from *"v2 does not publish"*, which was never true. The argument that carries it is
+the other one, and it never knew whether anyone was reading: a few hundred approvals a day is what
+stops the MVP existing. Two things arrived since that make it **stronger** — **Reviewed** means the
+queue terminates, and the payload is served live so a hide takes effect on click rather than at
+tomorrow's run.
+
 Three reasons to hide exist in practice — not tourism or MICE, the same show as another row,
 and unusable data — and none of them changes what happens, so none is stored. ⚠️ Accepted
 cost: how much of a source is being hidden as irrelevant cannot be counted afterwards.
+
+⚠️ **A wrong date is not a hiding problem and has no moderation answer.** Hiding fixes an
+*irrelevant* record; nothing catches a date the parser misread, and on a public calendar someone
+plans around it. That needs a stated-limitations line on the page (#145), not a gate.
 
 **Only a person sets it, because otherwise the flag means two things that cannot be told
 apart** — *I judged this* and *the software found this odd*. A row that cannot be parsed into
