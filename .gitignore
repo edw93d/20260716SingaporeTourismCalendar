@@ -11,7 +11,19 @@ node_modules/
 .DS_Store
 *.tsbuildinfo
 
-# SQLite WAL sidecars. The store itself (data/calendar.sqlite) is committed;
-# these two are transient journal state a running process owns.
+# The published data artefacts, removed at the tip on #147 (ADR-0026 §4): the
+# repository publishes the code, not the harvest. A local run still regenerates
+# all four, so they are ignored to keep them from being re-committed.
+#
+# ⚠️ This is a **safety net, not the mechanism**. `.gitignore` does not stop an
+# explicit `git add <path>`, and `daily.yml`'s commit-back step names these paths
+# explicitly — so the schedule that drives it being retired is what actually
+# keeps them out, and this ignore only catches a stray manual add.
+data/calendar.sqlite
+site/calendar.json
+site/feeds/*.ics
+
+# SQLite WAL sidecars — transient journal state a running process owns. (The
+# store itself, data/calendar.sqlite, is no longer committed either; see above.)
 *.sqlite-shm
 *.sqlite-wal
