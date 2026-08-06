@@ -1,12 +1,12 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { PortCall, Scraped } from "../src/domain/types.js";
 import { runPipeline } from "../src/pipeline/run.js";
 import { mbccs, type MbccsRaw } from "../src/sources/mbccs.js";
 import type { BrowserSession, FetchDeps, HttpClient, ParseResult } from "../src/sources/types.js";
+import { openStore } from "../src/store/store.js";
+import { freshSchema } from "./support/postgres.js";
 
 /**
  * **Seam 2 — pure `parse` over a saved harvested payload, with an injected clock.**
@@ -235,58 +235,61 @@ describe("through the pipeline", () => {
   /**
    * The registered adapter, driven end to end through `runPipeline` — only the
    * browser is faked. `fetch` reads the injected session, `parse` maps the
-   * harvested payload, the store mints uids, and the feed is written from the
-   * store. MBCCS folds into the **existing** port-calls.ics; no new feed appears.
+   * harvested payload, and the store mints uids. v2's pipeline is a pure store
+   * writer (ADR-0025 §4), so this asserts the stored records read back from a
+   * real ephemeral Postgres. MBCCS folds into the **same `port_call` table** SCC
+   * writes: the store grows with types, not sources.
    */
   const runOverFixture = async (name = "schedule.json") => {
-    const workspace = mkdtempSync(join(tmpdir(), "mbccs-"));
+    const schema = await freshSchema();
     const browser = fakeBrowser(fixture(name).schedule);
+    try {
+      const { outcomes } = await runPipeline({
+        sources: [mbccs],
+        connectionString: schema.connectionString,
+        now: () => NOW,
+        http: noHttp,
+        browser: browser.session,
+      });
 
-    const { outcomes } = await runPipeline({
-      sources: [mbccs],
-      db: join(workspace, "calendar.sqlite"),
-      feedsDir: join(workspace, "feeds"),
-      payloadPath: join(workspace, "calendar.json"),
-      now: () => NOW,
-      http: noHttp,
-      browser: browser.session,
-    });
-
-    const feeds = join(workspace, "feeds");
-    const result = {
-      ics: readFileSync(join(feeds, "port-calls.ics"), "utf8"),
-      feedNames: readdirSync(feeds).sort(),
-      outcomes,
-    };
-    rmSync(workspace, { recursive: true, force: true });
-    return result;
+      const store = await openStore(schema.connectionString);
+      try {
+        return {
+          portCalls: await store.readPortCalls(),
+          venueEvents: await store.readVenueEvents(),
+          outcomes,
+        };
+      } finally {
+        await store.close();
+      }
+    } finally {
+      await schema.drop();
+    }
   };
 
-  it("folds MBCCS calls into port-calls.ics and reports a clean outcome", async () => {
-    const { ics, outcomes } = await runOverFixture();
+  it("folds MBCCS calls into the port_call table and reports a clean outcome", async () => {
+    const { portCalls, venueEvents, outcomes } = await runOverFixture();
 
     expect(outcomes).toEqual([{ source: "mbccs", ok: true, records: 3, failures: [] }]);
-    expect(ics).toContain("X-WR-CALNAME:SG Cruise Arrivals");
-    expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(3);
-    expect(ics).toContain("SUMMARY:Cruise: Genting Dream at MBCCS");
-    expect(ics).toContain("LOCATION:MBCCS");
+    expect(portCalls).toHaveLength(3);
+    expect(portCalls.every((call) => call.terminal === "MBCCS")).toBe(true);
+    expect(portCalls.map((call) => call.vessel)).toContain("Genting Dream");
+    // The store grows with types, not sources: a new cruise source adds no table.
+    expect(venueEvents).toEqual([]);
   });
 
-  it("adds no new feed — the feed set grows with types, not sources", async () => {
-    // #37: MBCCS port calls appear in the existing port-calls.ics, no new feed.
-    expect((await runOverFixture()).feedNames).toEqual(["port-calls.ics", "venue-events.ics"]);
-  });
-
-  it("carries the berth into the description, never the location", async () => {
-    const { ics } = await runOverFixture();
-    expect(ics).toContain("Pier 1");
-    expect(ics).not.toContain("LOCATION:MBCCS\\, Pier");
+  it("carries the berth on the record, distinct from the terminal", async () => {
+    // The berth is a fact about the ship, demoted from the reader-facing location
+    // (a pier number is not where demand lands) but never dropped from the store.
+    const { portCalls } = await runOverFixture();
+    expect(portCalls.map((call) => call.berth)).toContain("Pier 1");
+    expect(portCalls.every((call) => call.terminal === "MBCCS")).toBe(true);
   });
 
   it("writes nothing when the schedule payload is absent", async () => {
-    const { ics, outcomes } = await runOverFixture("absent.json");
+    const { portCalls, outcomes } = await runOverFixture("absent.json");
     expect(outcomes[0]).toMatchObject({ source: "mbccs", ok: false });
-    expect(ics).not.toContain("BEGIN:VEVENT");
+    expect(portCalls).toEqual([]);
   });
 });
 

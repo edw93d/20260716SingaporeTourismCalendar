@@ -1,23 +1,26 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
+import { Client } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { instant } from "../src/domain/instant.js";
-import type {
-  PortCall,
-  Scraped,
-  SourceId,
-  VenueEvent,
-} from "../src/domain/types.js";
+import type { PortCall, Scraped, SourceId, VenueEvent } from "../src/domain/types.js";
 import { runPipeline } from "../src/pipeline/run.js";
+import { migrateFromV1 } from "../src/store/migrate.js";
 import { openStore } from "../src/store/store.js";
 import type { HttpClient, ParseResult, Source } from "../src/sources/types.js";
+import { freshSchema, type EphemeralStore } from "./support/postgres.js";
 
 /**
- * **Seam 1 — the whole pipeline run.** Records go in through a fixture adapter,
- * a `.ics` file and a SQLite database come out, and every assertion reads one
- * of those two. Nothing here reaches for a private helper.
+ * **Seam 1 — the whole pipeline run, now against a real Postgres.** Records go in
+ * through a fixture adapter and land in the store; every assertion reads the
+ * store back. The pipeline is a pure writer in v2 (ADR-0025 §4) — it emits no
+ * `.ics` and no `calendar.json`, so nothing here reaches for a file. The store's
+ * traps live in real SQL (the `ON CONFLICT` sequence bump, the upsert that must
+ * not touch a moderation column, the migration column-copy), so the tests run
+ * against a real ephemeral schema rather than a fake, exactly as v1's ran against
+ * a real temp SQLite store.
  *
  * The adapters are fixtures rather than real scrapers **by design**. Every hard
  * behaviour at this seam is about memory across runs — uid durability, sequence
@@ -85,12 +88,15 @@ const odyssey = (overrides: Partial<Scraped<PortCall>> = {}): Scraped<PortCall> 
 // Harness
 // ---------------------------------------------------------------------------
 
-let workspace: string;
+let schema: EphemeralStore;
 
-const dbPath = () => join(workspace, "calendar.sqlite");
-const feedsDir = () => join(workspace, "feeds");
-const venueFeed = () => readFileSync(join(feedsDir(), "venue-events.ics"), "utf8");
-const portCallFeed = () => readFileSync(join(feedsDir(), "port-calls.ics"), "utf8");
+beforeEach(async () => {
+  schema = await freshSchema();
+});
+
+afterEach(async () => {
+  await schema.drop();
+});
 
 const clockAt = (value: string) => () => new Date(value);
 
@@ -105,34 +111,41 @@ const noHttp: HttpClient = {
   },
 };
 
-const payloadPath = () => join(workspace, "calendar.json");
-
 const run = (sources: (Source<VenueEvent> | Source<PortCall>)[], at: string) =>
   runPipeline({
     sources,
-    db: dbPath(),
-    feedsDir: feedsDir(),
-    payloadPath: payloadPath(),
+    connectionString: schema.connectionString,
     now: clockAt(at),
     http: noHttp,
   });
 
 /** Reads the database back the way a later run — or the operator — would. */
-const storedVenueEvents = () => {
-  const store = openStore(dbPath());
+const storedVenueEvents = async () => {
+  const store = await openStore(schema.connectionString);
   try {
-    return store.readVenueEvents();
+    return await store.readVenueEvents();
   } finally {
-    store.close();
+    await store.close();
   }
 };
 
-const storedPortCalls = () => {
-  const store = openStore(dbPath());
+const storedPortCalls = async () => {
+  const store = await openStore(schema.connectionString);
   try {
-    return store.readPortCalls();
+    return await store.readPortCalls();
   } finally {
-    store.close();
+    await store.close();
+  }
+};
+
+/** A raw client on this test's schema, for the SQL a store method deliberately cannot express. */
+const withClient = async <T>(work: (client: Client) => Promise<T>): Promise<T> => {
+  const client = new Client({ connectionString: schema.connectionString });
+  await client.connect();
+  try {
+    return await work(client);
+  } finally {
+    await client.end();
   }
 };
 
@@ -140,52 +153,16 @@ const RUN_ONE = "2026-07-01T02:00:00Z";
 const RUN_TWO = "2026-07-02T02:00:00Z";
 const RUN_THREE = "2026-07-03T02:00:00Z";
 
-/** The VEVENT bodies, one array of property lines each, unfolded. */
-const vevents = (ics: string): string[][] => {
-  const unfolded = ics.replace(/\r\n[ \t]/g, "");
-  return unfolded
-    .split("\r\n")
-    .reduce<{ blocks: string[][]; current: string[] | null }>(
-      (acc, line) => {
-        if (line === "BEGIN:VEVENT") return { ...acc, current: [] };
-        if (line === "END:VEVENT" && acc.current) {
-          return { blocks: [...acc.blocks, acc.current], current: null };
-        }
-        if (acc.current) acc.current.push(line);
-        return acc;
-      },
-      { blocks: [], current: null },
-    ).blocks;
-};
-
-/** `SUMMARY;X=1:value` → `SUMMARY`. */
-const propertyName = (line: string): string =>
-  line.slice(0, Math.min(...[line.indexOf(":"), line.indexOf(";")].filter((i) => i >= 0))) ||
-  line;
-
-const valueOf = (block: string[], name: string): string | undefined => {
-  const line = block.find((l) => propertyName(l) === name);
-  return line?.slice(line.indexOf(":") + 1);
-};
-
-beforeEach(() => {
-  workspace = mkdtempSync(join(tmpdir(), "sg-calendar-"));
-});
-
-afterEach(() => {
-  rmSync(workspace, { recursive: true, force: true });
-});
-
 // ---------------------------------------------------------------------------
 
 describe("the store", () => {
   it("persists both record types, keyed on (source, sourceKey)", async () => {
     await run([venueSourceOf("suntec", [bniVision()]), portCallSourceOf("scc", [odyssey()])], RUN_ONE);
 
-    expect(storedVenueEvents()).toMatchObject([
+    expect(await storedVenueEvents()).toMatchObject([
       { source: "suntec", sourceKey: "bni-vision1472026", name: "BNI Vision" },
     ]);
-    expect(storedPortCalls()).toMatchObject([
+    expect(await storedPortCalls()).toMatchObject([
       { source: "scc", vessel: "ODYSSEY / VILLA VIE RESIDENCES" },
     ]);
   });
@@ -201,7 +178,7 @@ describe("the store", () => {
       RUN_ONE,
     );
 
-    const stored = storedVenueEvents();
+    const stored = await storedVenueEvents();
     expect(stored).toHaveLength(2);
     expect(new Set(stored.map((r) => r.uid)).size).toBe(2);
   });
@@ -211,25 +188,90 @@ describe("the store", () => {
     // stated. A column would be the first place that refusal leaks.
     await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
 
-    const db = new Database(dbPath(), { readonly: true });
-    try {
-      const columns = ["venue_event", "port_call"].flatMap((table) =>
-        (db.pragma(`table_info(${table})`) as { name: string }[]).map(({ name }) => name),
+    const columns = await withClient(async (client) => {
+      const { rows } = await client.query(
+        `SELECT column_name FROM information_schema.columns
+          WHERE table_name IN ('venue_event', 'port_call')`,
       );
-      expect(columns.filter((c) => /status|state|deleted|cancelled|active/i.test(c))).toEqual([]);
+      return rows.map((row) => row["column_name"] as string);
+    });
+    expect(columns.filter((c) => /status|state|deleted|cancelled|active/i.test(c))).toEqual([]);
+  });
+});
+
+describe("per-source transactions", () => {
+  it("rolls the whole transaction back when its work throws", async () => {
+    // One transaction per source (ADR-0025 §5): a source that breaks mid-write
+    // rolls back its own records and no others, so a run never leaves a
+    // half-written source behind. A `transact` that committed regardless — or
+    // omitted the ROLLBACK — would leave the first upsert stranded here.
+    const store = await openStore(schema.connectionString);
+    try {
+      await expect(
+        store.transact(async (tx) => {
+          await tx.upsertVenueEvent(bniVision({ sourceKey: "a" }), instant(RUN_ONE));
+          throw new Error("source broke mid-write");
+        }),
+      ).rejects.toThrow("source broke mid-write");
+
+      expect(await store.readVenueEvents()).toEqual([]);
     } finally {
-      db.close();
+      await store.close();
     }
+  });
+
+  it("commits every record when the work completes", async () => {
+    const store = await openStore(schema.connectionString);
+    try {
+      await store.transact(async (tx) => {
+        await tx.upsertVenueEvent(bniVision({ sourceKey: "a", name: "A" }), instant(RUN_ONE));
+        await tx.upsertVenueEvent(bniVision({ sourceKey: "b", name: "B" }), instant(RUN_ONE));
+      });
+
+      expect((await store.readVenueEvents()).map((r) => r.name).sort()).toEqual(["A", "B"]);
+    } finally {
+      await store.close();
+    }
+  });
+});
+
+describe("the upsert writes only the fields Scraped<T> carries", () => {
+  it("never clobbers a person-set column a scrape does not own", async () => {
+    // ⚠️ The one storage-shaped trap on the ticket (ADR-0025 §5). #4 adds a
+    // person-set `hidden` flag; a scrape that overwrote it would silently un-do
+    // every moderation judgement on the next run. `hidden` does not exist yet, so
+    // this simulates it: add the column, hide a record, then re-scrape it with
+    // changed content. The upsert's SET clause names only content, sequence and
+    // last_seen_at — so `hidden` must survive untouched while the content moves.
+    // A `SELECT *`-style write, or one that widened the column list, fails here.
+    await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
+
+    await withClient((client) =>
+      client.query(`ALTER TABLE venue_event ADD COLUMN hidden boolean NOT NULL DEFAULT false`),
+    );
+    await withClient((client) => client.query(`UPDATE venue_event SET hidden = true`));
+
+    await run([venueSourceOf("suntec", [bniVision({ name: "BNI Vision 2026" })])], RUN_TWO);
+
+    const [after] = await storedVenueEvents();
+    const hidden = await withClient(async (client) => {
+      const { rows } = await client.query(`SELECT hidden FROM venue_event`);
+      return rows[0]?.["hidden"] as boolean;
+    });
+
+    expect(hidden).toBe(true);
+    expect(after?.name).toBe("BNI Vision 2026");
+    expect(after?.sequence).toBe(1);
   });
 });
 
 describe("uid durability", () => {
   it("mints a uid once and never recomputes it", async () => {
     await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
-    const [first] = storedVenueEvents();
+    const [first] = await storedVenueEvents();
 
     await run([venueSourceOf("suntec", [bniVision()])], RUN_TWO);
-    const [second] = storedVenueEvents();
+    const [second] = await storedVenueEvents();
 
     expect(second?.uid).toBe(first?.uid);
     expect(first?.uid).toBeTruthy();
@@ -239,7 +281,7 @@ describe("uid durability", () => {
     // The change subscribers most need delivered as an update. Hashing `start`
     // into the uid would deliver it as a second entry beside a stale one.
     await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
-    const [before] = storedVenueEvents();
+    const [before] = await storedVenueEvents();
 
     await run(
       [
@@ -253,22 +295,20 @@ describe("uid durability", () => {
       RUN_TWO,
     );
 
-    const stored = storedVenueEvents();
+    const stored = await storedVenueEvents();
     expect(stored).toHaveLength(1);
     expect(stored[0]?.uid).toBe(before?.uid);
     expect(stored[0]?.sequence).toBe((before?.sequence ?? 0) + 1);
     expect(stored[0]?.start).toBe("2026-08-17T04:00:00Z");
-
-    expect(vevents(venueFeed())).toHaveLength(1);
   });
 
   it("keeps the uid when a title is corrected, and bumps sequence", async () => {
     await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
-    const [before] = storedVenueEvents();
+    const [before] = await storedVenueEvents();
 
     await run([venueSourceOf("suntec", [bniVision({ name: "BNI Vision 2026" })])], RUN_TWO);
 
-    const [after] = storedVenueEvents();
+    const [after] = await storedVenueEvents();
     expect(after?.uid).toBe(before?.uid);
     expect(after?.sequence).toBe((before?.sequence ?? 0) + 1);
     expect(after?.name).toBe("BNI Vision 2026");
@@ -278,7 +318,7 @@ describe("uid durability", () => {
     await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
     await run([venueSourceOf("suntec", [bniVision()])], RUN_TWO);
 
-    expect(storedVenueEvents()[0]?.sequence).toBe(0);
+    expect((await storedVenueEvents())[0]?.sequence).toBe(0);
   });
 });
 
@@ -287,7 +327,7 @@ describe("seen-tracking", () => {
     await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
     await run([venueSourceOf("suntec", [bniVision()])], RUN_TWO);
 
-    expect(storedVenueEvents()[0]).toMatchObject({
+    expect((await storedVenueEvents())[0]).toMatchObject({
       firstSeenAt: RUN_ONE,
       lastSeenAt: RUN_TWO,
     });
@@ -300,22 +340,22 @@ describe("seen-tracking", () => {
     await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
     await run([venueSourceOf("suntec", [])], RUN_TWO);
 
-    const stored = storedVenueEvents();
+    const stored = await storedVenueEvents();
     expect(stored).toHaveLength(1);
     expect(stored[0]).toMatchObject({ firstSeenAt: RUN_ONE, lastSeenAt: RUN_ONE });
   });
 
   it("preserves the uid across a disappearance and reappearance", async () => {
     await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
-    const [minted] = storedVenueEvents();
+    const [minted] = await storedVenueEvents();
 
     await run([venueSourceOf("suntec", [])], RUN_TWO);
-    await run([venueSourceOf("suntec", [bniVision()])], "2026-07-03T02:00:00Z");
+    await run([venueSourceOf("suntec", [bniVision()])], RUN_THREE);
 
-    expect(storedVenueEvents()[0]).toMatchObject({
+    expect((await storedVenueEvents())[0]).toMatchObject({
       uid: minted?.uid,
       firstSeenAt: RUN_ONE,
-      lastSeenAt: "2026-07-03T02:00:00Z",
+      lastSeenAt: RUN_THREE,
     });
   });
 });
@@ -338,7 +378,7 @@ describe("parse outcomes", () => {
       RUN_TWO,
     );
 
-    expect(storedVenueEvents()[0]).toMatchObject({
+    expect((await storedVenueEvents())[0]).toMatchObject({
       firstSeenAt: RUN_ONE,
       lastSeenAt: RUN_ONE,
     });
@@ -356,8 +396,7 @@ describe("parse outcomes", () => {
       RUN_ONE,
     );
 
-    expect(storedVenueEvents()).toHaveLength(1);
-    expect(vevents(venueFeed())).toHaveLength(1);
+    expect(await storedVenueEvents()).toHaveLength(1);
   });
 
   it("reports what each source did, so a bad reading is not swallowed", async () => {
@@ -400,207 +439,9 @@ describe("parse outcomes", () => {
 
     expect(outcomes[0]).toMatchObject({ source: "scc", ok: false });
     expect(outcomes[0]).toHaveProperty("reason", expect.stringContaining("ETIMEDOUT"));
-    expect(storedVenueEvents()).toHaveLength(1);
-  });
-});
-
-describe("venue-events.ics", () => {
-  beforeEach(async () => {
-    await run(
-      [venueSourceOf("suntec", [bniVision()]), portCallSourceOf("scc", [odyssey()])],
-      RUN_ONE,
-    );
+    expect(await storedVenueEvents()).toHaveLength(1);
   });
 
-  it("announces itself as SG Venue Events", () => {
-    expect(venueFeed()).toContain("X-WR-CALNAME:SG Venue Events");
-  });
-
-  it("carries every VenueEvent and no PortCall", () => {
-    const blocks = vevents(venueFeed());
-    expect(blocks).toHaveLength(1);
-    expect(valueOf(blocks[0]!, "SUMMARY")).toBe("BNI Vision");
-    expect(venueFeed()).not.toContain("ODYSSEY");
-  });
-
-  it("carries only the seven properties that survive all three clients", () => {
-    // CATEGORIES and URL are standard RFC 5545 and each survives on 1 of 3;
-    // X- properties are allowlisted per vendor. Conformance is not survival.
-    expect(vevents(venueFeed())[0]!.map(propertyName).sort()).toEqual([
-      "DESCRIPTION",
-      "DTEND",
-      "DTSTAMP",
-      "DTSTART",
-      "LOCATION",
-      "SUMMARY",
-      "UID",
-    ]);
-  });
-
-  it("projects location as venue plus hall", () => {
-    expect(valueOf(vevents(venueFeed())[0]!, "LOCATION")).toBe(
-      "Suntec Convention Centre\\, Level 4\\, Hall 404",
-    );
-  });
-
-  it("generates a description carrying category and attribution", () => {
-    const description = valueOf(vevents(venueFeed())[0]!, "DESCRIPTION") ?? "";
-    expect(description).toMatch(/Venue event/i);
-    expect(description).toContain("suntec");
-  });
-
-  it("serializes times as UTC instants", () => {
-    const block = vevents(venueFeed())[0]!;
-    expect(valueOf(block, "DTSTART")).toBe("20260717T040000Z");
-    // No +1 adjustment: an exclusive DTEND is naturally correct for a timed event.
-    expect(valueOf(block, "DTEND")).toBe("20260717T100000Z");
-  });
-
-  it("carries a static VTIMEZONE literal and needs no timezone library", () => {
-    expect(venueFeed()).toContain("BEGIN:VTIMEZONE");
-    expect(venueFeed()).toContain("TZID:Asia/Singapore");
-    // Fixed +08:00 with no DST since 1982.
-    expect(venueFeed()).not.toContain("DAYLIGHT");
-  });
-
-  it("admits no all-day shape and no recurrence", () => {
-    expect(venueFeed()).not.toContain("VALUE=DATE");
-    expect(venueFeed()).not.toContain("RRULE");
-  });
-
-  it("terminates every line with CRLF", () => {
-    expect(venueFeed().endsWith("END:VCALENDAR\r\n")).toBe(true);
-  });
-});
-
-describe("port-calls.ics", () => {
-  beforeEach(async () => {
-    await run(
-      [venueSourceOf("suntec", [bniVision()]), portCallSourceOf("scc", [odyssey()])],
-      RUN_ONE,
-    );
-  });
-
-  it("announces itself as SG Cruise Arrivals", () => {
-    // Plain audience language, read beside a hotelier's own work calendars.
-    expect(portCallFeed()).toContain("X-WR-CALNAME:SG Cruise Arrivals");
-  });
-
-  it("carries every PortCall and no VenueEvent", () => {
-    const blocks = vevents(portCallFeed());
-    expect(blocks).toHaveLength(1);
-    expect(valueOf(blocks[0]!, "SUMMARY")).toBe(
-      "Cruise: ODYSSEY / VILLA VIE RESIDENCES at Singapore Cruise Centre",
-    );
-    expect(portCallFeed()).not.toContain("BNI Vision");
-  });
-
-  it("is one of exactly two feeds, with no all firehose among them", () => {
-    // Split by **type**, never by source, and there is no `all` (ADR-0008). The
-    // unfiltered duplicate-heavy stream is not a subscription anyone should
-    // hold; the everything-view is the web calendar. Asserted as the whole
-    // directory listing, so a third feed cannot appear unnoticed.
-    expect(readdirSync(feedsDir()).sort()).toEqual(["port-calls.ics", "venue-events.ics"]);
-  });
-
-  it("projects location as the terminal, never the berth", () => {
-    // A pier number is a fact about a ship, not about where demand lands.
-    expect(valueOf(vevents(portCallFeed())[0]!, "LOCATION")).toBe("Singapore Cruise Centre");
-    expect(valueOf(vevents(portCallFeed())[0]!, "LOCATION")).not.toContain("Pier");
-  });
-
-  it("carries the berth in the generated description instead", () => {
-    // Demoted, not dropped — and it travels in prose we generate, never scraped.
-    const description = valueOf(vevents(portCallFeed())[0]!, "DESCRIPTION") ?? "";
-    expect(description).toContain("Pier 2");
-    expect(description).toMatch(/cruise/i);
-    expect(description).toContain("scc");
-  });
-
-  it("carries the same seven properties as the other feed", () => {
-    // The split is a subscription boundary, not a schema difference.
-    expect(vevents(portCallFeed())[0]!.map(propertyName).sort()).toEqual([
-      "DESCRIPTION",
-      "DTEND",
-      "DTSTAMP",
-      "DTSTART",
-      "LOCATION",
-      "SUMMARY",
-      "UID",
-    ]);
-  });
-
-  it("serializes arrival and departure as the entry's start and end", () => {
-    const block = vevents(portCallFeed())[0]!;
-    expect(valueOf(block, "DTSTART")).toBe("20260718T000000Z");
-    expect(valueOf(block, "DTEND")).toBe("20260718T100000Z");
-  });
-});
-
-describe("the web calendar payload", () => {
-  const payload = () =>
-    JSON.parse(readFileSync(payloadPath(), "utf8")) as {
-      venueEvents: { summary: string; source: string }[];
-      portCalls: { summary: string; source: string }[];
-    };
-
-  it("is emitted beside the feeds, from the same store", async () => {
-    // #38: the page is built from this file. It is re-emitted from the store on
-    // every run, so — like the feeds — a record absent from today's scrape still
-    // reaches the page.
-    await run([venueSourceOf("suntec", [bniVision()]), portCallSourceOf("scc", [odyssey()])], RUN_ONE);
-
-    expect(payload().venueEvents.map((entry) => entry.summary)).toEqual(["BNI Vision"]);
-    expect(payload().portCalls[0]?.summary).toBe(
-      "Cruise: ODYSSEY / VILLA VIE RESIDENCES at Singapore Cruise Centre",
-    );
-  });
-
-  it("carries the everything-view — both types, every source, duplicates unmerged", async () => {
-    // The load-bearing property (#11): two sources publishing the same event
-    // arrive as two labelled entries, merged by nothing (ADR-0004).
-    await run(
-      [
-        venueSourceOf("suntec", [bniVision()]),
-        venueSourceOf("other", [bniVision({ source: "other", sourceKey: "dup" })]),
-      ],
-      RUN_ONE,
-    );
-
-    expect(payload().venueEvents.map((entry) => entry.source).sort()).toEqual(["other", "suntec"]);
-  });
-});
-
-describe("iCal text handling", () => {
-  it("escapes the characters that would otherwise end the property value", async () => {
-    await run(
-      [
-        venueSourceOf("suntec", [
-          bniVision({ name: "Wine, Spirits; Asia\\Pacific", hall: null }),
-        ]),
-      ],
-      RUN_ONE,
-    );
-
-    const block = vevents(venueFeed())[0]!;
-    expect(valueOf(block, "SUMMARY")).toBe("Wine\\, Spirits\\; Asia\\\\Pacific");
-    // Hall absent — the location is the venue alone, with no dangling separator.
-    expect(valueOf(block, "LOCATION")).toBe("Suntec Convention Centre");
-  });
-
-  it("folds at 75 octets without splitting a character", async () => {
-    // Counted in bytes, not characters: an accented venue name cut mid-codepoint
-    // would reach the subscriber as mojibake.
-    const longName = `Café Résidence ${"Exhibition ".repeat(12)}2026`;
-    await run([venueSourceOf("suntec", [bniVision({ name: longName })])], RUN_ONE);
-
-    const feed = venueFeed();
-    const lines = feed.split("\r\n").slice(0, -1);
-    expect(lines.some((line) => Buffer.byteLength(line) > 60)).toBe(true);
-    expect(lines.every((line) => Buffer.byteLength(line) <= 75)).toBe(true);
-    expect(feed).not.toContain("�");
-    expect(valueOf(vevents(feed)[0]!, "SUMMARY")).toBe(longName);
-  });
 });
 
 describe("retention", () => {
@@ -614,13 +455,14 @@ describe("retention", () => {
 
     await run([venueSourceOf("suntec", [lastYear])], RUN_ONE);
 
-    expect(storedVenueEvents()).toHaveLength(1);
-    expect(vevents(venueFeed()).map((b) => valueOf(b, "SUMMARY"))).toEqual(["Cellar Fiesta"]);
+    const stored = await storedVenueEvents();
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.name).toBe("Cellar Fiesta");
   });
 });
 
 describe("idempotence", () => {
-  it("produces byte-identical output and identical state on a re-run", async () => {
+  it("produces identical state on a re-run", async () => {
     // A dropped run must cost freshness and nothing else, so the scrape has to
     // be safe to repeat.
     const fixtures = () => [
@@ -629,15 +471,13 @@ describe("idempotence", () => {
     ];
 
     await run(fixtures(), RUN_ONE);
-    const firstBytes = venueFeed();
-    const firstVenueEvents = storedVenueEvents();
-    const firstPortCalls = storedPortCalls();
+    const firstVenueEvents = await storedVenueEvents();
+    const firstPortCalls = await storedPortCalls();
 
     await run(fixtures(), RUN_ONE);
 
-    expect(venueFeed()).toBe(firstBytes);
-    expect(storedVenueEvents()).toEqual(firstVenueEvents);
-    expect(storedPortCalls()).toEqual(firstPortCalls);
+    expect(await storedVenueEvents()).toEqual(firstVenueEvents);
+    expect(await storedPortCalls()).toEqual(firstPortCalls);
   });
 
   it("self-heals a dropped run, costing freshness and nothing else", async () => {
@@ -652,11 +492,11 @@ describe("idempotence", () => {
     const fixtures = () => [venueSourceOf("suntec", [bniVision()])];
 
     await run(fixtures(), RUN_ONE);
-    const before = storedVenueEvents();
+    const before = await storedVenueEvents();
 
     // Nothing runs at RUN_TWO. The scheduled run was dropped.
     await run(fixtures(), RUN_THREE);
-    const after = storedVenueEvents();
+    const after = await storedVenueEvents();
 
     expect(after).toHaveLength(before.length);
     expect(after.map((record) => record.uid)).toEqual(before.map((record) => record.uid));
@@ -669,14 +509,17 @@ describe("idempotence", () => {
     expect(after.map((record) => record.lastSeenAt)).toEqual([instant(RUN_THREE)]);
   });
 
-  it("orders entries deterministically regardless of the order sources are read", async () => {
+  it("orders records deterministically regardless of the order sources are read", async () => {
     const later = bniVision({ sourceKey: "later", name: "Later", start: instant("2026-09-01T04:00:00Z"), end: instant("2026-09-01T10:00:00Z") });
 
     await run([venueSourceOf("suntec", [bniVision(), later])], RUN_ONE);
-    const forwards = vevents(venueFeed()).map((b) => valueOf(b, "SUMMARY"));
+    const forwards = (await storedVenueEvents()).map((r) => r.name);
+
+    await schema.drop();
+    schema = await freshSchema();
 
     await run([venueSourceOf("suntec", [later, bniVision()])], RUN_ONE);
-    const backwards = vevents(venueFeed()).map((b) => valueOf(b, "SUMMARY"));
+    const backwards = (await storedVenueEvents()).map((r) => r.name);
 
     expect(forwards).toEqual(["BNI Vision", "Later"]);
     expect(backwards).toEqual(forwards);
@@ -791,5 +634,135 @@ describe("breakage detection", () => {
     );
 
     expect(signalsFor(first, "suntec")).toEqual([{ kind: "rows-failed", failures: [failure] }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The migration from v1's SQLite store (ADR-0025 §7).
+// ---------------------------------------------------------------------------
+
+describe("migration from v1", () => {
+  let v1Dir: string;
+  let v1Path: string;
+
+  beforeEach(() => {
+    v1Dir = mkdtempSync(join(tmpdir(), "sg-v1-"));
+    v1Path = join(v1Dir, "calendar.sqlite");
+  });
+
+  afterEach(() => {
+    rmSync(v1Dir, { recursive: true, force: true });
+  });
+
+  /** A v1-shaped SQLite store, seeded with rows carrying their minted identity. */
+  const seedV1 = () => {
+    const db = new Database(v1Path);
+    db.exec(`
+      CREATE TABLE venue_event (
+        source text NOT NULL, source_key text NOT NULL, uid text NOT NULL UNIQUE,
+        sequence integer NOT NULL, name text NOT NULL, start_at text NOT NULL,
+        end_at text NOT NULL, venue text NOT NULL, hall text,
+        first_seen_at text NOT NULL, last_seen_at text NOT NULL,
+        PRIMARY KEY (source, source_key)
+      );
+      CREATE TABLE port_call (
+        source text NOT NULL, source_key text NOT NULL, uid text NOT NULL UNIQUE,
+        sequence integer NOT NULL, vessel text NOT NULL, terminal text NOT NULL,
+        berth text, arrival_at text NOT NULL, departure_at text NOT NULL,
+        first_seen_at text NOT NULL, last_seen_at text NOT NULL,
+        PRIMARY KEY (source, source_key)
+      );
+    `);
+    db.prepare(
+      `INSERT INTO venue_event VALUES
+        ('suntec','bni-vision1472026','uid-ve-1@sg-tourism-calendar',3,'BNI Vision',
+         '2026-07-17T04:00:00Z','2026-07-17T10:00:00Z','Suntec Convention Centre','Level 4, Hall 404',
+         '2026-01-02T02:00:00Z','2026-07-01T02:00:00Z')`,
+    ).run();
+    db.prepare(
+      `INSERT INTO port_call VALUES
+        ('scc','ODYSSEY|2026-07-18','uid-pc-1@sg-tourism-calendar',0,'ODYSSEY / VILLA VIE RESIDENCES',
+         'Singapore Cruise Centre','Pier 2','2026-07-18T00:00:00Z','2026-07-18T10:00:00Z',
+         '2026-03-04T02:00:00Z','2026-07-01T02:00:00Z')`,
+    ).run();
+    db.close();
+  };
+
+  it("copies every record carrying uid, sequence, firstSeenAt and lastSeenAt untouched", async () => {
+    // ADR-0004: the uid is minted once and never recomputed; v1's public feed
+    // served real uids to real subscribers, so a re-mint would replace every
+    // subscribed entry. The migration is a column copy — this asserts the four
+    // durable fields arrive byte-for-byte, which fails the instant the migration
+    // routes through the scrape upsert (which mints a new uid and resets
+    // firstSeenAt).
+    seedV1();
+
+    const counts = await migrateFromV1(v1Path, schema.connectionString);
+    expect(counts).toEqual({ venueEvents: 1, portCalls: 1 });
+
+    expect(await storedVenueEvents()).toEqual([
+      {
+        uid: "uid-ve-1@sg-tourism-calendar",
+        sequence: 3,
+        source: "suntec",
+        sourceKey: "bni-vision1472026",
+        name: "BNI Vision",
+        start: "2026-07-17T04:00:00Z",
+        end: "2026-07-17T10:00:00Z",
+        venue: "Suntec Convention Centre",
+        hall: "Level 4, Hall 404",
+        firstSeenAt: "2026-01-02T02:00:00Z",
+        lastSeenAt: "2026-07-01T02:00:00Z",
+      },
+    ]);
+    expect(await storedPortCalls()).toEqual([
+      {
+        uid: "uid-pc-1@sg-tourism-calendar",
+        sequence: 0,
+        source: "scc",
+        sourceKey: "ODYSSEY|2026-07-18",
+        vessel: "ODYSSEY / VILLA VIE RESIDENCES",
+        terminal: "Singapore Cruise Centre",
+        berth: "Pier 2",
+        arrival: "2026-07-18T00:00:00Z",
+        departure: "2026-07-18T10:00:00Z",
+        firstSeenAt: "2026-03-04T02:00:00Z",
+        lastSeenAt: "2026-07-01T02:00:00Z",
+      },
+    ]);
+  });
+
+  it("is idempotent — a second run re-mints nothing and changes no uid", async () => {
+    // A migration is a one-shot, but a partial run that gets re-run must not
+    // duplicate or re-mint. ON CONFLICT DO NOTHING preserves the first copy's
+    // uid; a DO UPDATE, or a plain INSERT, would either overwrite or throw.
+    seedV1();
+
+    await migrateFromV1(v1Path, schema.connectionString);
+    const [firstPass] = await storedVenueEvents();
+
+    const counts = await migrateFromV1(v1Path, schema.connectionString);
+    const [secondPass] = await storedVenueEvents();
+
+    expect(counts).toEqual({ venueEvents: 1, portCalls: 1 });
+    expect(secondPass?.uid).toBe(firstPass?.uid);
+    expect(await storedVenueEvents()).toHaveLength(1);
+  });
+
+  it("hands migrated records straight to a normal scrape, which bumps sequence on change", async () => {
+    // The migration is the substrate a live run sits on: after it, a scrape of a
+    // migrated record with changed content keeps the migrated uid and bumps the
+    // migrated sequence — proof the copied identity is a first-class store row,
+    // not a special case.
+    seedV1();
+    await migrateFromV1(v1Path, schema.connectionString);
+    const [migrated] = await storedVenueEvents();
+
+    await run([venueSourceOf("suntec", [bniVision({ name: "BNI Vision 2026" })])], RUN_TWO);
+
+    const [after] = await storedVenueEvents();
+    expect(after?.uid).toBe(migrated?.uid);
+    expect(after?.sequence).toBe(4);
+    expect(after?.name).toBe("BNI Vision 2026");
   });
 });

@@ -36,6 +36,37 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+
+    # **A real ephemeral Postgres, because the store's traps live in real SQL**
+    # (ADR-0025). The upsert that must not touch a moderation column, the
+    # `ON CONFLICT` sequence bump, the migration column-copy — a fake would be
+    # exactly where those hide. It is the storage-layer equal of the fake browser
+    # below: spun up per run, thrown away with it, and holding nothing that
+    # outlives the job.
+    #
+    # **Still zero *stored* credentials.** `POSTGRES_PASSWORD` here is a literal
+    # for a throwaway database on `localhost` that lives and dies with this
+    # runner — not a `secrets.*` reference, which `tests/workflow.test.ts` still
+    # forbids for anything but `GITHUB_TOKEN`. The one real credential v2 holds is
+    # the *production* connection string, injected into `main.ts` at run time and
+    # named nowhere in this file.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sgcal_test
+        ports:
+          - 5432:5432
+        # Gate the steps on readiness: without the health check the first query
+        # can race the container's startup and fail a perfectly good change.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -56,5 +87,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # `TEST_DATABASE_URL` points the store tests at the service above. The
+      # tests carve a fresh schema per test off this connection and drop it after,
+      # so nothing leaks between them.
       - name: Test
         run: npm test
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sgcal_test

@@ -1,38 +1,29 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { instantFromDate, type Instant } from "../domain/instant.js";
-import { projectPortCall, projectVenueEvent } from "../domain/project.js";
 import type { DomainRecord, PortCall, Scraped, SourceId, VenueEvent } from "../domain/types.js";
-import { serializeCalendar } from "../feeds/ical.js";
-import { buildSitePayload } from "../site/payload.js";
 import type { BrowserSession, FetchDeps, HttpClient, ParseFailure, Source } from "../sources/types.js";
 import { openStore, type Store } from "../store/store.js";
 import { assess, cohortDelta, type BreakageSignal } from "./breakage.js";
 
 /**
- * One pipeline run: every source is read, what it observed is folded into the
- * store's memory, and the feeds are re-emitted from the store — never from the
- * scrape.
+ * One pipeline run: every source is read, and what it observed is folded into the
+ * store's memory. That is the whole of it.
  *
- * **Re-emitting from the store, not the scrape, is what makes retention real.**
- * A record absent from today's scrape still appears in today's feed, because the
- * feed is a view over everything ever seen. Absence stops `lastSeenAt` advancing
- * and does nothing else.
+ * **v2's run is a pure store writer** (ADR-0025 §4). v1 re-emitted `.ics` feeds
+ * and the web calendar's `calendar.json` from the store on every run; v2 builds
+ * no feeds (they are v3) and serves the web calendar live from the store, so the
+ * run publishes nothing. What it still does — and the reason retention is real —
+ * is upsert: a record absent from today's scrape stays in the store untouched,
+ * because absence only stops `lastSeenAt` advancing and does nothing else.
  */
 
 export type PipelineOptions = {
   sources: (Source<VenueEvent> | Source<PortCall>)[];
-  /** Path to the SQLite file. Created, with its directory, if absent. */
-  db: string;
-  /** Where the `.ics` files land. */
-  feedsDir: string;
   /**
-   * Where the web calendar's data payload lands — the everything-view the static
-   * page is built from (#38). A path rather than a directory because it is one
-   * file, and it sits above `feedsDir` in the published root (ADR-0011), not
-   * inside it.
+   * The Postgres connection string (ADR-0025). **Required and never defaulted**
+   * — the entry point reads it and passes it, exactly as it passes `http`. A
+   * default would be a caller silently reaching a database it never named.
    */
-  payloadPath: string;
+  connectionString: string;
   now: () => Date;
   /**
    * The rate-limited client every adapter reads through.
@@ -103,9 +94,7 @@ const isPortCall = (
 
 export const runPipeline = async ({
   sources,
-  db,
-  feedsDir,
-  payloadPath,
+  connectionString,
   now,
   http,
   browser,
@@ -118,7 +107,7 @@ export const runPipeline = async ({
   // one, enforced by the type rather than by a note in a doc.
   const deps: FetchDeps = { http, now, ...(browser ? { browser } : {}) };
 
-  const store = openStore(db);
+  const store = await openStore(connectionString);
 
   try {
     // Snapshot the store **before any upsert**, so breakage detection compares
@@ -126,8 +115,8 @@ export const runPipeline = async ({
     // once up front because no source's upsert has landed yet — a source only
     // ever owns rows in one table, so filtering both by `source` recovers exactly
     // its previous cohort (ADR-0007 §2).
-    const previousVenueEvents = store.readVenueEvents();
-    const previousPortCalls = store.readPortCalls();
+    const previousVenueEvents = await store.readVenueEvents();
+    const previousPortCalls = await store.readPortCalls();
     const previousFor = (key: SourceId): DomainRecord[] =>
       [...previousVenueEvents, ...previousPortCalls].filter((record) => record.source === key);
 
@@ -149,49 +138,9 @@ export const runPipeline = async ({
       breakage.push({ source: source.key, signals });
     }
 
-    // Two feeds, split by **type** — never a single firehose, never split by
-    // source, and there is no `all` (ADR-0008). The audience thinks in demand
-    // shapes, `source` already rides inside every entry, and the unfiltered
-    // duplicate-heavy stream is not a subscription anyone should hold. The
-    // everything-view is the web calendar. Consequently the feed set grows with
-    // types, not sources: a fourth source folds into one of these two.
-    const venueEvents = store.readVenueEvents();
-    const portCalls = store.readPortCalls();
-
-    mkdirSync(feedsDir, { recursive: true });
-    writeFileSync(
-      join(feedsDir, "venue-events.ics"),
-      serializeCalendar({
-        name: "SG Venue Events",
-        entries: venueEvents.map(projectVenueEvent),
-        dtstamp: ranAt,
-      }),
-    );
-    writeFileSync(
-      join(feedsDir, "port-calls.ics"),
-      serializeCalendar({
-        name: "SG Cruise Arrivals",
-        entries: portCalls.map(projectPortCall),
-        dtstamp: ranAt,
-      }),
-    );
-
-    // The everything-view the web calendar is built from (#38, ADR-0009 §4):
-    // both types, every source, duplicates unmerged, emitted from the store like
-    // the feeds so retention is real — a record absent from today's scrape still
-    // ships to the page. It also bakes the per-source last-confirmed instant (#40)
-    // — a machine-readable proof-of-life the page turns into a growing "X ago"
-    // client-side; that instant advances every healthy run, so the entries stay
-    // byte-stable when nothing changed but the freshness line does not, by design.
-    mkdirSync(dirname(payloadPath), { recursive: true });
-    writeFileSync(
-      payloadPath,
-      `${JSON.stringify(buildSitePayload(venueEvents, portCalls, ranAt), null, 2)}\n`,
-    );
-
     return { ranAt, outcomes, breakage };
   } finally {
-    store.close();
+    await store.close();
   }
 };
 
@@ -230,14 +179,15 @@ const readSource = async (
     return { outcome, signals: assess(outcome, null) };
   }
 
-  // Failed rows do not block the good ones — but they are reported, never
-  // dropped. A silently dropped row stops appearing and becomes
-  // indistinguishable from a genuine absence, which launders a scraper defect
-  // into a domain observation.
-  store.transact(() => {
+  // One transaction per source, not one per run (ADR-0025 §5): a source that
+  // breaks mid-write rolls back its own records and no others. Failed rows do
+  // not block the good ones — but they are reported, never dropped. A silently
+  // dropped row stops appearing and becomes indistinguishable from a genuine
+  // absence, which launders a scraper defect into a domain observation.
+  await store.transact(async (tx) => {
     for (const record of result.records) {
-      if (isPortCall(record)) store.upsertPortCall(record, seenAt);
-      else store.upsertVenueEvent(record, seenAt);
+      if (isPortCall(record)) await tx.upsertPortCall(record, seenAt);
+      else await tx.upsertVenueEvent(record, seenAt);
     }
   });
 

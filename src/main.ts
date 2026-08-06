@@ -3,22 +3,38 @@ import { reconcile } from "./alerts/issues.js";
 import { createBrowserSession } from "./pipeline/browser.js";
 import { createHttpClient } from "./pipeline/http.js";
 import { runPipeline } from "./pipeline/run.js";
-import { DB_PATH, FEEDS_DIR, SITE_PAYLOAD } from "./paths.js";
 import { sources } from "./sources/registry.js";
 
 /**
  * The daily run — the only production caller of `runPipeline`, and the only
- * place in this repository that constructs a network client or a browser session.
+ * place in this repository that constructs a network client, launches a browser
+ * session, or reads a credential from the environment.
  *
  * `createHttpClient()` and `createBrowserSession()` are passed explicitly because
  * reaching the live internet — over HTTP (ADR-0010) or a headless browser
- * (ADR-0005, Amendment 2) — is something a caller says out loud. This file is
- * where it gets said, once.
+ * (ADR-0005, Amendment 2) — is something a caller says out loud. The Postgres
+ * connection string is read here for the same reason (ADR-0025): v1 had zero
+ * credentials, v2 holds exactly one, and this file is where it is named — once,
+ * out loud, never defaulted. The store is injected exactly as the HTTP client is.
  *
  * The browser's lifecycle is owned here: launched before the run and closed in a
  * `finally`, so a source that throws mid-scrape still releases Chromium. MBCCS is
  * the only source that reads it; the others cannot, by the shape of `FetchDeps`.
  */
+
+/**
+ * The one environment read in `src/` — the single injection site the architecture
+ * test allows (ADR-0025 spends ADR-0010's zero-credentials property, keeping its
+ * code shape: injected, never defaulted). Absent, the run refuses rather than
+ * improvising a connection.
+ */
+const requireConnectionString = (): string => {
+  const value = process.env["DATABASE_URL"];
+  if (!value) {
+    throw new Error("DATABASE_URL is required — the store connection is injected, never defaulted.");
+  }
+  return value;
+};
 
 const main = async (): Promise<void> => {
   const browser = await createBrowserSession();
@@ -26,9 +42,7 @@ const main = async (): Promise<void> => {
   try {
     const run = await runPipeline({
       sources,
-      db: DB_PATH,
-      feedsDir: FEEDS_DIR,
-      payloadPath: SITE_PAYLOAD,
+      connectionString: requireConnectionString(),
       now: () => new Date(),
       http: createHttpClient(),
       browser: browser.session,
@@ -53,11 +67,10 @@ const main = async (): Promise<void> => {
     }
 
     // Raise or clear the operator's breakage issues (ADR-0007, #41). This runs
-    // **after** the feeds were written inside `runPipeline`, so an alerting
-    // failure — a `gh` hiccup, a token that expired mid-run — is logged and
-    // swallowed rather than allowed to fail a run that already published. The
-    // gateway authenticates with `GITHUB_TOKEN` only, read by `gh` from the
-    // environment the workflow injects.
+    // **after** the run has upserted, so an alerting failure — a `gh` hiccup, a
+    // token that expired mid-run — is logged and swallowed rather than allowed to
+    // fail a run whose writes already landed. The gateway authenticates with
+    // `GITHUB_TOKEN` only, read by `gh` from the environment the workflow injects.
     try {
       await reconcile(run.breakage, createGhGateway());
     } catch (error) {
@@ -73,13 +86,12 @@ const main = async (): Promise<void> => {
 /**
  * **A source that could not be read is not a failed run.** Three of the four
  * breakage signals are already carried in the outcomes above, and turning one
- * into a non-zero exit would abort the steps that commit the store and publish
- * the site — punishing every healthy source for one broken one, and losing a
- * day of seen-tracking to a transient 503. Surfacing that suspicion to the
- * operator is #41's job, not this file's.
+ * into a non-zero exit would abort the whole run — punishing every healthy
+ * source for one broken one, and losing a day of seen-tracking to a transient
+ * 503. Surfacing that suspicion to the operator is #41's job, not this file's.
  *
- * A throw is different: it means no feed was written, so there is nothing to
- * publish and the run genuinely failed.
+ * A throw is different: it means the run itself failed — no connection, or a
+ * store that could not be reached — and genuinely did not complete.
  */
 main().catch((error: unknown) => {
   console.error(error);

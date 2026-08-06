@@ -1,14 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
-import Database from "better-sqlite3";
+import { Pool, type PoolClient } from "pg";
 import { instant, type Instant } from "../domain/instant.js";
 import type { PortCall, Scraped, Terminal, VenueEvent } from "../domain/types.js";
 
 /**
- * The pipeline's memory — a SQLite file committed to the repo (git-as-database,
- * chosen because a connection string is a credential and the zero-credentials
- * property is load-bearing).
+ * The pipeline's memory — a hosted Postgres reached over an injected connection
+ * string (ADR-0025). It stopped being a SQLite file committed to the repository
+ * the moment there were two writers (a scrape in GitHub Actions and the admin
+ * page's server) and one unbackfillable dataset (flights): a binary blob in git
+ * cannot merge, and one machine cannot own a disk the other needs.
+ *
+ * **The connection string is injected, never defaulted** (ADR-0010's rule, whose
+ * zero-credentials *property* ADR-0025 spends but whose *code shape* it keeps):
+ * the entry point says the credential out loud, exactly as it says the HTTP
+ * client. A store that defaulted its connection would be a module deciding for
+ * its callers which database they meant to write.
  *
  * **The adapter observes; the core remembers.** Everything an adapter
  * structurally cannot know lives here and only here: `uid` minting, `sequence`
@@ -26,35 +32,41 @@ import type { PortCall, Scraped, Terminal, VenueEvent } from "../domain/types.js
  * There is deliberately **no status, state, or deleted column.** Absence is an
  * observation, not a verdict; a column here would be the first place that
  * refusal leaked. Records are never hard-deleted, so nothing needs one.
+ *
+ * Instants are stored as `text`, not `timestamptz`. The migration is a column
+ * copy that must leave `firstSeenAt`/`lastSeenAt` byte-for-byte untouched
+ * (ADR-0025 §7), and `timestamptz` would reformat the ISO string on the way in;
+ * `text` round-trips the exact bytes v1 minted, and `Instant` already sorts
+ * chronologically as plain text (see `instant.ts`).
  */
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS venue_event (
-    source        TEXT    NOT NULL,
-    source_key    TEXT    NOT NULL,
-    uid           TEXT    NOT NULL UNIQUE,
-    sequence      INTEGER NOT NULL,
-    name          TEXT    NOT NULL,
-    start_at      TEXT    NOT NULL,
-    end_at        TEXT    NOT NULL,
-    venue         TEXT    NOT NULL,
-    hall          TEXT,
-    first_seen_at TEXT    NOT NULL,
-    last_seen_at  TEXT    NOT NULL,
+    source        text    NOT NULL,
+    source_key    text    NOT NULL,
+    uid           text    NOT NULL UNIQUE,
+    sequence      integer NOT NULL,
+    name          text    NOT NULL,
+    start_at      text    NOT NULL,
+    end_at        text    NOT NULL,
+    venue         text    NOT NULL,
+    hall          text,
+    first_seen_at text    NOT NULL,
+    last_seen_at  text    NOT NULL,
     PRIMARY KEY (source, source_key)
   );
 
   CREATE TABLE IF NOT EXISTS port_call (
-    source        TEXT    NOT NULL,
-    source_key    TEXT    NOT NULL,
-    uid           TEXT    NOT NULL UNIQUE,
-    sequence      INTEGER NOT NULL,
-    vessel        TEXT    NOT NULL,
-    terminal      TEXT    NOT NULL,
-    berth         TEXT,
-    arrival_at    TEXT    NOT NULL,
-    departure_at  TEXT    NOT NULL,
-    first_seen_at TEXT    NOT NULL,
-    last_seen_at  TEXT    NOT NULL,
+    source        text    NOT NULL,
+    source_key    text    NOT NULL,
+    uid           text    NOT NULL UNIQUE,
+    sequence      integer NOT NULL,
+    vessel        text    NOT NULL,
+    terminal      text    NOT NULL,
+    berth         text,
+    arrival_at    text    NOT NULL,
+    departure_at  text    NOT NULL,
+    first_seen_at text    NOT NULL,
+    last_seen_at  text    NOT NULL,
     PRIMARY KEY (source, source_key)
   );
 
@@ -65,12 +77,12 @@ const SCHEMA = `
 /** The columns that carry what the source published, in serialization order. */
 type ContentColumns<T> = ReadonlyArray<readonly [column: string, field: keyof Scraped<T>]>;
 
-type TableSpec<T extends VenueEvent | PortCall> = {
+export type TableSpec<T extends VenueEvent | PortCall> = {
   readonly table: string;
   readonly content: ContentColumns<T>;
 };
 
-const VENUE_EVENT: TableSpec<VenueEvent> = {
+export const VENUE_EVENT: TableSpec<VenueEvent> = {
   table: "venue_event",
   content: [
     ["name", "name"],
@@ -81,7 +93,7 @@ const VENUE_EVENT: TableSpec<VenueEvent> = {
   ],
 };
 
-const PORT_CALL: TableSpec<PortCall> = {
+export const PORT_CALL: TableSpec<PortCall> = {
   table: "port_call",
   content: [
     ["vessel", "vessel"],
@@ -97,21 +109,27 @@ type StoredValue = string | null;
 
 type Row = Record<string, StoredValue | number>;
 
+/** Both a `Pool` and a transaction-bound `PoolClient` answer this — the store is written once against it. */
+type Queryable = {
+  query(text: string, params?: unknown[]): Promise<{ rows: Row[] }>;
+};
+
 /**
  * A `uid` is **durable state, not a function of content.** Every candidate hash
  * input is mutable: hash the title and a typo fix duplicates the record; hash
  * the start and a *rescheduled* conference duplicates rather than moves —
  * precisely the change subscribers most need delivered as an update.
  *
- * So it is random, minted once, and thereafter only ever looked up.
+ * So it is random, minted once, and thereafter only ever looked up. It is minted
+ * for every upsert and discarded on conflict, which is harmless: a random value
+ * that is thrown away is not a recompute — only a *content-derived* uid would be.
  */
 const mintUid = (): string => `${randomUUID()}@sg-tourism-calendar`;
 
 /**
- * Reading a column is a **parse, not a cast.** The database is a file committed
- * to the repo, which a human can edit and a bad merge can mangle; a column that
- * silently arrived as `null` would otherwise reach a subscriber's calendar as
- * the string `"null"`.
+ * Reading a column is a **parse, not a cast.** A store a human can reach and a
+ * bad migration can mangle must not let a column that silently arrived as `null`
+ * reach a subscriber's calendar as the string `"null"`.
  */
 const readText = (value: unknown): string => {
   if (typeof value !== "string") {
@@ -130,7 +148,7 @@ const readNumber = (value: unknown): number => {
   return value;
 };
 
-/** Re-validated rather than trusted — a malformed instant must not reach a feed. */
+/** Re-validated rather than trusted — a malformed instant must not reach a reader. */
 const readInstant = (value: unknown): Instant => instant(readText(value));
 
 const contentOf = <T extends VenueEvent | PortCall>(
@@ -139,115 +157,176 @@ const contentOf = <T extends VenueEvent | PortCall>(
 ): StoredValue[] =>
   spec.content.map(([, field]) => (scraped[field] ?? null) as StoredValue);
 
+/**
+ * Every read and write, reachable over the network so every method resolves a
+ * promise. The seam is v1's exactly — `readVenueEvents`, `readPortCalls`,
+ * `upsert*`, `transact`, `close` — because the pipeline above it never learned
+ * the store was a file, and must not learn it is now a service.
+ */
 export type Store = {
   /** Every stored `VenueEvent`, oldest start first. Retention is unbounded. */
-  readVenueEvents(): VenueEvent[];
-  readPortCalls(): PortCall[];
-  upsertVenueEvent(scraped: Scraped<VenueEvent>, seenAt: Instant): void;
-  upsertPortCall(scraped: Scraped<PortCall>, seenAt: Instant): void;
-  /** Runs `work` as one transaction, so a run either lands or does not. */
-  transact(work: () => void): void;
-  close(): void;
+  readVenueEvents(): Promise<VenueEvent[]>;
+  readPortCalls(): Promise<PortCall[]>;
+  upsertVenueEvent(scraped: Scraped<VenueEvent>, seenAt: Instant): Promise<void>;
+  upsertPortCall(scraped: Scraped<PortCall>, seenAt: Instant): Promise<void>;
+  /**
+   * Runs `work` as one transaction — so a source either lands whole or not at
+   * all (ADR-0025 §5). The `tx` handed in is the same `Store`, bound to the
+   * transaction's connection; writes made through it commit or roll back
+   * together. Reads and the outer store's own `upsert*` still work, each as its
+   * own implicit transaction.
+   */
+  transact(work: (tx: Store) => Promise<void>): Promise<void>;
+  close(): Promise<void>;
 };
 
-export const openStore = (path: string): Store => {
-  mkdirSync(dirname(path), { recursive: true });
-  const db = new Database(path);
-  db.pragma("journal_mode = WAL");
-  db.exec(SCHEMA);
+/**
+ * Upsert by `(source, sourceKey)` in **one statement**.
+ *
+ * ⚠️ **The trap ADR-0025 §5 names: the write must touch only the columns an
+ * adapter observed — exactly the fields of `Scraped<T>`.** A person-set flag
+ * (`hidden`/`reviewed`, arriving with #4) that a scrape overwrote would un-do
+ * every moderation judgement ever made, silently, on the next run. So the
+ * `SET` clause below is built *only* from `spec.content`, `sequence` and
+ * `last_seen_at`: `uid` and `first_seen_at` are set on insert and never on
+ * conflict, and a moderation column is named nowhere at all — unwritable in SQL
+ * as `Scraped<T>` makes it unwritable in the type. `SELECT *`-style column
+ * copying is exactly what this avoids.
+ *
+ * Three rules, applied here once for both record types:
+ *
+ * - **First sight** (`INSERT`) mints a `uid` and fixes `first_seen_at`.
+ * - **Same key, changed content** keeps the `uid` and bumps `sequence` — the
+ *   `CASE` fires only when some content column `IS DISTINCT FROM` the value
+ *   proposed — so a reschedule reaches a subscriber as a move rather than a
+ *   duplicate. `sequence` is recorded but deliberately not serialized (ADR-0008
+ *   §5); the move is carried by the stable `uid`.
+ * - **Every sighting** advances `last_seen_at`. A record that stops appearing is
+ *   simply not passed here, so its `last_seen_at` stops advancing — which is the
+ *   whole of what absence means.
+ */
+const upsert = async <T extends VenueEvent | PortCall>(
+  db: Queryable,
+  spec: TableSpec<T>,
+  scraped: Scraped<T>,
+  seenAt: Instant,
+): Promise<void> => {
+  const columns = spec.content.map(([column]) => column);
+  const values = contentOf(spec, scraped);
 
-  /**
-   * Upsert by `(source, sourceKey)`.
-   *
-   * Three rules, applied here once for both record types:
-   *
-   * - **First sight** mints a `uid` and fixes `firstSeenAt`.
-   * - **Same key, changed content** keeps the `uid` and bumps `sequence`, so a
-   *   reschedule reaches a subscriber as a move rather than a duplicate. The
-   *   move is carried by the stable `uid`, not by `sequence`, which is recorded
-   *   here but deliberately not serialized (ADR-0008 §5).
-   * - **Every sighting** advances `lastSeenAt`. A record that stops appearing is
-   *   simply not passed here, so its `lastSeenAt` stops advancing — which is the
-   *   whole of what absence means.
-   */
-  const upsert = <T extends VenueEvent | PortCall>(
-    spec: TableSpec<T>,
-    scraped: Scraped<T>,
-    seenAt: Instant,
-  ): void => {
-    const columns = spec.content.map(([column]) => column);
-    const values = contentOf(spec, scraped);
+  // $1 source, $2 source_key, $3 uid, then one placeholder per content column,
+  // then $seen for both first_seen_at and last_seen_at.
+  const contentPlaceholders = columns.map((_, i) => `$${i + 4}`);
+  const seenPlaceholder = `$${columns.length + 4}`;
 
-    const existing = db
-      .prepare(`SELECT * FROM ${spec.table} WHERE source = ? AND source_key = ?`)
-      .get(scraped.source, scraped.sourceKey) as Row | undefined;
+  const changed = columns
+    .map((column) => `${spec.table}.${column} IS DISTINCT FROM EXCLUDED.${column}`)
+    .join(" OR ");
 
-    if (!existing) {
-      db.prepare(
-        `INSERT INTO ${spec.table}
-           (source, source_key, uid, sequence, ${columns.join(", ")}, first_seen_at, last_seen_at)
-         VALUES (?, ?, ?, 0, ${columns.map(() => "?").join(", ")}, ?, ?)`,
-      ).run(scraped.source, scraped.sourceKey, mintUid(), ...values, seenAt, seenAt);
-      return;
+  await db.query(
+    `INSERT INTO ${spec.table}
+       (source, source_key, uid, sequence, ${columns.join(", ")}, first_seen_at, last_seen_at)
+     VALUES ($1, $2, $3, 0, ${contentPlaceholders.join(", ")}, ${seenPlaceholder}, ${seenPlaceholder})
+     ON CONFLICT (source, source_key) DO UPDATE SET
+       ${columns.map((column) => `${column} = EXCLUDED.${column}`).join(", ")},
+       sequence = ${spec.table}.sequence + (CASE WHEN ${changed} THEN 1 ELSE 0 END),
+       last_seen_at = EXCLUDED.last_seen_at`,
+    [scraped.source, scraped.sourceKey, mintUid(), ...values, seenAt],
+  );
+};
+
+/**
+ * The identity-and-observation fields every stored record carries, read once for
+ * both types. These are the core's own — minted and tracked here, never observed
+ * — so they map identically whichever table the row came from; only the content
+ * columns differ.
+ */
+const trackedOf = (row: Row) => ({
+  uid: readText(row["uid"]),
+  sequence: readNumber(row["sequence"]),
+  source: readText(row["source"]),
+  sourceKey: readText(row["source_key"]),
+  firstSeenAt: readInstant(row["first_seen_at"]),
+  lastSeenAt: readInstant(row["last_seen_at"]),
+});
+
+const readVenueEvents = async (db: Queryable): Promise<VenueEvent[]> => {
+  const { rows } = await db.query(`SELECT * FROM venue_event ORDER BY start_at, uid`);
+  return rows.map((row) => ({
+    ...trackedOf(row),
+    name: readText(row["name"]),
+    start: readInstant(row["start_at"]),
+    end: readInstant(row["end_at"]),
+    venue: readText(row["venue"]),
+    hall: optionalText(row["hall"]),
+  }));
+};
+
+const readPortCalls = async (db: Queryable): Promise<PortCall[]> => {
+  const { rows } = await db.query(`SELECT * FROM port_call ORDER BY arrival_at, uid`);
+  return rows.map((row) => ({
+    ...trackedOf(row),
+    vessel: readText(row["vessel"]),
+    terminal: readText(row["terminal"]) as Terminal,
+    berth: optionalText(row["berth"]),
+    arrival: readInstant(row["arrival_at"]),
+    departure: readInstant(row["departure_at"]),
+  }));
+};
+
+/**
+ * The store bound to one `Queryable` — the pool, or a transaction's client.
+ *
+ * The `transact` handed in is the pool-level one, so a `tx.transact(...)` called
+ * on a transaction handle would open a *fresh* pooled connection rather than nest
+ * — it is not a real nested transaction, and no caller does it (run.ts calls
+ * `transact` once per source and only `upsert*` inside). It is on the type only
+ * because `tx` is a full `Store`.
+ */
+const storeOver = (db: Queryable, transact: Store["transact"]): Store => ({
+  readVenueEvents: () => readVenueEvents(db),
+  readPortCalls: () => readPortCalls(db),
+  upsertVenueEvent: (scraped, seenAt) => upsert(db, VENUE_EVENT, scraped, seenAt),
+  upsertPortCall: (scraped, seenAt) => upsert(db, PORT_CALL, scraped, seenAt),
+  transact,
+  close: async () => {},
+});
+
+/**
+ * Opens the store against `connectionString` and ensures the schema exists.
+ *
+ * **Required, and deliberately not defaulted** — the argument has no default and
+ * no fallback to the environment (ADR-0025; the entry point reads the string and
+ * passes it). A pool is created eagerly and connects lazily; `close()` drains it.
+ */
+export const openStore = async (connectionString: string): Promise<Store> => {
+  const pool = new Pool({ connectionString });
+  await pool.query(SCHEMA);
+
+  // Each transaction owns a dedicated client so its `BEGIN`/`COMMIT` cannot
+  // interleave with another caller's work on a pooled connection. Postgres
+  // readers do not block writers and writers do not block readers (ADR-0025 §5),
+  // so a scrape's per-source transaction and a moderator's flag toggle are
+  // ordinary concurrent transactions needing no isolation level above the
+  // default.
+  const transact: Store["transact"] = async (work) => {
+    const client: PoolClient = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await work(storeOver(client, transact));
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
-
-    const changed = columns.some((column, index) => existing[column] !== values[index]);
-
-    db.prepare(
-      `UPDATE ${spec.table}
-          SET sequence = ?, ${columns.map((column) => `${column} = ?`).join(", ")}, last_seen_at = ?
-        WHERE source = ? AND source_key = ?`,
-    ).run(
-      changed ? readNumber(existing["sequence"]) + 1 : readNumber(existing["sequence"]),
-      ...values,
-      seenAt,
-      scraped.source,
-      scraped.sourceKey,
-    );
   };
 
   return {
-    readVenueEvents: () =>
-      (db.prepare(`SELECT * FROM venue_event ORDER BY start_at, uid`).all() as Row[]).map(
-        (row) => ({
-          uid: readText(row["uid"]),
-          sequence: readNumber(row["sequence"]),
-          source: readText(row["source"]),
-          sourceKey: readText(row["source_key"]),
-          name: readText(row["name"]),
-          start: readInstant(row["start_at"]),
-          end: readInstant(row["end_at"]),
-          venue: readText(row["venue"]),
-          hall: optionalText(row["hall"]),
-          firstSeenAt: readInstant(row["first_seen_at"]),
-          lastSeenAt: readInstant(row["last_seen_at"]),
-        }),
-      ),
-
-    readPortCalls: () =>
-      (db.prepare(`SELECT * FROM port_call ORDER BY arrival_at, uid`).all() as Row[]).map(
-        (row) => ({
-          uid: readText(row["uid"]),
-          sequence: readNumber(row["sequence"]),
-          source: readText(row["source"]),
-          sourceKey: readText(row["source_key"]),
-          vessel: readText(row["vessel"]),
-          terminal: readText(row["terminal"]) as Terminal,
-          berth: optionalText(row["berth"]),
-          arrival: readInstant(row["arrival_at"]),
-          departure: readInstant(row["departure_at"]),
-          firstSeenAt: readInstant(row["first_seen_at"]),
-          lastSeenAt: readInstant(row["last_seen_at"]),
-        }),
-      ),
-
-    upsertVenueEvent: (scraped, seenAt) => upsert(VENUE_EVENT, scraped, seenAt),
-    upsertPortCall: (scraped, seenAt) => upsert(PORT_CALL, scraped, seenAt),
-
-    transact: (work) => {
-      db.transaction(work)();
+    ...storeOver(pool, transact),
+    close: async () => {
+      await pool.end();
     },
-
-    close: () => db.close(),
   };
 };
