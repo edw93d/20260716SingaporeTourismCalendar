@@ -190,3 +190,229 @@ describe("mountAdmin only acts on its own pills", () => {
     expect(toast()).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// The grid — sort, funnel filters, and the filter-then-bulk bar (#157).
+// ---------------------------------------------------------------------------
+
+/** The visible (non-filtered) rows' uids, in DOM order — the read the grid drives. */
+const visibleUids = (): string[] =>
+  Array.from(root.querySelectorAll<HTMLElement>("tbody tr[data-uid]"))
+    .filter((tr) => !tr.hidden)
+    .map((tr) => tr.dataset["uid"] ?? "");
+
+/** All rows' uids in DOM order, ignoring visibility — for asserting sort order. */
+const orderedUids = (): string[] =>
+  Array.from(root.querySelectorAll<HTMLElement>("tbody tr[data-uid]")).map(
+    (tr) => tr.dataset["uid"] ?? "",
+  );
+
+const th = (key: string): HTMLElement => root.querySelector(`th[data-key="${key}"]`) as HTMLElement;
+const funnelOf = (key: string): HTMLButtonElement =>
+  th(key).querySelector(".funnel") as HTMLButtonElement;
+const openMenu = (): HTMLElement => root.querySelector(".menu") as HTMLElement;
+const menuBox = (value: string): HTMLInputElement =>
+  Array.from(openMenu().querySelectorAll<HTMLInputElement>("input[type=checkbox]")).find(
+    (b) => b.value === value,
+  ) as HTMLInputElement;
+
+/** A small, varied corpus: two venues, two months, three sources, mixed state. */
+const corpus = (): VenueEvent[] => [
+  suntecEvent({ uid: "u1", name: "Alpha", venue: "Suntec", source: "suntec", start: instant("2026-07-17T04:00:00Z") }),
+  suntecEvent({ uid: "u2", name: "Bravo", venue: "Marina Bay Sands", source: "sistic", start: instant("2026-08-02T04:00:00Z") }),
+  suntecEvent({ uid: "u3", name: "Charlie", venue: "Suntec", source: "eventseye", start: instant("2026-08-10T04:00:00Z") }),
+  suntecEvent({ uid: "u4", name: "Delta", venue: "Suntec", source: "suntec", start: instant("2026-07-20T04:00:00Z"), hidden: true }),
+];
+
+describe("clicking a column label sorts the rows (#157)", () => {
+  it("sorts a text column ascending, then descending on a second click", () => {
+    renderInto([
+      suntecEvent({ uid: "u2", name: "Bravo" }),
+      suntecEvent({ uid: "u1", name: "Alpha" }),
+      suntecEvent({ uid: "u3", name: "Charlie" }),
+    ]);
+    mountAdmin(root, { fetch: fakeFetch().fetch });
+
+    th("name").click();
+    expect(orderedUids()).toEqual(["u1", "u2", "u3"]); // Alpha, Bravo, Charlie
+    expect(th("name").getAttribute("aria-sort")).toBe("ascending");
+
+    th("name").click();
+    expect(orderedUids()).toEqual(["u3", "u2", "u1"]);
+    expect(th("name").getAttribute("aria-sort")).toBe("descending");
+  });
+
+  it("sorts the date column chronologically, not by the display string", () => {
+    // Ascending by Start must order Jul 17 < Jul 20 < Aug 2 < Aug 10 — which the
+    // alphabetised display ("17 Jul" vs "2 Aug") would get wrong. The numeric
+    // data-sort is what makes the chronological order hold.
+    renderInto(corpus());
+    mountAdmin(root, { fetch: fakeFetch().fetch });
+
+    th("start").click();
+    expect(orderedUids()).toEqual(["u1", "u4", "u2", "u3"]);
+  });
+});
+
+describe("per-column funnel filters compose (#157)", () => {
+  it("puts a funnel on the filter-able columns but not on free-text Event", () => {
+    renderInto(corpus());
+    mountAdmin(root, { fetch: fakeFetch().fetch });
+
+    expect(funnelOf("venue")).not.toBeNull();
+    expect(funnelOf("start")).not.toBeNull();
+    expect(th("name").querySelector(".funnel")).toBeNull();
+  });
+
+  it("filters to one venue in one month across all sources — filters AND together", () => {
+    renderInto(corpus());
+    mountAdmin(root, { fetch: fakeFetch().fetch });
+
+    // Venue funnel → keep only Suntec.
+    funnelOf("venue").click();
+    menuBox("Marina Bay Sands").click(); // uncheck the other venue
+    // u1 (Jul), u3 (Aug), u4 (Jul) are Suntec; u2 (MBS) is filtered out.
+    expect(visibleUids().sort()).toEqual(["u1", "u3", "u4"]);
+
+    // Start funnel → keep only Aug 2026. This composes with the venue filter.
+    funnelOf("start").click();
+    menuBox("Jul 2026").click(); // uncheck July, leaving August
+    // Suntec AND August → only u3.
+    expect(visibleUids()).toEqual(["u3"]);
+
+    // The headers with an active filter are flagged.
+    expect(th("venue").classList.contains("filtered")).toBe(true);
+    expect(th("start").classList.contains("filtered")).toBe(true);
+    expect(th("source").classList.contains("filtered")).toBe(false); // untouched
+  });
+
+  it("re-checking every value clears the column's filter", () => {
+    renderInto(corpus());
+    mountAdmin(root, { fetch: fakeFetch().fetch });
+
+    funnelOf("venue").click();
+    menuBox("Marina Bay Sands").click(); // filter on
+    expect(th("venue").classList.contains("filtered")).toBe(true);
+    menuBox("Marina Bay Sands").click(); // back to all checked
+    expect(th("venue").classList.contains("filtered")).toBe(false);
+    expect(visibleUids().length).toBe(4);
+  });
+
+  it("orders a month funnel chronologically, not alphabetically", () => {
+    renderInto(corpus());
+    mountAdmin(root, { fetch: fakeFetch().fetch });
+
+    funnelOf("start").click();
+    const labels = Array.from(openMenu().querySelectorAll<HTMLElement>("label span")).map(
+      (s) => s.textContent,
+    );
+    expect(labels).toEqual(["Jul 2026", "Aug 2026"]);
+  });
+});
+
+describe("the bulk bar moderates the filtered selection (#157)", () => {
+  type BulkCall = { url: string; body: { uids: string[]; flag: string; value: boolean } };
+  const bulkFetch = (ok = true) => {
+    const calls: BulkCall[] = [];
+    const fetch = async (url: string, init?: RequestInit): Promise<Response> => {
+      calls.push({ url, body: JSON.parse(String(init?.body)) });
+      return { ok, json: async () => ({}) } as Response;
+    };
+    return { fetch, calls };
+  };
+
+  const bulkButton = (text: string): HTMLButtonElement =>
+    Array.from(root.querySelectorAll<HTMLButtonElement>(".bulkbar button")).find(
+      (b) => b.textContent === text,
+    ) as HTMLButtonElement;
+  const bulkCount = (): string => (root.querySelector(".bulkbar .count") as HTMLElement).textContent ?? "";
+
+  it("shows a live count of the rows the filters leave", () => {
+    renderInto(corpus());
+    mountAdmin(root, { fetch: bulkFetch().fetch });
+
+    expect(bulkCount()).toBe("4 records shown");
+
+    funnelOf("venue").click();
+    menuBox("Marina Bay Sands").click();
+    expect(bulkCount()).toBe("3 records shown"); // the three Suntec rows
+  });
+
+  it("hides only the filtered, currently-shown rows and raises one Undo toast", async () => {
+    renderInto(corpus());
+    const { fetch, calls } = bulkFetch();
+    mountAdmin(root, { fetch });
+
+    // Filter to Suntec: u1, u3, u4 — but u4 is already hidden, so a Hide targets
+    // only the two that actually change (u1, u3), which is what Undo can restore.
+    funnelOf("venue").click();
+    menuBox("Marina Bay Sands").click();
+    bulkButton("Hide").click();
+    await flush();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe("/admin/flag/bulk");
+    expect(calls[0]?.body.flag).toBe("hidden");
+    expect(calls[0]?.body.value).toBe(true);
+    expect(calls[0]?.body.uids.sort()).toEqual(["u1", "u3"]);
+
+    const raised = toast();
+    expect(raised?.textContent).toContain("Hidden 2 records");
+    expect(raised?.querySelector("button")?.textContent).toBe("Undo");
+    // The two pills now read Hidden.
+    const shown = (uid: string) =>
+      root.querySelector(`tr[data-uid="${uid}"] .shown-state .pill`) as HTMLElement;
+    expect(shown("u1").textContent).toBe("Hidden");
+    expect(shown("u3").textContent).toBe("Hidden");
+  });
+
+  it("undo posts the inverse for the same selection and clears the toast", async () => {
+    renderInto(corpus());
+    const { fetch, calls } = bulkFetch();
+    mountAdmin(root, { fetch });
+
+    bulkButton("Mark reviewed").click();
+    await flush();
+    (toast()?.querySelector("button") as HTMLButtonElement).click();
+    await flush();
+
+    // Two calls: mark-reviewed-true over the four, then reviewed-false over the
+    // same four — the exact inverse (ADR-0024 §7).
+    expect(calls).toHaveLength(2);
+    expect(calls.map((c) => c.body.value)).toEqual([true, false]);
+    expect(calls.every((c) => c.body.flag === "reviewed")).toBe(true);
+    expect(calls[0]?.body.uids.sort()).toEqual(calls[1]?.body.uids.sort());
+    expect(toast()).toBeNull();
+  });
+
+  it("does nothing but report when the selection has nothing to change", async () => {
+    // Every row is already shown, so a Show acts on none — no write, and a plain
+    // message rather than an Undo for a write that never happened.
+    renderInto([
+      suntecEvent({ uid: "u1", name: "Alpha" }),
+      suntecEvent({ uid: "u2", name: "Bravo" }),
+    ]);
+    const { fetch, calls } = bulkFetch();
+    mountAdmin(root, { fetch });
+
+    bulkButton("Show").click();
+    await flush();
+
+    expect(calls).toEqual([]);
+    expect(toast()?.textContent).toContain("No records to show");
+    expect(toast()?.querySelector("button")).toBeNull();
+  });
+
+  it("leaves the pills untouched when the bulk write is refused", async () => {
+    renderInto(corpus());
+    const { fetch } = bulkFetch(false);
+    mountAdmin(root, { fetch });
+
+    bulkButton("Hide").click();
+    await flush();
+
+    const shown = root.querySelector(`tr[data-uid="u1"] .shown-state .pill`) as HTMLElement;
+    expect(shown.textContent).toBe("Shown"); // unchanged — the store refused it
+    expect(toast()?.textContent).toContain("Could not save");
+  });
+});

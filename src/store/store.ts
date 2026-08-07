@@ -217,6 +217,23 @@ export type Store = {
    */
   setModerationFlag(uid: string, flag: ModerationFlag, value: boolean): Promise<boolean>;
   /**
+   * Sets one moderation flag to `value` on **every** `VenueEvent` in `uids` at
+   * once (#157) — the same one-flag write as `setModerationFlag`, in bulk, so a
+   * moderator can hide or mark a whole filtered selection in a single action
+   * (filter-then-bulk). It obeys the single write's rules unchanged: it names only
+   * the one flag, so the other stays exactly as it was (independence, ADR-0024
+   * §2), and the opposite `value` over the same `uids` restores the set (ADR-0024
+   * §7). One statement, so the selection lands whole or not at all.
+   *
+   * Returns **how many rows matched** — not the length of `uids`, which may name a
+   * uid the store never had. An empty `uids` writes nothing and returns 0. The
+   * route echoes this count so an HTTP caller can tell a whole-selection write from
+   * one that silently touched fewer rows than it named; the browser client reports
+   * the number of pills it actually relabelled, which is the same number on a page
+   * built from the store it is writing to.
+   */
+  setModerationFlags(uids: string[], flag: ModerationFlag, value: boolean): Promise<number>;
+  /**
    * Stamps the store with the instant this run completed — the payload's
    * `generatedAt` (ADR-0013, #154). v1 baked it into a committed `calendar.json`;
    * v2's pipeline publishes nothing and the server builds the payload live, so
@@ -379,6 +396,34 @@ const setModerationFlag = async (
 };
 
 /**
+ * Flips one moderation flag on many `VenueEvent`s at once, by `uid` (#157). A
+ * single-column `UPDATE ... WHERE uid = ANY($2)` — it names only the one flag, so
+ * the others stay exactly as they were (independence, ADR-0024 §2), and one
+ * statement means the whole selection lands or none does, which is what makes the
+ * bulk bar's Undo revert the exact set. `RETURNING uid` counts the rows that
+ * actually matched, so a selection naming a uid the store never had is reported as
+ * fewer matches rather than a phantom success.
+ *
+ * An empty `uids` short-circuits to 0 — `= ANY('{}')` would match nothing anyway,
+ * but there is no reason to send a statement that cannot touch a row.
+ */
+const setModerationFlags = async (
+  db: Queryable,
+  uids: string[],
+  flag: ModerationFlag,
+  value: boolean,
+): Promise<number> => {
+  const column = MODERATION_COLUMN[flag];
+  if (column === undefined) throw new Error(`Not a moderation flag: ${JSON.stringify(flag)}.`);
+  if (uids.length === 0) return 0;
+  const { rows } = await db.query(
+    `UPDATE venue_event SET ${column} = $1 WHERE uid = ANY($2) RETURNING uid`,
+    [value, uids],
+  );
+  return rows.length;
+};
+
+/**
  * The single-row run-marker. `id` is a constant `true` under a `CHECK (id)` and
  * `PRIMARY KEY`, so the table holds at most one row — the upsert can conflict on
  * a fixed key rather than on any run detail, and there is no way to accumulate a
@@ -414,6 +459,7 @@ const storeOver = (db: Queryable, transact: Store["transact"]): Store => ({
   upsertVenueEvent: (scraped, seenAt) => upsert(db, VENUE_EVENT, scraped, seenAt),
   upsertPortCall: (scraped, seenAt) => upsert(db, PORT_CALL, scraped, seenAt),
   setModerationFlag: (uid, flag, value) => setModerationFlag(db, uid, flag, value),
+  setModerationFlags: (uids, flag, value) => setModerationFlags(db, uids, flag, value),
   recordRun: (ranAt) => recordRun(db, ranAt),
   lastRun: () => lastRun(db),
   transact,

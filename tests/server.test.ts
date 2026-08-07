@@ -76,6 +76,7 @@ const fakeStore = (over: Partial<Store>): Store => ({
   upsertVenueEvent: notCalled,
   upsertPortCall: notCalled,
   setModerationFlag: notCalled,
+  setModerationFlags: notCalled,
   recordRun: notCalled,
   transact: notCalled,
   close: async () => {},
@@ -288,6 +289,99 @@ describe("POST /admin/flag — the toggle write route (#156, ADR-0024)", () => {
       body: "{ not json",
     });
     expect(response.status).toBe(400);
+  });
+});
+
+describe("POST /admin/flag/bulk — the filter-then-bulk write route (#157, ADR-0024)", () => {
+  /** A store that records the one bulk call, so the route's exact request is asserted. */
+  type BulkCall = { uids: string[]; flag: "hidden" | "reviewed"; value: boolean };
+  const recordingStore = (matched: number) => {
+    const calls: BulkCall[] = [];
+    const store = fakeStore({
+      setModerationFlags: async (uids, flag, value) => {
+        calls.push({ uids, flag, value });
+        return matched;
+      },
+    });
+    return { store, calls };
+  };
+
+  const post = (base: string, body: unknown, auth = basic(ADMIN_SECRET)): Promise<Response> =>
+    fetch(`${base}/admin/flag/bulk`, {
+      method: "POST",
+      headers: { authorization: auth, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  it("401s without credentials — the bulk write is behind the one boundary too", async () => {
+    const { store } = recordingStore(2);
+    const base = await serve(store);
+    const response = await fetch(`${base}/admin/flag/bulk`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ uids: ["a"], flag: "hidden", value: true }),
+    });
+    expect(response.status).toBe(401);
+  });
+
+  it("hides a whole selection and echoes back what matched", async () => {
+    const { store, calls } = recordingStore(2);
+    const base = await serve(store);
+
+    const response = await post(base, { uids: ["u1", "u2"], flag: "hidden", value: true });
+
+    expect(response.status).toBe(200);
+    // The echo carries the matched *count*, not the request length, so a caller
+    // can tell a whole-selection write from one that touched fewer rows than it
+    // named (a selection may name a stale uid).
+    expect(await response.json()).toEqual({
+      uids: ["u1", "u2"],
+      flag: "hidden",
+      value: true,
+      matched: 2,
+    });
+    expect(calls).toEqual([{ uids: ["u1", "u2"], flag: "hidden", value: true }]);
+  });
+
+  it("marks a selection reviewed independently — the store is asked for exactly that flag", async () => {
+    const { store, calls } = recordingStore(3);
+    const base = await serve(store);
+
+    await post(base, { uids: ["u1", "u2", "u3"], flag: "reviewed", value: true });
+
+    expect(calls).toEqual([{ uids: ["u1", "u2", "u3"], flag: "reviewed", value: true }]);
+  });
+
+  it("carries a large selection past the single-toggle body cap", async () => {
+    // A day-one backfill selection is hundreds of uids — well over the few-byte
+    // cap a single toggle needs. The bulk route accepts a larger body so a real
+    // filtered selection can be moderated in one action.
+    const { store, calls } = recordingStore(400);
+    const base = await serve(store);
+    const uids = Array.from({ length: 400 }, (_, i) => `uid-${i}@sg-tourism-calendar`);
+
+    const response = await post(base, { uids, flag: "hidden", value: true });
+
+    expect(response.status).toBe(200);
+    expect(calls[0]?.uids).toHaveLength(400);
+  });
+
+  it("400s an empty selection — a bulk write names records", async () => {
+    const base = await serve(fakeStore({ setModerationFlags: notCalled }));
+    expect((await post(base, { uids: [], flag: "hidden", value: true })).status).toBe(400);
+  });
+
+  it("400s a body naming a column that is not a moderation flag", async () => {
+    const base = await serve(fakeStore({ setModerationFlags: notCalled }));
+    const response = await post(base, { uids: ["u"], flag: "sequence", value: true });
+    expect(response.status).toBe(400);
+  });
+
+  it("400s a non-boolean value, a non-array uids, and a non-string uid", async () => {
+    const base = await serve(fakeStore({ setModerationFlags: notCalled }));
+    expect((await post(base, { uids: ["u"], flag: "hidden", value: "yes" })).status).toBe(400);
+    expect((await post(base, { uids: "u", flag: "hidden", value: true })).status).toBe(400);
+    expect((await post(base, { uids: ["u", 7], flag: "hidden", value: true })).status).toBe(400);
   });
 });
 

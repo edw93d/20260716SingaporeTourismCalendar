@@ -210,19 +210,30 @@ const sendUnauthorized = (res: ServerResponse): void => {
 };
 
 /**
- * Reads a request body as JSON, with a small hard cap — a toggle is a handful of
- * bytes, so anything larger is malformed or hostile and is refused before it is
- * buffered whole. Rejects on invalid JSON too; the caller answers either as a 400.
+ * Reads a request body as JSON, with a hard `maxBytes` cap — anything larger is
+ * refused before it is buffered whole, so a hostile or malformed body cannot grow
+ * the process's memory. The cap is per-route: a single toggle is a handful of
+ * bytes (`TOGGLE_BODY_BYTES`), but a filter-then-bulk selection can name hundreds
+ * of uids (`BULK_BODY_BYTES`, #157). Rejects on invalid JSON too; the caller
+ * answers either as a 400.
  */
-const MAX_BODY_BYTES = 4 * 1024;
+const TOGGLE_BODY_BYTES = 4 * 1024;
 
-const readJsonBody = (req: IncomingMessage): Promise<unknown> =>
+/**
+ * The bulk route's cap. A day-one backfill selection is ~670 uids of ~55 chars
+ * each — a few tens of KB — so this is set well above that and still far below any
+ * memory concern, bounding the largest honest selection without inviting an
+ * unbounded one.
+ */
+const BULK_BODY_BYTES = 256 * 1024;
+
+const readJsonBody = (req: IncomingMessage, maxBytes: number): Promise<unknown> =>
   new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
     req.on("data", (chunk: Buffer) => {
       size += chunk.byteLength;
-      if (size > MAX_BODY_BYTES) {
+      if (size > maxBytes) {
         reject(new Error("request body too large"));
         req.destroy();
         return;
@@ -259,14 +270,37 @@ const parseFlagRequest = (body: unknown): FlagRequest | null => {
   return { uid, flag: flag as ModerationFlag, value };
 };
 
+/** The validated shape of a bulk toggle — a non-empty list of uids, one flag, one value. */
+type BulkFlagRequest = { uids: string[]; flag: ModerationFlag; value: boolean };
+
 /**
- * The admin surface, reached only past the boundary (ADR-0030 §5). Three routes:
+ * Parses an untrusted JSON body into a `BulkFlagRequest`, or `null` if it is not
+ * one. `uids` must be a **non-empty** array of non-empty strings — a bulk write
+ * names records, so an empty selection is a malformed request, not a no-op the
+ * store should be asked to run. `flag` and `value` are checked exactly as the
+ * single route checks them, so the store is never handed a column the operator did
+ * not name or a value that is not a boolean.
+ */
+const parseBulkFlagRequest = (body: unknown): BulkFlagRequest | null => {
+  if (typeof body !== "object" || body === null) return null;
+  const { uids, flag, value } = body as Record<string, unknown>;
+  if (!Array.isArray(uids) || uids.length === 0) return null;
+  if (!uids.every((uid) => typeof uid === "string" && uid !== "")) return null;
+  if (typeof flag !== "string" || !FLAGS.includes(flag as ModerationFlag)) return null;
+  if (typeof value !== "boolean") return null;
+  return { uids: uids as string[], flag: flag as ModerationFlag, value };
+};
+
+/**
+ * The admin surface, reached only past the boundary (ADR-0030 §5). Four routes:
  * `GET /admin`, the moderator spreadsheet built live from the store — every
  * `VenueEvent` including the hidden and the unreviewed; `GET /admin/client.js`,
- * the browser module that makes the pills toggle; and `POST /admin/flag`, the one
- * write path, which flips a single moderation flag on one record. The write names
- * only the flag the operator toggled, so the two flags stay independent and a
- * scrape can touch neither (ADR-0024 §2, `store.setModerationFlag`).
+ * the browser module that makes the pills toggle, filter, sort and bulk-moderate;
+ * `POST /admin/flag`, which flips a single moderation flag on one record; and
+ * `POST /admin/flag/bulk` (#157), which flips the same flag on a whole filtered
+ * selection at once. Both writes name only the flag the operator toggled, so the
+ * two flags stay independent and a scrape can touch neither (ADR-0024 §2,
+ * `store.setModerationFlag`/`setModerationFlags`).
  *
  * The client module is served **from under the admin path on purpose** — every
  * admin asset sits inside the one guarded subtree, not one file beside it. It
@@ -303,7 +337,7 @@ const handleAdmin = async (
   if (req.method === "POST" && pathname === "/admin/flag") {
     let body: unknown;
     try {
-      body = await readJsonBody(req);
+      body = await readJsonBody(req, TOGGLE_BODY_BYTES);
     } catch {
       sendText(res, 400, "bad request");
       return;
@@ -321,6 +355,33 @@ const handleAdmin = async (
     // Echo the flip back so the client confirms what it applied — the pill and the
     // Undo it raises revert this exact write (ADR-0024 §7).
     sendJson(res, 200, { uid: request.uid, flag: request.flag, value: request.value });
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/admin/flag/bulk") {
+    let body: unknown;
+    try {
+      body = await readJsonBody(req, BULK_BODY_BYTES);
+    } catch {
+      sendText(res, 400, "bad request");
+      return;
+    }
+    const request = parseBulkFlagRequest(body);
+    if (request === null) {
+      sendText(res, 400, "bad request");
+      return;
+    }
+    const matched = await store.setModerationFlags(request.uids, request.flag, request.value);
+    // Echo the selection and the *matched count* back — unlike the single route,
+    // there is no 404 branch: a bulk selection may name a uid the store no longer
+    // has, and that is a smaller `matched`, not a failed request. The client's Undo
+    // reverts the same selection with the opposite value (ADR-0024 §7).
+    sendJson(res, 200, {
+      uids: request.uids,
+      flag: request.flag,
+      value: request.value,
+      matched,
+    });
     return;
   }
 
