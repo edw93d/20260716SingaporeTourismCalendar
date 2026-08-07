@@ -3,7 +3,8 @@ import { reconcile } from "./alerts/issues.js";
 import { createBrowserSession } from "./pipeline/browser.js";
 import { createHttpClient } from "./pipeline/http.js";
 import { runPipeline } from "./pipeline/run.js";
-import { sources } from "./sources/registry.js";
+import { selectRun } from "./pipeline/select.js";
+import { manifests, sources } from "./sources/registry.js";
 
 /**
  * The daily run — the only production caller of `runPipeline`, and the only
@@ -17,13 +18,23 @@ import { sources } from "./sources/registry.js";
  * credentials, v2 holds exactly one, and this file is where it is named — once,
  * out loud, never defaulted. The store is injected exactly as the HTTP client is.
  *
- * The browser's lifecycle is owned here: launched before the run and closed in a
- * `finally`, so a source that throws mid-scrape still releases Chromium. MBCCS is
- * the only source that reads it; the others cannot, by the shape of `FetchDeps`.
+ * **The run reads all sources, or one named on demand** (ADR-0028 §3). `SOURCE`
+ * is the workflow's *"which source?"* input, forwarded as an environment variable
+ * because a workflow speaks to a process through the environment; empty runs the
+ * whole registry (the nightly cadence), a source id runs exactly that one.
+ * `selectRun` turns that one input into the subset, whether a browser is needed,
+ * and whether the freshness marker advances.
+ *
+ * **The browser's lifecycle is owned here** (ADR-0028 §6): launched before the run
+ * and closed in a `finally`, so a source that throws mid-scrape still releases
+ * Chromium. Only the *launch* is now conditional — Chromium boots only when a
+ * source in the selected run declares `needsBrowser`, so a by-hand run of a
+ * browser-less source boots none. Even when launched, only MBCCS can reach it, by
+ * the shape of `FetchDeps`.
  */
 
 /**
- * The one environment read in `src/` — the single injection site the architecture
+ * The one credential read in `src/` — the single injection site the architecture
  * test allows (ADR-0025 spends ADR-0010's zero-credentials property, keeping its
  * code shape: injected, never defaulted). Absent, the run refuses rather than
  * improvising a connection.
@@ -37,15 +48,21 @@ const requireConnectionString = (): string => {
 };
 
 const main = async (): Promise<void> => {
-  const browser = await createBrowserSession();
+  const selection = selectRun(sources, manifests, process.env["SOURCE"]);
+
+  // Launch Chromium **only** when a source in this run needs it (ADR-0028 §6). A
+  // full run includes MBCCS and launches once, as before; a by-hand run of a
+  // browser-less source launches nothing and needs no Chromium installed at all.
+  const browser = selection.needsBrowser ? await createBrowserSession() : undefined;
 
   try {
     const run = await runPipeline({
-      sources,
+      sources: selection.sources,
+      full: selection.full,
       connectionString: requireConnectionString(),
       now: () => new Date(),
       http: createHttpClient(),
-      browser: browser.session,
+      ...(browser ? { browser: browser.session } : {}),
     });
 
     console.log(`Ran at ${run.ranAt}`);
@@ -77,9 +94,11 @@ const main = async (): Promise<void> => {
       console.error("Alert reconciliation failed:", error);
     }
   } finally {
-    // The core owns the browser's lifecycle: it is released whether the run
-    // completed or a source threw, so Chromium never outlives the process's work.
-    await browser.close();
+    // The core owns the browser's lifecycle: when one was launched it is released
+    // whether the run completed or a source threw, so Chromium never outlives the
+    // process's work. A browser-less run launched nothing, so there is nothing to
+    // close.
+    await browser?.close();
   }
 };
 

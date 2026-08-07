@@ -53,6 +53,18 @@ export type PipelineOptions = {
    * MBCCS's `fetch` throws loudly if it is ever reached without one.
    */
   browser?: BrowserSession;
+  /**
+   * Whether this run read the **whole registry** (ADR-0028 §8). Only a full run
+   * advances the freshness marker: an on-demand single-source run leaves
+   * `generatedAt` untouched, because bumping "last refreshed" off a poke of one
+   * source would mask a dead nightly run — the silent-staleness failure the
+   * freshness watcher exists to catch (#60/#61).
+   *
+   * Defaults to `true`: the nightly run of the whole registry is the common case,
+   * and every caller that reads all sources publishes on time. Only a deliberate
+   * subset run (the entry point's on-demand path) passes `false`.
+   */
+  full?: boolean;
 };
 
 /**
@@ -98,6 +110,7 @@ export const runPipeline = async ({
   now,
   http,
   browser,
+  full = true,
 }: PipelineOptions): Promise<PipelineRun> => {
   const ranAt = instantFromDate(now());
 
@@ -138,14 +151,18 @@ export const runPipeline = async ({
       breakage.push({ source: source.key, signals });
     }
 
-    // Stamp the run **unconditionally**, after every source has been read — the
-    // payload's `generatedAt` (ADR-0013, #154). Freshness is a property of the
-    // publish, not of any source: a run that completed having confirmed no source
-    // at all still published on time, and must advance the marker so the alarm
-    // stays quiet. Reading a source's `lastSeenAt` instead would freeze the moment
-    // a scraper broke and fire on a calendar that ran perfectly (CONTEXT.md §
+    // Stamp the run after every source has been read — the payload's
+    // `generatedAt` (ADR-0013, #154). Freshness is a property of the publish, not
+    // of any source: a **full** run that completed having confirmed no source at
+    // all still published on time, and must advance the marker so the alarm stays
+    // quiet. Reading a source's `lastSeenAt` instead would freeze the moment a
+    // scraper broke and fire on a calendar that ran perfectly (CONTEXT.md §
     // Freshness). Written last so the marker means "the run reached its end".
-    await store.recordRun(ranAt);
+    //
+    // A single-source on-demand run does **not** advance it (ADR-0028 §8): the
+    // freshness watcher would otherwise read a poke of one source as proof the
+    // whole calendar refreshed, masking a nightly run that has silently stopped.
+    if (full) await store.recordRun(ranAt);
 
     return { ranAt, outcomes, breakage };
   } finally {

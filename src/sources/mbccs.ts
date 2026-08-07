@@ -1,6 +1,6 @@
 import { instant, type Instant } from "../domain/instant.js";
 import type { PortCall, Scraped, SourceKey, Terminal } from "../domain/types.js";
-import type { BrowserSession, FetchDeps, ParseFailure, ParseResult, Source } from "./types.js";
+import type { BrowserSession, FetchDeps, ParseFailure, ParseResult, Source, SourceManifest } from "./types.js";
 
 /**
  * Marina Bay Cruise Centre Singapore (MBCCS).
@@ -364,6 +364,18 @@ const widenToPublishingWindow = async (session: BrowserSession): Promise<void> =
 };
 
 // ---------------------------------------------------------------------------
+
+/**
+ * Manifest metadata (ADR-0028 §6), beside the contract, not on it. First-hand —
+ * the terminal's own schedule — and the one source that **needs a browser**: its
+ * grid is a hydrated Next.js app whose stable ids live only in React state, so a
+ * run selecting it launches Chromium (and a run that does not, does not).
+ */
+export const mbccsManifest: SourceManifest = {
+  provenance: "first-hand",
+  description: "Marina Bay Cruise Centre Singapore — the terminal's own cruise schedule (live site).",
+  needsBrowser: true,
+};
 
 export const mbccs: Source<PortCall, MbccsRaw> = {
   key: "mbccs",

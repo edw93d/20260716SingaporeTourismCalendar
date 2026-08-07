@@ -1,70 +1,69 @@
-# The daily run — **retired, not deleted** (ADR-0026 §4, #144/#147).
+# The daily run — **re-enabled for v2** (ADR-0028, #159).
 #
-# ⚠️ **DO NOT re-add a `schedule:` trigger.** This job scrapes, commits the
-# harvest back to the repository and publishes it, and ADR-0026 §4 rules that the
-# repository publishes **the code and not the harvest**. The store blob, the
-# payload and the feeds were removed at the tip on #147; a scheduled run re-adds
-# them at 03:37 SGT the next morning, republishing scraped data to a public repo.
-# The schedule was removed rather than commented out precisely so it cannot be
-# brought back by a careless uncomment. `tests/workflow.test.ts` holds that it is
-# gone, and that any future revival lands off the top of the hour.
+# v1 retired this workflow because it scraped, committed the harvest back to the
+# repository and published it, and ADR-0026 §4 rules that the repository publishes
+# **the code and not the harvest** (#147). v2 removes the reason the schedule was
+# dangerous: the run is now a **pure writer to a hosted Postgres store**
+# (ADR-0025) — there is no commit-back and no Pages publish here, so a scheduled
+# run puts nothing scraped into the public repository. The server serves the
+# calendar live from the store (ADR-0025 §4); this job only refreshes it.
 #
-# **Kept for v2.** v2's daily run is this same job against Postgres (ADR-0025),
-# and the concurrency group, the single push retry and the reason a push to a
-# protected branch succeeds at all were paid for by #45/#46/#60 over three days
-# of failures — so the file stays, disabled, rather than being deleted and
-# rediscovered.
+# What was paid for over #45/#46/#60 and kept: the concurrency group and its
+# `cancel-in-progress: false`, now serializing the on-demand path too (ADR-0028
+# §4). What is gone with the commit-back: the full-history checkout, the push
+# retry, and every Pages step.
 #
-# Zero credentials end to end. `GITHUB_TOKEN` is minted by Actions for this run
-# and expires with it; there is no secret, PAT or connection string anywhere in
-# this file, and `tests/workflow.test.ts` holds that.
+# **One credential, injected, never stored in the tree.** The run holds the
+# Postgres connection string as `secrets.DATABASE_URL` (ADR-0025 spends v1's
+# zero-credentials property) and authenticates `gh` with the run-scoped
+# `GITHUB_TOKEN`. `tests/workflow.test.ts` allows exactly those two and fails a
+# third.
 name: Daily pipeline
 
 on:
-  # ⚠️ **`workflow_dispatch` is the only trigger, and running it republishes.**
-  # A manual dispatch still executes the commit-back and Pages-deploy steps below,
-  # so it commits the scraped store, payload and feeds and pushes them to the
-  # public repository — the exact thing ADR-0026 §4 stops. Kept, not stripped,
-  # because v2 revives this job and those steps carry the #45/#46/#60 reasoning;
-  # do not dispatch it on v1 unless you intend to republish.
-  workflow_dispatch:
+  # The nightly cadence (ADR-0028 §1), off the top of the hour: GitHub drops
+  # scheduled runs under load, and load concentrates on the minute everybody
+  # picked, so :37 (19:37 UTC = 03:37 SGT). `tests/workflow.test.ts` holds that a
+  # revived schedule stays daily and off-hour, and keeps the freshness watcher's
+  # offset arithmetic (ADR-0013) valid.
+  schedule:
+    - cron: "37 19 * * *"
 
-# **Two runs must never overlap.** The store is a single SQLite blob committed
-# to the repository; two runs would each build on the same parent and the second
-# push would either be rejected or clobber the first. A blob cannot merge.
-#
-# Queued rather than cancelled: a cancelled run may already have upserted, and
-# killing it between the transaction and the commit is the one way to lose a
-# scrape that was actually made.
+  # On demand, with a *"which source?"* input (ADR-0028 §3). Empty runs the whole
+  # registry — the same as the nightly — and a source id runs **only** that one,
+  # the founding complaint's direct fix. The input reaches the pipeline as the
+  # `SOURCE` environment variable on the run step below.
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Which source? Leave empty to run all; a source id runs only that one."
+        required: false
+        default: ""
+
+# **On-demand and nightly runs queue; they never overlap** (ADR-0028 §4). Two
+# concurrent scrapes would let ADR-0007's net-drop detection read each other's
+# partial writes and raise a false breakage signal. Queued rather than cancelled:
+# a cancelled run may already have upserted, and killing it between the
+# transaction and its completion is the one way to lose a scrape actually made.
 concurrency:
   group: daily-pipeline
   cancel-in-progress: false
 
 permissions:
-  # Commit the refreshed store and feeds back.
-  contents: write
-  # Publish the site.
-  pages: write
-  id-token: write
+  # Read the code to run it. Nothing is written back — the store is Postgres, not
+  # a committed blob, so this job needs no `contents: write` (that was v1's
+  # commit-back, removed).
+  contents: read
   # Raise and auto-close the operator's breakage issues (ADR-0007, #41). The
   # pipeline shells out to `gh`, which authenticates with the run-scoped
-  # `GITHUB_TOKEN` — still zero stored credentials.
+  # `GITHUB_TOKEN`.
   issues: write
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      # Full history, not the default shallow clone. The push retry below rebases
-      # onto the remote ref, and rebasing a depth-1 checkout is not something git
-      # can be relied on to do — the one recovery path this run has would fail in
-      # exactly the situation it exists for.
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -76,95 +75,27 @@ jobs:
       # MBCCS is the one source that needs a real browser (ADR-0005, Amendment 2):
       # its schedule is a hydrated Next.js app with the stable ids only in React
       # state. Chromium and its OS libraries are installed here so the headless
-      # session `src/pipeline/browser.ts` launches has a browser to drive. No
-      # credential is involved — the page authenticates itself and we only read
+      # session `src/pipeline/browser.ts` launches has a browser to drive. The run
+      # itself launches Chromium only when a selected source declares
+      # `needsBrowser` (ADR-0028 §6); installing it here is cheap insurance so a
+      # full nightly run — which always includes MBCCS — never lacks it. No
+      # credential is involved: the page authenticates itself and we only read
       # what it has already loaded (#37).
       - name: Install the headless browser
         run: npx playwright install --with-deps chromium
 
-      # Scrapes every source, folds what it saw into the store, and re-emits the
-      # feeds from the store. A source that cannot be read is reported and does
-      # not fail the run — see the note in `src/main.ts`. The same process then
-      # raises or clears the operator's breakage issues (ADR-0007, #41) via `gh`,
-      # which reads `GITHUB_TOKEN` from this step's environment — the only place a
-      # credential is named, and it is the run-scoped token, not a stored secret.
+      # Scrapes the selected sources and folds what it saw into the Postgres store
+      # (ADR-0025). A pure writer — it emits no feeds and no committed artefact
+      # (ADR-0028 §9). A source that cannot be read is reported and does not fail
+      # the run — see the note in `src/main.ts`. The same process then raises or
+      # clears the operator's breakage issues (ADR-0007, #41) via `gh`.
+      #
+      # `DATABASE_URL` is the injected store connection (ADR-0025); `GITHUB_TOKEN`
+      # is the run-scoped token `gh` reads; `SOURCE` is the on-demand input, empty
+      # on a scheduled run so the whole registry runs.
       - name: Run the pipeline
         run: npm run pipeline
         env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Commit the refreshed store and feeds
-        run: |
-          set -euo pipefail
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/calendar.sqlite site/feeds site/calendar.json
-
-          # **Unreachable today, and kept anyway.** DTSTAMP is the run instant
-          # (ADR-0011), so the feed differs on every run even when no source
-          # could be read and nothing was upserted — there is currently no such
-          # thing as a no-op run. This guard is what stops an empty commit if
-          # that ever stops being true; the alternative, inventing a commit with
-          # `--allow-empty`, is the keepalive #19 bans.
-          if git diff --cached --quiet; then
-            echo "Nothing changed."
-            exit 0
-          fi
-
-          git commit -m "Daily run: refresh the store and the feeds"
-
-          # **This push works only because `main` has no required status check;
-          # see ADR-0012.** The commit is pushed directly to a protected branch
-          # by `github-actions[bot]`, carrying no status of its own — so a
-          # required check declines it outright, whatever it is, and the retry
-          # below cannot recover (a missing status is not a stale ref). That is
-          # not a hypothetical: #45 made `check` required and this step failed
-          # for three days until #60 removed the requirement. Branch protection
-          # is out-of-band state no test here can hold, which is why the reason
-          # this line is allowed to succeed is written down rather than left to
-          # be rediscovered from the failure.
-          #
-          # One retry, and only one. The concurrency group above means this
-          # workflow is the sole writer of these paths, so a rejected push can
-          # only mean a human commit landed during the run — which our commit
-          # rebases onto cleanly, because it touches nothing a human edits.
-          git push || {
-            git fetch origin "${{ github.ref_name }}"
-            git rebase "origin/${{ github.ref_name }}"
-            git push
-          }
-
-      # **Publishing runs after the commit-back, and is blocked by its failure.**
-      # That coupling is deliberate rather than incidental. A uid is minted once
-      # and then persisted (CONTEXT.md § UID); a feed published from a store that
-      # was never pushed carries uids the next run will mint again, landing a
-      # duplicate in every subscriber's calendar. Not publishing costs a day of
-      # freshness — the cheaper of the two failures by a wide margin.
-      #
-      # A failed deploy leaves the previous site up rather than blanking it, so
-      # the reader sees stale, never empty.
-
-      # **Pages must already be enabled on the repository; this step will not do
-      # it.** `configure-pages` accepts an `enablement: true` that creates the
-      # Pages site, and it was set here on the theory that the run should have no
-      # manual prerequisite. It does not work: `GITHUB_TOKEN` is granted
-      # `pages: write`, which deploys to an existing site, but *creating* one is
-      # administrative and the run token is not an admin. The first real run
-      # failed here with `Resource not accessible by integration` (#46).
-      #
-      # So Pages-enabled is this repository's one piece of clicked-once state,
-      # set by `POST /repos/:owner/:repo/pages` with `build_type=workflow`. It is
-      # recorded in ADR-0011 rather than left to be rediscovered from a failure,
-      # because nothing in the working tree reveals it.
-      - uses: actions/configure-pages@v5
-
-      # **Uploaded as an artifact, not committed to a gh-pages branch.** The
-      # feeds are already committed above, on the branch they are generated on,
-      # which is what keeps them diffable; publishing them a second time into a
-      # branch would add a commit per run whose entire diff is a DTSTAMP.
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-      - id: deploy
-        uses: actions/deploy-pages@v4
+          SOURCE: ${{ inputs.source }}

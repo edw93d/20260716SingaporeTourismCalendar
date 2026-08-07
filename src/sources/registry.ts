@@ -1,8 +1,8 @@
-import type { PortCall, VenueEvent } from "../domain/types.js";
-import { mbccs } from "./mbccs.js";
-import { scc } from "./scc.js";
-import { suntec } from "./suntec.js";
-import type { Source } from "./types.js";
+import type { PortCall, SourceId, VenueEvent } from "../domain/types.js";
+import { mbccs, mbccsManifest } from "./mbccs.js";
+import { scc, sccManifest } from "./scc.js";
+import { suntec, suntecManifest } from "./suntec.js";
+import type { Source, SourceManifest } from "./types.js";
 
 /**
  * Every source that feeds this calendar. One file answers "what feeds this?".
@@ -21,3 +21,18 @@ import type { Source } from "./types.js";
  * point, not overhead.
  */
 export const sources: (Source<VenueEvent> | Source<PortCall>)[] = [suntec, scc, mbccs];
+
+/**
+ * Each source's manifest metadata (ADR-0028 §6), keyed by source id. Kept beside
+ * the registry — not on the `Source` objects — so the contract stays
+ * `key`/`fetch`/`parse` while a run can still read `needsBrowser` before it
+ * starts. A source and its manifest are added together; the architecture test
+ * holds that this map's keys are exactly the registry's, so a source added
+ * without a manifest (or a manifest left behind after a source is removed) fails
+ * the build rather than launching the wrong browser or none at all.
+ */
+export const manifests: Record<SourceId, SourceManifest> = {
+  [suntec.key]: suntecManifest,
+  [scc.key]: sccManifest,
+  [mbccs.key]: mbccsManifest,
+};
