@@ -4,13 +4,12 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
-import { DB_PATH, FEEDS_DIR, SITE_DIR, SITE_PAYLOAD } from "../src/paths.js";
 
 /**
  * The daily run is the one part of this project that nobody watches. Its
- * properties — off-the-hour scheduling, non-overlap, zero credentials, no
- * keepalive — are decisions taken once in a YAML file and then never read
- * again, which is exactly the shape of thing that rots silently.
+ * properties — off-the-hour scheduling, non-overlap, one injected credential and
+ * no other, no keepalive — are decisions taken once in a YAML file and then never
+ * read again, which is exactly the shape of thing that rots silently.
  *
  * These guards are deliberately structural rather than behavioural. There is no
  * way to test a cron firing or a Pages deployment from here; what *can* be held
@@ -99,101 +98,99 @@ describe("the daily workflow", () => {
     expect(workflowFiles).toContain(DAILY);
   });
 
-  it("has retired its scheduled trigger, keeping only manual dispatch", () => {
-    // ADR-0026 §4 (decided #144, executed #147): the repository publishes the
-    // code and not the harvest, and this job scrapes, commits the harvest back
-    // and publishes it. Left scheduled it re-adds the removed artefacts at 03:37
-    // SGT the next morning, so a half-landed removal is worse than none — the
-    // schedule is retired as part of the same change.
-    //
-    // **Removed, not commented.** A commented `schedule:` under an active `on:`
-    // is one careless uncomment from a public republication, so the guard is that
-    // no scheduled trigger exists at all.
-    expect(crons).toEqual([]);
-    expect(daily.on?.schedule).toBeUndefined();
-
-    // **Disabled, not deleted.** v2's daily run is this same job against Postgres
-    // (ADR-0025), so `workflow_dispatch` is kept and the commit-back/Pages steps
-    // stay reachable by hand. That a manual run republishes is the hazard the
-    // file now calls out explicitly.
+  it("runs on a nightly schedule and on manual dispatch", () => {
+    // Re-enabled for v2 (ADR-0028, #159). The reason v1 retired the schedule —
+    // this job committed the harvest back and published it, and ADR-0026 §4 bars
+    // the repository from publishing the harvest — is removed in the same change:
+    // the run is now a pure writer to Postgres (see the commit-back guard below),
+    // so a scheduled run puts nothing scraped into the public repository. A
+    // half-landed revival (schedule back while the commit-back lingers) is exactly
+    // what these two guards together forbid.
+    expect(crons).toHaveLength(1);
+    expect(daily.on?.schedule).toBeDefined();
     expect(daily.on).toHaveProperty("workflow_dispatch");
   });
 
-  it("if revived, runs once a day off the top of the hour", () => {
-    // A trap for the revival, not a check on today: `crons` is empty while the
-    // schedule is retired, so this asserts nothing yet. When v2 restores a cron
-    // it must land daily and off the top of the hour — GitHub drops scheduled
-    // runs under load, and load concentrates on the minute everybody picked; the
-    // retired cron fired at :37 (19:37 UTC = 03:37 SGT) for exactly that reason.
-    // Without this a revival can silently come back on the hour, the one property
-    // its removal would otherwise erase.
+  it("runs once a day off the top of the hour", () => {
+    // GitHub drops scheduled runs under load, and load concentrates on the minute
+    // everybody picked; the cron fires at :37 (19:37 UTC = 03:37 SGT) for exactly
+    // that reason. This also keeps the freshness watcher's offset arithmetic
+    // (ADR-0013) valid — see "keeps the threshold between one missed daily run and
+    // two" below, which reads this cron.
     expectRevivedScheduleRunsDailyOffHour(crons);
   });
 
   it("carries a concurrency group that queues rather than cancels", () => {
-    // The SQLite blob cannot merge, so two runs must never overlap. Cancelling
-    // is worse than queueing here: a cancelled run may already have upserted,
-    // and killing it mid-transaction is the one way to reach a torn store.
+    // On-demand and nightly runs must never overlap (ADR-0028 §4): two concurrent
+    // scrapes would let the net-drop check read each other's partial writes and
+    // false-alarm. Cancelling is worse than queueing: a cancelled run may already
+    // have upserted, and killing it mid-transaction loses a scrape actually made.
     expect(daily.concurrency?.group).toBeTruthy();
     expect(daily.concurrency?.["cancel-in-progress"]).toBe(false);
   });
 
-  it("grants itself exactly the four permissions it uses, and no others", () => {
+  it("grants itself exactly the two permissions it uses, and no others", () => {
     // Scoped rather than `write-all`, and asserted exhaustively rather than with
-    // toMatchObject: the failure worth catching is a *fifth* scope appearing,
+    // toMatchObject: the failure worth catching is a *third* scope appearing,
     // which a partial match would wave through. `issues: write` is the breakage
-    // alerter's (ADR-0007, #41) — `gh` raises and closes the operator's issues.
+    // alerter's (ADR-0007, #41). There is no `contents: write` any more — the
+    // store is Postgres, not a committed blob, so nothing is pushed back
+    // (ADR-0028 §9); a `contents: write` reappearing is the first sign the
+    // commit-back has crept back in.
     expect(daily.permissions).toEqual({
-      contents: "write",
-      pages: "write",
-      "id-token": "write",
+      contents: "read",
       issues: "write",
     });
   });
 
   it("injects GITHUB_TOKEN into the pipeline step, so gh can authenticate", () => {
     // The breakage alerter (#41) shells out to `gh`, which reads the run-scoped
-    // token from its environment. This is the one place a credential is named,
-    // and it is `secrets.GITHUB_TOKEN` — the token Actions mints and expires with
-    // the run — which the GITHUB_TOKEN-only guard below explicitly allows. No
+    // token from its environment. It is `secrets.GITHUB_TOKEN` — the token Actions
+    // mints and expires with the run — which the credential guard below allows. No
     // token here would leave every `gh` call unauthenticated and every alert lost.
     const pipeline = steps.find((step) => /npm\s+run\s+pipeline/.test(step.run ?? ""));
     expect(pipeline?.env?.["GITHUB_TOKEN"]).toBe("${{ secrets.GITHUB_TOKEN }}");
   });
 
-  it("commits the store and the feeds back to the repository", () => {
-    // The store is the pipeline's whole memory; a run that did not write it back
-    // would leave the next run scraping into an empty database and re-minting
-    // every uid, which is the recompute UID forbids.
+  it("injects the Postgres connection string into the pipeline step", () => {
+    // v2's store is a hosted Postgres reached over the network (ADR-0025), so the
+    // run holds its connection string as an injected secret — the credential v1's
+    // committed-blob store did without. Named here, and allowed by the credential
+    // guard below alongside GITHUB_TOKEN. Absent, the run cannot reach the store
+    // and refuses (see `requireConnectionString` in `src/main.ts`).
+    const pipeline = steps.find((step) => /npm\s+run\s+pipeline/.test(step.run ?? ""));
+    expect(pipeline?.env?.["DATABASE_URL"]).toBe("${{ secrets.DATABASE_URL }}");
+  });
+
+  it("exposes a which-source workflow_dispatch input and forwards it to the run", () => {
+    // The on-demand single-source path (ADR-0028 §3): a *"which source?"* input on
+    // the existing dispatch, forwarded to the process as the `SOURCE` environment
+    // variable that `selectRun` reads. Empty runs the whole registry; a source id
+    // runs only that one. Without the input there is no on-demand path; without
+    // forwarding it the input would be accepted and silently ignored, always
+    // running everything — the founding complaint left unfixed.
+    const dispatch = daily.on?.workflow_dispatch as { inputs?: Record<string, unknown> };
+    expect(dispatch?.inputs).toHaveProperty("source");
+
+    const pipeline = steps.find((step) => /npm\s+run\s+pipeline/.test(step.run ?? ""));
+    expect(pipeline?.env?.["SOURCE"]).toBe("${{ inputs.source }}");
+  });
+
+  it("is a pure store writer — no commit-back and no Pages publish", () => {
+    // v2's run writes only to Postgres (ADR-0028 §9, ADR-0025 §4): it emits no
+    // committed artefact and publishes no site, so the commit-back and every Pages
+    // step v1 carried are gone. This is the other half of the revived-schedule
+    // guard above — reviving the schedule is only safe because these are absent,
+    // so a commit-back or a Pages deploy reappearing beside a live schedule is the
+    // ADR-0026 §4 republication hazard returning. Matched against the parsed steps
+    // and the raw text so neither a `uses:` step nor a `git push` line can slip in.
     const body = text(DAILY);
-    expect(body).toContain(DB_PATH);
-    expect(body).toContain(FEEDS_DIR);
-    // The web calendar's data payload is committed beside the feeds (#38): the
-    // page is built from it, and like the feeds it is the diffable record of what
-    // the day's calendar holds, next to a store blob that only says *that* it
-    // changed (ADR-0011).
-    expect(body).toContain(SITE_PAYLOAD);
-    expect(body).toMatch(/git\s+push/);
-  });
-
-  it("does not ask configure-pages to enable Pages", () => {
-    // `enablement: true` asks the action to *create* the Pages site, which
-    // `GITHUB_TOKEN` cannot do — `pages: write` deploys to an existing site, but
-    // creating one is administrative. Setting it does not degrade to a no-op: it
-    // fails the step, and with it the publish (#46). Pages-enabled is repository
-    // state set once by hand, recorded in ADR-0011.
-    //
-    // Read from the parsed step rather than the text, so the comment above the
-    // step is free to name the flag it forbids.
-    const configure = steps.find((step) => step.uses?.startsWith("actions/configure-pages"));
-    expect(configure).toBeDefined();
-    expect(configure?.with?.enablement).toBeUndefined();
-  });
-
-  it("publishes the site directory to Pages", () => {
-    const upload = steps.find((step) => step.uses?.startsWith("actions/upload-pages-artifact"));
-    expect(upload?.with?.path).toBe(SITE_DIR);
-    expect(steps.some((step) => step.uses?.startsWith("actions/deploy-pages"))).toBe(true);
+    expect(body).not.toMatch(/git\s+add/);
+    expect(body).not.toMatch(/git\s+push/);
+    expect(body).not.toMatch(/git\s+commit/);
+    expect(steps.some((step) => step.uses?.startsWith("actions/configure-pages"))).toBe(false);
+    expect(steps.some((step) => step.uses?.startsWith("actions/upload-pages-artifact"))).toBe(false);
+    expect(steps.some((step) => step.uses?.startsWith("actions/deploy-pages"))).toBe(false);
   });
 
   it("installs the headless browser before running the pipeline", () => {
@@ -485,15 +482,24 @@ describe("every workflow", () => {
     expect(all.length).toBeGreaterThan(0);
   });
 
-  it("authenticates with GITHUB_TOKEN and nothing else", () => {
-    // v1 has zero credentials end to end. A secret reference here is the first
-    // step of walking that property back — and the architecture test's ban on
-    // process.env reads in src/ is only half the guard without this one.
+  it("authenticates with GITHUB_TOKEN and the store connection, and nothing else", () => {
+    // v1 had zero credentials end to end; v2 spends exactly one — the Postgres
+    // connection string (ADR-0025), the store having become a hosted service the
+    // committed blob is not. `DATABASE_URL` is the deliberate exception this scan
+    // records, alongside the run-scoped `GITHUB_TOKEN`, and it is documented in
+    // `daily.yml` exactly as the token is.
+    //
+    // **Asserted exhaustively, not loosened.** The scan still lists every other
+    // secret reference as an offender, so a *further* secret — an admin password,
+    // a PAT, a second connection — fails this test rather than riding in behind
+    // the exception. The architecture test's ban on process.env reads in src/ is
+    // only half the guard without this one.
+    const ALLOWED = ["GITHUB_TOKEN", "DATABASE_URL"];
     const offenders = all
       .flatMap(({ name, body }) =>
         [...body.matchAll(/secrets\.([A-Za-z0-9_]+)/g)].map((match) => `${name}: ${match[1]}`),
       )
-      .filter((reference) => !reference.endsWith("GITHUB_TOKEN"));
+      .filter((reference) => !ALLOWED.some((allowed) => reference.endsWith(allowed)));
 
     expect(offenders).toEqual([]);
   });

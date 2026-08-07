@@ -484,6 +484,29 @@ describe("the run-marker (#154, ADR-0013)", () => {
     await run([venueSourceOf("suntec", [bniVision()])], RUN_THREE);
     expect(await storedLastRun()).toBe(instant(RUN_THREE));
   });
+
+  it("leaves the marker untouched on a single-source on-demand run", async () => {
+    // Only a full run advances the marker (ADR-0028 §8). A by-hand poke of one
+    // source — `full: false`, the subset path the entry point takes from
+    // `selectRun` — must not bump `generatedAt`: reading a one-source poke as
+    // proof the whole calendar refreshed is exactly how a dead nightly run would
+    // go unseen, the silent-staleness failure the freshness watcher exists to
+    // catch. The scrape still lands; only the marker holds.
+    await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
+    expect(await storedLastRun()).toBe(instant(RUN_ONE));
+
+    await runPipeline({
+      sources: [venueSourceOf("scc", [bniVision({ source: "scc" })])],
+      connectionString: schema.connectionString,
+      now: clockAt(RUN_TWO),
+      http: noHttp,
+      full: false,
+    });
+
+    // The subset run wrote its record, but did not move the marker off RUN_ONE.
+    expect(await storedVenueEvents()).toHaveLength(2);
+    expect(await storedLastRun()).toBe(instant(RUN_ONE));
+  });
 });
 
 describe("retention", () => {

@@ -1,7 +1,7 @@
 import { instant } from "../domain/instant.js";
 import type { PortCall, Scraped, SourceKey, Terminal } from "../domain/types.js";
 import { textOf } from "./html.js";
-import type { FetchDeps, ParseFailure, ParseResult, Source } from "./types.js";
+import type { FetchDeps, ParseFailure, ParseResult, Source, SourceManifest } from "./types.js";
 
 /**
  * Singapore Cruise Centre.
@@ -196,6 +196,16 @@ const parseRow = (row: string): { record: Scraped<PortCall> } | { failure: Parse
       departure: departureAt.at,
     },
   };
+};
+
+/**
+ * Manifest metadata (ADR-0028 §6), beside the contract, not on it. First-hand —
+ * the terminal operator's own schedule — and server-rendered, so no browser.
+ */
+export const sccManifest: SourceManifest = {
+  provenance: "first-hand",
+  description: "Singapore Cruise Centre — the terminal operator's own cruise sailing schedule.",
+  needsBrowser: false,
 };
 
 export const scc: Source<PortCall, string> = {

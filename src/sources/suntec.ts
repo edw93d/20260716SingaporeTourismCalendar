@@ -1,7 +1,7 @@
 import { instant } from "../domain/instant.js";
 import type { Scraped, SourceKey, VenueEvent } from "../domain/types.js";
 import { decodeEntities, textOf } from "./html.js";
-import type { FetchDeps, ParseFailure, ParseResult, Source } from "./types.js";
+import type { FetchDeps, ParseFailure, ParseResult, Source, SourceManifest } from "./types.js";
 
 /**
  * Suntec Singapore Convention & Exhibition Centre.
@@ -216,6 +216,16 @@ const parseRow = (
   return {
     record: { source: suntec.key, sourceKey, name, start, end, venue: VENUE, hall: hallFrom(location) },
   };
+};
+
+/**
+ * Manifest metadata (ADR-0028 §6), beside the contract, not on it. First-hand —
+ * the venue's own listing — and server-rendered, so no browser.
+ */
+export const suntecManifest: SourceManifest = {
+  provenance: "first-hand",
+  description: "Suntec Singapore Convention & Exhibition Centre — the venue's own events listing.",
+  needsBrowser: false,
 };
 
 export const suntec: Source<VenueEvent, string> = {

@@ -119,3 +119,38 @@ export type Source<T extends DomainRecord, Raw = unknown> = {
   /** Pure. */
   parse(raw: Raw, now: Date): ParseResult<Scraped<T>>;
 };
+
+/**
+ * Whether a source is the primary publisher of what it lists, or a listing that
+ * republishes another venue's programme (ADR-0020). **It drives no behaviour in
+ * the MVP** (CONTEXT.md § Provenance): its one job was breaking ties when the same
+ * event arrived from more than one source, a field ladder the MVP does not build
+ * (ADR-0024), so with no merging nothing consults it. It survives because the
+ * admin-facing description is useful and because the tiebreak returns with
+ * matching. It carries **no credibility ranking**: a second-hand aggregator is
+ * not a worse source, only a derivative one.
+ */
+export type Provenance = "first-hand" | "second-hand";
+
+/**
+ * Flat metadata a source carries **beside** its `fetch`/`parse` contract, never
+ * on it (ADR-0027 §1, ADR-0028 §6). It is read *before* a run, not during one:
+ * `needsBrowser` decides whether the entry point launches Chromium for the
+ * selected sources, and `provenance`/`description` are the source's admin-facing
+ * facts. Keeping it off `Source` is what lets the interface stay `key`/`fetch`/
+ * `parse` — the architecture test holds that shape — while a source still
+ * declares these three things in one place, its own module.
+ */
+export type SourceManifest = {
+  provenance: Provenance;
+  /** One line for the operator: what this source is and whose listing it reads. */
+  description: string;
+  /**
+   * Whether reading this source requires a headless browser. Read across the
+   * run's selected sources to decide the launch (ADR-0028 §6): Chromium boots
+   * only when at least one selected source declares the need, so a by-hand run
+   * of a browser-less source boots none. Declaring it here rather than on
+   * `FetchDeps` is what keeps the launch a pre-run decision, not a contract one.
+   */
+  needsBrowser: boolean;
+};

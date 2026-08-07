@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { sources } from "../src/sources/registry.js";
+import { manifests, sources } from "../src/sources/registry.js";
 import { identifiersOnly } from "./support/identifiers-only.js";
 
 /**
@@ -177,6 +177,31 @@ describe("the source registry", () => {
     for (const source of sources) {
       expect(source).not.toHaveProperty("enabled");
       expect(Object.keys(source).sort()).toEqual(["fetch", "key", "parse"]);
+    }
+  });
+
+  it("carries a manifest for exactly the registered sources, and no others", () => {
+    // The registry comment promises "a source added without a manifest — or a
+    // manifest left behind after a source is removed — fails the build". This is
+    // that guard: the two sets of keys are the same, so the launch decision
+    // (`needsBrowser`) is never read off a source with no manifest, nor a manifest
+    // for a source that no longer runs. Kept off the `Source` object (see the
+    // enabled-flag guard above holding the contract at fetch/key/parse) precisely
+    // so this cross-check, not the type system, is what binds the two together.
+    expect(Object.keys(manifests).sort()).toEqual(sources.map((source) => source.key).sort());
+  });
+
+  it("gives every manifest a provenance, a description, and a needsBrowser flag", () => {
+    // The three flat facts a source declares beside its contract (ADR-0028 §6).
+    // Their types are the guard: `needsBrowser` a real boolean because a run reads
+    // it to decide the browser launch, and a truthy-string `description` because
+    // the empty string is the manifest that was added to pass the key check and
+    // never filled in.
+    for (const manifest of Object.values(manifests)) {
+      expect(["first-hand", "second-hand"]).toContain(manifest.provenance);
+      expect(typeof manifest.description).toBe("string");
+      expect(manifest.description.length).toBeGreaterThan(0);
+      expect(typeof manifest.needsBrowser).toBe("boolean");
     }
   });
 });
