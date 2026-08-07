@@ -1,9 +1,9 @@
-import { timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, resolve, sep } from "node:path";
-import type { Instant } from "../domain/instant.js";
-import type { ModerationFlag, PortCall, VenueEvent } from "../domain/types.js";
+import { instant, instantFromDate, type Instant } from "../domain/instant.js";
+import type { ModerationFlag, PortCall, Scraped, VenueEvent } from "../domain/types.js";
 import { buildSitePayload, type SitePayload } from "../site/payload.js";
 import { manifests } from "../sources/registry.js";
 import type { Store } from "../store/store.js";
@@ -45,6 +45,16 @@ export type CalendarServerDeps = {
    * `process.env` and a test can drive the boundary with a known secret.
    */
   adminPassword: string;
+  /**
+   * The clock the manual write path stamps its instant with (#158, ADR-0024 §9) —
+   * `firstSeenAt`/`lastSeenAt` on a hand-entered row, both frozen at the moment of
+   * entry. **Injected but defaulted** to the wall clock (a DI seam on an entry
+   * point, #159 — unlike `adminPassword` above, whose ADR-0010 rule forbids a
+   * default because a defaulted secret is a live hazard; a defaulted clock is not).
+   * Production reads the real time; a test pins a known instant so the frozen stamp
+   * is asserted rather than read off the wall.
+   */
+  now?: () => Instant;
 };
 
 /** The content types the static tree actually holds. Unlisted extensions 404. */
@@ -292,15 +302,46 @@ const parseBulkFlagRequest = (body: unknown): BulkFlagRequest | null => {
 };
 
 /**
- * The admin surface, reached only past the boundary (ADR-0030 §5). Four routes:
+ * The validated shape of a hand-entry form (#158, ADR-0024 §9) — the four
+ * load-bearing facts, plus an optional hall. `start`/`end` are still raw strings
+ * here: shape is checked at this layer, but turning them into {@link Instant}s is
+ * `instant()`'s job (and its refusal of a naive/offsetless value is the route's
+ * 400), so this parser stops short of it.
+ */
+type EntryRequest = { name: string; venue: string; hall: string | null; start: string; end: string };
+
+/**
+ * Parses an untrusted JSON body into an {@link EntryRequest}, or `null` if it is
+ * not one. **Facts-only, no guessing** (ADR-0024 §9): name, venue, start and end
+ * are all demanded — a missing or blank one is a malformed request, not a field to
+ * fill with a default. `hall` is genuinely optional (a room a listing may not
+ * name); absent, null, or blank all collapse to `null` rather than an invented
+ * value. There is deliberately **no description field** — the model has none.
+ */
+const parseEntryRequest = (body: unknown): EntryRequest | null => {
+  if (typeof body !== "object" || body === null) return null;
+  const { name, venue, hall, start, end } = body as Record<string, unknown>;
+  if (typeof name !== "string" || name.trim() === "") return null;
+  if (typeof venue !== "string" || venue.trim() === "") return null;
+  if (typeof start !== "string" || start === "") return null;
+  if (typeof end !== "string" || end === "") return null;
+  if (hall !== undefined && hall !== null && typeof hall !== "string") return null;
+  const hallValue = typeof hall === "string" && hall.trim() !== "" ? hall.trim() : null;
+  return { name: name.trim(), venue: venue.trim(), hall: hallValue, start, end };
+};
+
+/**
+ * The admin surface, reached only past the boundary (ADR-0030 §5). Five routes:
  * `GET /admin`, the moderator spreadsheet built live from the store — every
  * `VenueEvent` including the hidden and the unreviewed; `GET /admin/client.js`,
  * the browser module that makes the pills toggle, filter, sort and bulk-moderate;
- * `POST /admin/flag`, which flips a single moderation flag on one record; and
+ * `POST /admin/flag`, which flips a single moderation flag on one record;
  * `POST /admin/flag/bulk` (#157), which flips the same flag on a whole filtered
- * selection at once. Both writes name only the flag the operator toggled, so the
- * two flags stay independent and a scrape can touch neither (ADR-0024 §2,
- * `store.setModerationFlag`/`setModerationFlags`).
+ * selection at once; and `POST /admin/entry` (#158), the hand-entry manual write
+ * path — the operator adds an event no adapter covers. The two flag writes name
+ * only the flag the operator toggled, so the flags stay independent and a scrape
+ * can touch neither (ADR-0024 §2, `store.setModerationFlag`/`setModerationFlags`);
+ * the entry write mints a `manual` row that arrives Reviewed + Shown (ADR-0024 §9).
  *
  * The client module is served **from under the admin path on purpose** — every
  * admin asset sits inside the one guarded subtree, not one file beside it. It
@@ -317,6 +358,7 @@ const handleAdmin = async (
   store: Store,
   siteDir: string,
   pathname: string,
+  now: () => Instant,
 ): Promise<void> => {
   if (req.method === "GET" && pathname === "/admin") {
     const venueEvents = await store.readVenueEvents();
@@ -385,13 +427,63 @@ const handleAdmin = async (
     return;
   }
 
+  if (req.method === "POST" && pathname === "/admin/entry") {
+    // The hand-entry manual write path (#158, ADR-0024 §9): the operator enters an
+    // event no adapter covers. It is a *second* write path, not a scrape — `manual`
+    // is not in the source registry and implements neither `fetch` nor `parse`, so
+    // it is exempt from Source health by that structural absence, not a special case.
+    let body: unknown;
+    try {
+      body = await readJsonBody(req, TOGGLE_BODY_BYTES);
+    } catch {
+      sendText(res, 400, "bad request");
+      return;
+    }
+    const request = parseEntryRequest(body);
+    if (request === null) {
+      sendText(res, 400, "bad request");
+      return;
+    }
+    // The two instants are parsed here, not in the shape parser: `instant()` refuses
+    // a date-only or offsetless value (ADR-0003), which is exactly the "no guessing"
+    // 400. An end at or before the start is not a real duration, so it is refused too.
+    let start: Instant;
+    let end: Instant;
+    try {
+      start = instant(request.start);
+      end = instant(request.end);
+    } catch {
+      sendText(res, 400, "bad request");
+      return;
+    }
+    if (end <= start) {
+      sendText(res, 400, "bad request");
+      return;
+    }
+    // Identity is `(source, sourceKey)` with the key minted *here* — the operator
+    // never supplies it, and a uuid cannot collide with a scraped key. The store
+    // stamps it Reviewed + Shown and freezes both seen-instants at `now()`.
+    const scraped: Scraped<VenueEvent> = {
+      source: "manual",
+      sourceKey: randomUUID(),
+      name: request.name,
+      start,
+      end,
+      venue: request.venue,
+      hall: request.hall,
+    };
+    const record = await store.addManualVenueEvent(scraped, now());
+    sendJson(res, 201, record);
+    return;
+  }
+
   sendText(res, 404, "not found");
 };
 
 const handle = async (
   req: IncomingMessage,
   res: ServerResponse,
-  { store, siteDir, adminPassword }: CalendarServerDeps,
+  { store, siteDir, adminPassword, now = () => instantFromDate(new Date()) }: CalendarServerDeps,
 ): Promise<void> => {
   const { pathname } = new URL(req.url ?? "/", "http://localhost");
 
@@ -403,7 +495,7 @@ const handle = async (
       sendUnauthorized(res);
       return;
     }
-    await handleAdmin(req, res, store, siteDir, pathname);
+    await handleAdmin(req, res, store, siteDir, pathname, now);
     return;
   }
 

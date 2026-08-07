@@ -20,6 +20,9 @@
  * - **Bulk bar** (#157): a fixed bar that hides or marks *the whole filtered
  *   selection* in one action — filter-then-bulk — each raising one Undo toast that
  *   reverts the exact set it changed.
+ * - **Add event** (#158): a ＋ button opens a modal that hand-enters an event no
+ *   adapter covers — a `manual` row, facts only (name, venue, start, end; no
+ *   description), written under the same auth boundary and stamped Reviewed + Shown.
  *
  * Same seam discipline as the calendar client (#38): the one thing it cannot be
  * allowed to reach for itself — the network — is **injected** as `fetch`, and the
@@ -31,12 +34,21 @@
  *
  * @typedef {"hidden" | "reviewed"} ModerationFlag
  * @typedef {(input: string, init?: RequestInit) => Promise<Response>} FetchLike
- * @typedef {{ fetch: FetchLike }} MountOptions
+ * @typedef {{ fetch: FetchLike, reload?: () => void }} MountOptions
  */
 
-/** The single-record write route (#156) and the whole-selection one (#157). */
+/** The single-record write route (#156), the whole-selection one (#157), and the hand-entry one (#158). */
 const FLAG_ROUTE = "/admin/flag";
 const BULK_ROUTE = "/admin/flag/bulk";
+const ENTRY_ROUTE = "/admin/entry";
+
+/**
+ * Singapore is a fixed +08:00 with no daylight saving, so a wall-clock time typed
+ * into a `datetime-local` is turned into an instant by stamping this one offset —
+ * the client never has to assume a zone, and the server never receives a naive one
+ * (ADR-0003, ADR-0024 §9).
+ */
+const SGT_OFFSET = "+08:00";
 
 /**
  * The label a pill shows for a flag at a value. `reviewed` reads as itself;
@@ -186,6 +198,144 @@ export const mountAdmin = (root, options) => {
     root.append(el);
     toast = el;
   };
+
+  // -------------------------------------------------------------------------
+  // Hand-entry manual write (#158, ADR-0024 §9). A ＋ Add event button opens a
+  // modal that writes an event no adapter covers — a `manual` row the server
+  // stamps Reviewed + Shown. **Facts only:** name, venue, start and end are
+  // demanded and there is deliberately no description field (the model has none),
+  // so there is nowhere to type copyrightable prose. The modal is built here, not
+  // server-rendered, so a no-JS page shows no dead control. On a successful write
+  // the page reloads — injected as `reload` so a test can observe it — so the new
+  // row appears through the same server render as every other, never spliced in by
+  // hand; a refused write keeps the modal open to retry from.
+  // -------------------------------------------------------------------------
+
+  const reload = options.reload ?? (() => doc.defaultView?.location.reload());
+
+  const addButton = doc.createElement("button");
+  addButton.type = "button";
+  addButton.className = "add-event";
+  addButton.textContent = "＋ Add event";
+
+  const overlay = doc.createElement("div");
+  overlay.className = "entry-modal";
+  overlay.hidden = true;
+
+  const form = doc.createElement("form");
+  form.className = "entry-form";
+
+  /**
+   * One labelled input in the form. The two instants are `datetime-local`, so the
+   * operator picks a wall-clock time and the offset is added on submit.
+   * @param {string} name
+   * @param {string} label
+   * @param {string} [type]
+   * @returns {HTMLInputElement}
+   */
+  const field = (name, label, type = "text") => {
+    const wrap = doc.createElement("label");
+    wrap.className = `entry-field entry-field-${name}`;
+    const span = doc.createElement("span");
+    span.textContent = label;
+    const input = doc.createElement("input");
+    input.type = type;
+    input.name = name;
+    wrap.append(span, input);
+    form.append(wrap);
+    return input;
+  };
+
+  const nameInput = field("name", "Event name");
+  const venueInput = field("venue", "Venue");
+  const hallInput = field("hall", "Hall (optional)");
+  const startInput = field("start", "Start", "datetime-local");
+  const endInput = field("end", "End", "datetime-local");
+
+  const error = doc.createElement("p");
+  error.className = "entry-error";
+  error.setAttribute("role", "alert");
+  error.hidden = true;
+  form.append(error);
+
+  /** @param {string} message */
+  const showError = (message) => {
+    error.textContent = message;
+    error.hidden = false;
+  };
+
+  const actions = doc.createElement("div");
+  actions.className = "entry-actions";
+  const cancel = doc.createElement("button");
+  cancel.type = "button";
+  cancel.className = "entry-cancel";
+  cancel.textContent = "Cancel";
+  const submit = doc.createElement("button");
+  submit.type = "submit";
+  submit.className = "entry-submit";
+  submit.textContent = "Add event";
+  actions.append(cancel, submit);
+  form.append(actions);
+  overlay.append(form);
+
+  const closeEntry = () => {
+    overlay.hidden = true;
+    error.hidden = true;
+  };
+
+  addButton.addEventListener("click", () => {
+    error.hidden = true;
+    overlay.hidden = false;
+    nameInput.focus();
+  });
+  cancel.addEventListener("click", closeEntry);
+
+  const submitEntry = async () => {
+    const name = nameInput.value.trim();
+    const venue = venueInput.value.trim();
+    const start = startInput.value;
+    const end = endInput.value;
+    const hall = hallInput.value.trim();
+    // Facts only, no guessing (ADR-0024 §9): the four load-bearing fields are
+    // demanded here as well as at the server, so an incomplete form never posts and
+    // the operator sees the gap rather than a rejected round-trip. The server
+    // remains the authority on the instants and on end-after-start.
+    if (name === "" || venue === "" || start === "" || end === "") {
+      showError("Name, venue, start and end are all required.");
+      return;
+    }
+    submit.disabled = true;
+    try {
+      const response = await fetch(ENTRY_ROUTE, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name,
+          venue,
+          hall: hall === "" ? null : hall,
+          start: `${start}${SGT_OFFSET}`,
+          end: `${end}${SGT_OFFSET}`,
+        }),
+      });
+      if (!response.ok) {
+        showError("Could not add that event.");
+        return;
+      }
+      closeEntry();
+      reload();
+    } catch {
+      showError("Could not add that event.");
+    } finally {
+      submit.disabled = false;
+    }
+  };
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void submitEntry();
+  });
+
+  root.append(addButton, overlay);
 
   // -------------------------------------------------------------------------
   // Single-pill write (#156). The pill is disabled in flight so a double-click

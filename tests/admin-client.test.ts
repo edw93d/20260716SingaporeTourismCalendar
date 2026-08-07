@@ -416,3 +416,139 @@ describe("the bulk bar moderates the filtered selection (#157)", () => {
     expect(toast()?.textContent).toContain("Could not save");
   });
 });
+
+// ---------------------------------------------------------------------------
+// The hand-entry manual write path — the ＋ Add event modal (#158, ADR-0024 §9).
+// ---------------------------------------------------------------------------
+
+describe("the ＋ Add event modal writes a manual row (#158)", () => {
+  type EntryCall = { url: string; body: Record<string, unknown> };
+  /** A fake `fetch` that records url + parsed body and answers with a settable outcome. */
+  const entryFetch = (ok = true) => {
+    const calls: EntryCall[] = [];
+    const fetch = async (url: string, init?: RequestInit): Promise<Response> => {
+      calls.push({ url, body: JSON.parse(String(init?.body)) });
+      return { ok, json: async () => ({}) } as Response;
+    };
+    return { fetch, calls };
+  };
+
+  const addButton = (): HTMLButtonElement => root.querySelector(".add-event") as HTMLButtonElement;
+  const modal = (): HTMLElement | null => root.querySelector(".entry-modal");
+  const field = (name: string): HTMLInputElement =>
+    root.querySelector(`.entry-form [name="${name}"]`) as HTMLInputElement;
+  const entrySubmit = (): HTMLButtonElement =>
+    root.querySelector(".entry-submit") as HTMLButtonElement;
+  const shownError = (): HTMLElement | null => root.querySelector(".entry-error:not([hidden])");
+
+  /** Fills a complete, valid form. Individual tests then clear one field to test a guard. */
+  const fillComplete = (): void => {
+    field("name").value = "Community Health Fair";
+    field("venue").value = "Marina Bay Sands Expo";
+    field("hall").value = "Hall B";
+    field("start").value = "2026-09-01T10:00";
+    field("end").value = "2026-09-01T17:00";
+  };
+
+  it("opens a modal with exactly five fields and no description — facts only", () => {
+    renderInto([suntecEvent()]);
+    mountAdmin(root, { fetch: entryFetch().fetch, reload: () => {} });
+
+    // Starts closed; the button opens it.
+    expect(modal()?.hidden).toBe(true);
+    addButton().click();
+    expect(modal()?.hidden).toBe(false);
+
+    // Name, venue, hall, start, end — and nothing else. No description field: the
+    // model has none (ADR-0024 §9), so there is nowhere to type copyrightable prose.
+    const inputs = modal()!.querySelectorAll("input");
+    expect(inputs).toHaveLength(5);
+    expect(modal()!.querySelector("textarea")).toBeNull();
+    expect(modal()!.querySelector('[name="description"]')).toBeNull();
+    for (const name of ["name", "venue", "hall", "start", "end"]) {
+      expect(field(name)).not.toBeNull();
+    }
+  });
+
+  it("refuses to post without a venue, and refuses to post without an end", async () => {
+    // It will not invent a venue or guess an end (ADR-0024 §9): a form missing
+    // either never reaches the network, and the modal stays open with an error.
+    renderInto([suntecEvent()]);
+    const { fetch, calls } = entryFetch();
+    mountAdmin(root, { fetch, reload: () => {} });
+    addButton().click();
+
+    fillComplete();
+    field("venue").value = "   "; // whitespace is no venue
+    entrySubmit().click();
+    await flush();
+    expect(calls).toEqual([]);
+    expect(modal()?.hidden).toBe(false);
+    expect(shownError()).not.toBeNull();
+
+    fillComplete();
+    field("end").value = ""; // no end
+    entrySubmit().click();
+    await flush();
+    expect(calls).toEqual([]);
+  });
+
+  it("posts the facts to /admin/entry with the fixed +08:00 offset, then reloads", async () => {
+    renderInto([suntecEvent()]);
+    const { fetch, calls } = entryFetch();
+    let reloaded = 0;
+    mountAdmin(root, { fetch, reload: () => void reloaded++ });
+    addButton().click();
+
+    fillComplete();
+    entrySubmit().click();
+    await flush();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe("/admin/entry");
+    // The datetime-local values carry no zone; the client stamps the Singapore
+    // offset so the server never has to assume one (ADR-0003).
+    expect(calls[0]?.body).toEqual({
+      name: "Community Health Fair",
+      venue: "Marina Bay Sands Expo",
+      hall: "Hall B",
+      start: "2026-09-01T10:00+08:00",
+      end: "2026-09-01T17:00+08:00",
+    });
+    // On success the row exists in the store; the page reloads so it appears
+    // through the same server render as every other row, and the modal closes.
+    expect(reloaded).toBe(1);
+    expect(modal()?.hidden).toBe(true);
+  });
+
+  it("sends a null hall when the optional room is left blank — no invented room", async () => {
+    renderInto([suntecEvent()]);
+    const { fetch, calls } = entryFetch();
+    mountAdmin(root, { fetch, reload: () => {} });
+    addButton().click();
+
+    fillComplete();
+    field("hall").value = "";
+    entrySubmit().click();
+    await flush();
+
+    expect(calls[0]?.body.hall).toBeNull();
+  });
+
+  it("keeps the modal open and does not reload when the server refuses the write", async () => {
+    renderInto([suntecEvent()]);
+    const { fetch } = entryFetch(false);
+    let reloaded = 0;
+    mountAdmin(root, { fetch, reload: () => void reloaded++ });
+    addButton().click();
+
+    fillComplete();
+    entrySubmit().click();
+    await flush();
+
+    // A refused write must not reload past a modal the operator can retry from.
+    expect(modal()?.hidden).toBe(false);
+    expect(reloaded).toBe(0);
+    expect(shownError()?.textContent).toContain("Could not add");
+  });
+});

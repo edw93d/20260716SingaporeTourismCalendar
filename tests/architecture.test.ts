@@ -171,6 +171,19 @@ describe("the source registry", () => {
     expect(Array.isArray(sources)).toBe(true);
   });
 
+  it("does not register `manual` — the hand-entry write path is not a source (#158, ADR-0024 §9)", () => {
+    // `manual` (the ＋ Add event write path, #158) is a *second* write path, not a
+    // scrape: it implements neither `fetch` nor `parse`, and it is exempt from
+    // Source health. That exemption is not a coded special case — it is this
+    // structural absence. Breakage is assessed only by iterating `sources`
+    // (`src/pipeline/run.ts` — `for (const source of sources)`), so a write path
+    // that is in neither the registry nor the manifests is simply never assessed.
+    // Registering `manual` here would silently start health-checking a path that
+    // never fetches; this locks it out so that can't happen by accident.
+    expect(sources.map((source) => source.key)).not.toContain("manual");
+    expect(Object.keys(manifests)).not.toContain("manual");
+  });
+
   it("carries no enabled flag on any source", () => {
     // Disabling a source is a one-line revertable diff. A flag would reintroduce
     // the config system through the side door — see ADR-0005.

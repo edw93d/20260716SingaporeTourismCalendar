@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { instant, type Instant } from "../src/domain/instant.js";
-import type { PortCall, VenueEvent } from "../src/domain/types.js";
-import { createCalendarServer } from "../src/server/server.js";
+import type { PortCall, Scraped, VenueEvent } from "../src/domain/types.js";
+import { createCalendarServer, type CalendarServerDeps } from "../src/server/server.js";
 import type { SitePayload } from "../src/site/payload.js";
 import type { Store } from "../src/store/store.js";
 
@@ -75,6 +75,7 @@ const fakeStore = (over: Partial<Store>): Store => ({
   lastRun: async () => null,
   upsertVenueEvent: notCalled,
   upsertPortCall: notCalled,
+  addManualVenueEvent: notCalled,
   setModerationFlag: notCalled,
   setModerationFlags: notCalled,
   recordRun: notCalled,
@@ -105,9 +106,14 @@ afterEach(async () => {
   rmSync(siteDir, { recursive: true, force: true });
 });
 
-/** Starts the server on an ephemeral port and returns its base URL. */
-const serve = async (store: Store): Promise<string> => {
-  const server = createCalendarServer({ store, siteDir, adminPassword: ADMIN_SECRET });
+/**
+ * Starts the server on an ephemeral port and returns its base URL. `over` lets a
+ * test inject the rest of `CalendarServerDeps` — notably a fixed `now` clock, so
+ * the manual write path's frozen instant is asserted rather than read off the wall
+ * (a DI seam on an entry point, #159).
+ */
+const serve = async (store: Store, over: Partial<CalendarServerDeps> = {}): Promise<string> => {
+  const server = createCalendarServer({ store, siteDir, adminPassword: ADMIN_SECRET, ...over });
   await new Promise<void>((ready) => server.listen(0, "127.0.0.1", ready));
   stop = () => new Promise<void>((closed) => server.close(() => closed()));
   const { port } = server.address() as AddressInfo;
@@ -382,6 +388,166 @@ describe("POST /admin/flag/bulk — the filter-then-bulk write route (#157, ADR-
     expect((await post(base, { uids: ["u"], flag: "hidden", value: "yes" })).status).toBe(400);
     expect((await post(base, { uids: "u", flag: "hidden", value: true })).status).toBe(400);
     expect((await post(base, { uids: ["u", 7], flag: "hidden", value: true })).status).toBe(400);
+  });
+});
+
+describe("POST /admin/entry — the hand-entry manual write path (#158, ADR-0024 §9)", () => {
+  /** The typed instant the injected clock hands the write — proves it is not read off the wall. */
+  const TYPED_AT: Instant = instant("2026-08-07T03:30:00Z");
+
+  /**
+   * A store that records the one manual write and echoes back the record the real
+   * store would build — arriving Reviewed + Shown, its seen-instants frozen at the
+   * typed instant (ADR-0024 §9). The route mints the sourceKey and passes `now()`,
+   * so the recorder captures both to assert them.
+   */
+  const recordingStore = () => {
+    const calls: { scraped: Scraped<VenueEvent>; typedAt: Instant }[] = [];
+    const store = fakeStore({
+      addManualVenueEvent: async (scraped, typedAt) => {
+        calls.push({ scraped, typedAt });
+        return {
+          ...scraped,
+          uid: "uid-manual-1@sg-tourism-calendar",
+          sequence: 0,
+          hidden: false,
+          reviewed: true,
+          firstSeenAt: typedAt,
+          lastSeenAt: typedAt,
+        };
+      },
+    });
+    return { store, calls };
+  };
+
+  /** A complete, valid form — facts only, no description field (ADR-0024 §9). */
+  const complete = {
+    name: "Community Health Fair",
+    venue: "Marina Bay Sands Expo",
+    hall: "Hall B",
+    start: "2026-09-01T02:00:00Z",
+    end: "2026-09-01T09:00:00Z",
+  };
+
+  const post = (base: string, body: unknown, auth = basic(ADMIN_SECRET)): Promise<Response> =>
+    fetch(`${base}/admin/entry`, {
+      method: "POST",
+      headers: { authorization: auth, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  it("401s without credentials — the manual write is behind the one boundary too", async () => {
+    // The guard sits one level up (ADR-0030 §5): the store is never reached, so the
+    // recorder's presence is enough — a leak would throw when `addManualVenueEvent` ran.
+    const { store, calls } = recordingStore();
+    const base = await serve(store);
+    const response = await fetch(`${base}/admin/entry`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(complete),
+    });
+    expect(response.status).toBe(401);
+    expect(calls).toEqual([]);
+  });
+
+  it("writes a manual row that arrives Reviewed + Shown, minting the key and freezing the typed instant", async () => {
+    const { store, calls } = recordingStore();
+    const base = await serve(store, { now: () => TYPED_AT });
+
+    const response = await post(base, complete);
+
+    expect(response.status).toBe(201);
+    // One write, with exactly the typed facts. The source is `manual` and the
+    // sourceKey is minted server-side (a uuid the operator never supplies).
+    expect(calls).toHaveLength(1);
+    const { scraped, typedAt } = calls[0]!;
+    expect(scraped.source).toBe("manual");
+    expect(scraped.sourceKey).toMatch(/^[0-9a-f-]{36}$/);
+    expect(scraped).toMatchObject({
+      name: "Community Health Fair",
+      venue: "Marina Bay Sands Expo",
+      hall: "Hall B",
+      start: instant("2026-09-01T02:00:00Z"),
+      end: instant("2026-09-01T09:00:00Z"),
+    });
+    // The instant handed to the store is the injected clock's, not the wall clock.
+    expect(typedAt).toBe(TYPED_AT);
+
+    // The response echoes the stored record — Reviewed + Shown (ADR-0024 §9).
+    const record = (await response.json()) as VenueEvent;
+    expect(record).toMatchObject({ source: "manual", reviewed: true, hidden: false });
+    expect(record.firstSeenAt).toBe(TYPED_AT);
+    expect(record.lastSeenAt).toBe(TYPED_AT);
+  });
+
+  it("keeps hall optional — a form with no hall writes a null hall, not an invented one", async () => {
+    const { store, calls } = recordingStore();
+    const base = await serve(store, { now: () => TYPED_AT });
+
+    const { hall: _omitted, ...noHall } = complete;
+    const response = await post(base, noHall);
+
+    expect(response.status).toBe(201);
+    expect(calls[0]!.scraped.hall).toBeNull();
+  });
+
+  it("accepts the client's wire format — a secondless datetime with the +08:00 offset — and converts to UTC", async () => {
+    // The contract with the client seam: `site/admin/client.js` stamps a bare
+    // `datetime-local` value (no seconds) with `+08:00`, so the boundary must accept
+    // exactly that string, not just the `…:00Z` the other tests post. `instant()`
+    // converts the offset to UTC — 10:00 +08:00 is 02:00Z — so the stored instant is
+    // canonical UTC regardless of how the operator's browser phrased it.
+    const { store, calls } = recordingStore();
+    const base = await serve(store, { now: () => TYPED_AT });
+
+    const response = await post(base, {
+      ...complete,
+      start: "2026-09-01T10:00+08:00",
+      end: "2026-09-01T17:00+08:00",
+    });
+
+    expect(response.status).toBe(201);
+    expect(calls[0]!.scraped.start).toBe(instant("2026-09-01T02:00:00Z"));
+    expect(calls[0]!.scraped.end).toBe(instant("2026-09-01T09:00:00Z"));
+  });
+
+  it("400s a form missing any of name, venue, start or end — it refuses to guess", async () => {
+    // Facts-only: the four load-bearing fields are demanded, and a missing one is a
+    // malformed request, not a row to fill with a guess. The store is never reached.
+    const { store, calls } = recordingStore();
+    const base = await serve(store, { now: () => TYPED_AT });
+
+    for (const field of ["name", "venue", "start", "end"] as const) {
+      const { [field]: _dropped, ...missing } = complete;
+      expect((await post(base, missing)).status).toBe(400);
+    }
+    // A whitespace-only venue is no venue — it will not stand in for a real one.
+    expect((await post(base, { ...complete, venue: "   " })).status).toBe(400);
+    expect(calls).toEqual([]);
+  });
+
+  it("400s a start or end that is not a valid instant — no offset, no guess", async () => {
+    const { store, calls } = recordingStore();
+    const base = await serve(store, { now: () => TYPED_AT });
+
+    // A naive datetime with no offset is refused by `instant()` (ADR-0003) — the
+    // route does not silently assume a zone.
+    expect((await post(base, { ...complete, start: "2026-09-01T10:00" })).status).toBe(400);
+    expect((await post(base, { ...complete, end: "not-a-date" })).status).toBe(400);
+    expect(calls).toEqual([]);
+  });
+
+  it("400s an end at or before the start — it refuses to invent a duration", async () => {
+    const { store, calls } = recordingStore();
+    const base = await serve(store, { now: () => TYPED_AT });
+
+    // End before start.
+    expect(
+      (await post(base, { ...complete, start: complete.end, end: complete.start })).status,
+    ).toBe(400);
+    // End equal to start — a zero-length event is not a real one.
+    expect((await post(base, { ...complete, end: complete.start })).status).toBe(400);
+    expect(calls).toEqual([]);
   });
 });
 

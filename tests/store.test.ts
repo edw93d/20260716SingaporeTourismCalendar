@@ -291,3 +291,119 @@ describe("the bulk moderation-flag write (#157, ADR-0024)", () => {
     });
   });
 });
+
+/**
+ * The **manual write path** (#158, ADR-0024 §9) — the second write into the store,
+ * outside the `Source` contract. Exercised against real SQL because its whole job
+ * is what a fake would paper over: a hand-entered row must land with the *set*
+ * moderation flags the scrape's upsert deliberately never touches (`reviewed:
+ * true`, `hidden: false`), a minted `uid`, and a `firstSeenAt`/`lastSeenAt` frozen
+ * at the typed instant. It is the only write that names a moderation column on the
+ * way *in*, so it is the one place a wrong literal would silently ship an event
+ * that either hides itself or re-enters the review queue.
+ */
+describe("the manual write path (#158, ADR-0024 §9)", () => {
+  const manualEntry = (over: Partial<Scraped<VenueEvent>> = {}): Scraped<VenueEvent> => ({
+    source: "manual",
+    sourceKey: "manual-key-1",
+    name: "Ad-hoc industry mixer",
+    start: instant("2026-09-01T10:00:00Z"),
+    end: instant("2026-09-01T12:00:00Z"),
+    venue: "Some rooftop bar",
+    hall: null,
+    ...over,
+  });
+
+  const only = async (store: Store): Promise<VenueEvent> => {
+    const [record] = await store.readVenueEvents();
+    if (record === undefined) throw new Error("expected exactly one VenueEvent");
+    return record;
+  };
+
+  it("arrives Reviewed and Shown — a person typed it (CONTEXT.md § Reviewed)", async () => {
+    // The one write that sets the flags on the way in: reviewed:true (looked-at by
+    // definition) and hidden:false (shown). The scrape's upsert sets neither.
+    await withStore(async (store) => {
+      await store.addManualVenueEvent(manualEntry(), instant("2026-08-07T06:30:00Z"));
+      const record = await only(store);
+      expect(record.reviewed).toBe(true);
+      expect(record.hidden).toBe(false);
+    });
+  });
+
+  it("mints a uid and freezes firstSeenAt = lastSeenAt at the typed instant", async () => {
+    // `manual` is never re-observed, so its lastSeenAt never advances — which is
+    // exactly why it is exempt from Source health (ADR-0007).
+    await withStore(async (store) => {
+      const typedAt = instant("2026-08-07T06:30:00Z");
+      const returned = await store.addManualVenueEvent(manualEntry(), typedAt);
+
+      expect(returned.uid).toMatch(/@sg-tourism-calendar$/);
+      expect(returned.source).toBe("manual");
+      expect(returned.sourceKey).toBe("manual-key-1");
+      expect(returned.firstSeenAt).toBe(typedAt);
+      expect(returned.lastSeenAt).toBe(typedAt);
+
+      // The returned record is the stored one — the RETURNING echo maps the same
+      // row the whole-table read does.
+      const stored = await only(store);
+      expect(stored).toEqual(returned);
+    });
+  });
+
+  it("stores exactly the typed content, hall and all", async () => {
+    await withStore(async (store) => {
+      const returned = await store.addManualVenueEvent(
+        manualEntry({ name: "Trade preview", venue: "Hall A", hall: "Level 2" }),
+        instant("2026-08-07T06:30:00Z"),
+      );
+      expect(returned.name).toBe("Trade preview");
+      expect(returned.venue).toBe("Hall A");
+      expect(returned.hall).toBe("Level 2");
+      expect(returned.start).toBe("2026-09-01T10:00:00Z");
+      expect(returned.end).toBe("2026-09-01T12:00:00Z");
+    });
+  });
+
+  it("keeps two manual entries as two rows — duplicates are accepted, not merged", async () => {
+    // ADR-0024 §1: every record stands alone under (source, sourceKey); a distinct
+    // minted key each time means a re-entry is a new row, hidden by hand if wrong.
+    await withStore(async (store) => {
+      const a = await store.addManualVenueEvent(
+        manualEntry({ sourceKey: "manual-a" }),
+        instant("2026-08-07T06:30:00Z"),
+      );
+      const b = await store.addManualVenueEvent(
+        manualEntry({ sourceKey: "manual-b" }),
+        instant("2026-08-07T06:31:00Z"),
+      );
+      const rows = await store.readVenueEvents();
+      expect(rows).toHaveLength(2);
+      expect(a.uid).not.toBe(b.uid);
+    });
+  });
+
+  it("a later scrape of a real source cannot touch a manual row", async () => {
+    // The manual row shares only the (source, sourceKey) identity shape; it is
+    // never in a scrape's output, so an unrelated upsert leaves it untouched.
+    await withStore(async (store) => {
+      const manual = await store.addManualVenueEvent(manualEntry(), instant("2026-08-07T06:30:00Z"));
+      await store.upsertVenueEvent(
+        {
+          source: "suntec",
+          sourceKey: "bni-vision1472026",
+          name: "BNI Vision",
+          start: instant("2026-07-17T04:00:00Z"),
+          end: instant("2026-07-17T10:00:00Z"),
+          venue: "Suntec Convention Centre",
+          hall: null,
+        },
+        instant("2026-08-07T07:00:00Z"),
+      );
+
+      const stored = (await store.readVenueEvents()).find((r) => r.uid === manual.uid);
+      expect(stored?.reviewed).toBe(true);
+      expect(stored?.lastSeenAt).toBe("2026-08-07T06:30:00Z");
+    });
+  });
+});
