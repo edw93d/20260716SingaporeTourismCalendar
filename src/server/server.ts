@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import type { Instant } from "../domain/instant.js";
-import type { PortCall, VenueEvent } from "../domain/types.js";
+import type { ModerationFlag, PortCall, VenueEvent } from "../domain/types.js";
 import { buildSitePayload, type SitePayload } from "../site/payload.js";
 import { manifests } from "../sources/registry.js";
 import type { Store } from "../store/store.js";
@@ -70,7 +70,15 @@ const CONTENT_TYPES: Record<string, string> = {
 const livePayload = async (
   store: Store,
 ): Promise<SitePayload | Omit<SitePayload, "generatedAt">> => {
-  const venueEvents: VenueEvent[] = await store.readVenueEvents();
+  // Hide-before-projection (ADR-0024 §8, #156). Hidden records are dropped *here*,
+  // before `buildSitePayload`, so the projection, `CalendarEntry` and the served
+  // payload never receive one and cannot forget to check. This is the public read
+  // path only: the admin surface reads `store.readVenueEvents()` directly, hidden
+  // rows and all (ADR-0030 §5). A hide takes effect on the very next live read,
+  // and unhiding restores the same entry (the store keeps the row, ADR-0024 §7).
+  const venueEvents: VenueEvent[] = (await store.readVenueEvents()).filter(
+    (record) => !record.hidden,
+  );
   const portCalls: PortCall[] = await store.readPortCalls();
   const lastRun: Instant | null = await store.lastRun();
 
@@ -202,16 +210,78 @@ const sendUnauthorized = (res: ServerResponse): void => {
 };
 
 /**
- * The admin surface, reached only past the boundary. For #155 it is one route —
- * `GET /admin`, the read-only spreadsheet built live from the store, every
- * `VenueEvent` including the hidden and the unreviewed (ADR-0030 §5). Write
- * routes arrive on later tickets under this same guard; anything not yet built
- * 404s — but behind auth, having already passed the boundary above.
+ * Reads a request body as JSON, with a small hard cap — a toggle is a handful of
+ * bytes, so anything larger is malformed or hostile and is refused before it is
+ * buffered whole. Rejects on invalid JSON too; the caller answers either as a 400.
+ */
+const MAX_BODY_BYTES = 4 * 1024;
+
+const readJsonBody = (req: IncomingMessage): Promise<unknown> =>
+  new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.byteLength;
+      if (size > MAX_BODY_BYTES) {
+        reject(new Error("request body too large"));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error("invalid JSON"));
+      }
+    });
+    req.on("error", reject);
+  });
+
+/** The validated shape of a toggle request — an unknown flag or a non-boolean is rejected. */
+type FlagRequest = { uid: string; flag: ModerationFlag; value: boolean };
+
+const FLAGS: readonly ModerationFlag[] = ["hidden", "reviewed"];
+
+/**
+ * Parses an untrusted JSON body into a `FlagRequest`, or `null` if it is not one.
+ * Every field is checked — `flag` against the closed set, `value` as a real
+ * boolean — so nothing past this point trusts the request's shape, and the store
+ * is never asked to write a column the operator did not name.
+ */
+const parseFlagRequest = (body: unknown): FlagRequest | null => {
+  if (typeof body !== "object" || body === null) return null;
+  const { uid, flag, value } = body as Record<string, unknown>;
+  if (typeof uid !== "string" || uid === "") return null;
+  if (typeof flag !== "string" || !FLAGS.includes(flag as ModerationFlag)) return null;
+  if (typeof value !== "boolean") return null;
+  return { uid, flag: flag as ModerationFlag, value };
+};
+
+/**
+ * The admin surface, reached only past the boundary (ADR-0030 §5). Three routes:
+ * `GET /admin`, the moderator spreadsheet built live from the store — every
+ * `VenueEvent` including the hidden and the unreviewed; `GET /admin/client.js`,
+ * the browser module that makes the pills toggle; and `POST /admin/flag`, the one
+ * write path, which flips a single moderation flag on one record. The write names
+ * only the flag the operator toggled, so the two flags stay independent and a
+ * scrape can touch neither (ADR-0024 §2, `store.setModerationFlag`).
+ *
+ * The client module is served **from under the admin path on purpose** — every
+ * admin asset sits inside the one guarded subtree, not one file beside it. It
+ * holds no secret, but keeping it here means there is exactly one place where
+ * "public" becomes "operator", which is the property ADR-0030 §5 is spending. It
+ * comes off `siteDir` through the same `serveStatic` the public tree uses, so the
+ * content type and the traversal guard are not re-implemented here.
+ *
+ * Anything else 404s, but behind auth, having already passed the boundary above.
  */
 const handleAdmin = async (
   req: IncomingMessage,
   res: ServerResponse,
   store: Store,
+  siteDir: string,
   pathname: string,
 ): Promise<void> => {
   if (req.method === "GET" && pathname === "/admin") {
@@ -222,6 +292,35 @@ const handleAdmin = async (
       "content-length": Buffer.byteLength(html),
     });
     res.end(html);
+    return;
+  }
+
+  if (req.method === "GET" && pathname === "/admin/client.js") {
+    await serveStatic(res, siteDir, pathname);
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/admin/flag") {
+    let body: unknown;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      sendText(res, 400, "bad request");
+      return;
+    }
+    const request = parseFlagRequest(body);
+    if (request === null) {
+      sendText(res, 400, "bad request");
+      return;
+    }
+    const matched = await store.setModerationFlag(request.uid, request.flag, request.value);
+    if (!matched) {
+      sendText(res, 404, "not found");
+      return;
+    }
+    // Echo the flip back so the client confirms what it applied — the pill and the
+    // Undo it raises revert this exact write (ADR-0024 §7).
+    sendJson(res, 200, { uid: request.uid, flag: request.flag, value: request.value });
     return;
   }
 
@@ -243,7 +342,7 @@ const handle = async (
       sendUnauthorized(res);
       return;
     }
-    await handleAdmin(req, res, store, pathname);
+    await handleAdmin(req, res, store, siteDir, pathname);
     return;
   }
 

@@ -86,6 +86,15 @@ export type VenueEvent = TrackedRecord & {
 };
 
 /**
+ * The two person-set moderation flags, named as a closed union so the one place
+ * that writes them — the store's `setModerationFlag`, reached only past the admin
+ * auth boundary (ADR-0030 §5) — cannot be handed a column that is not a flag. It
+ * is the runtime companion to `Scraped<T>`'s type-level exclusion: `Scraped<T>`
+ * stops a *scrape* naming these, this stops a *toggle route* naming anything else.
+ */
+export type ModerationFlag = "hidden" | "reviewed";
+
+/**
  * A ship berthing at a Singapore cruise terminal. Nobody attends it. Its value
  * to the audience is that it lands thousands of people nearby.
  *
