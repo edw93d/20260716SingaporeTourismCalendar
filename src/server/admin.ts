@@ -87,7 +87,7 @@ const sourceCell = (source: SourceId, describe: SourceDescription): string => {
 
 /**
  * A state cell as a clickable **pill** (#156). The server renders the current
- * state; `site/admin-client.js` attaches the toggle on load, so a click flips the
+ * state; `site/admin/client.js` attaches the toggle on load, so a click flips the
  * flag under the auth boundary and raises an Undo toast. `data-flag` names the
  * `VenueEvent` boolean this pill sets (`reviewed`, or `hidden` for the Shown
  * column) and `data-value` carries that boolean's current value, so the client
@@ -171,7 +171,7 @@ export const renderAdminPage = (
     </tbody>
   </table>
   <script type="module">
-    import { mountAdmin } from "/admin-client.js";
+    import { mountAdmin } from "/admin/client.js";
     mountAdmin(document.body, { fetch: (...args) => window.fetch(...args) });
   </script>
 </body>

@@ -260,18 +260,28 @@ const parseFlagRequest = (body: unknown): FlagRequest | null => {
 };
 
 /**
- * The admin surface, reached only past the boundary (ADR-0030 §5). Two routes:
+ * The admin surface, reached only past the boundary (ADR-0030 §5). Three routes:
  * `GET /admin`, the moderator spreadsheet built live from the store — every
- * `VenueEvent` including the hidden and the unreviewed — and `POST /admin/flag`,
- * the one write path, which flips a single moderation flag on one record. The
- * write names only the flag the operator toggled, so the two flags stay
- * independent and a scrape can touch neither (ADR-0024 §2, `store.setModerationFlag`).
+ * `VenueEvent` including the hidden and the unreviewed; `GET /admin/client.js`,
+ * the browser module that makes the pills toggle; and `POST /admin/flag`, the one
+ * write path, which flips a single moderation flag on one record. The write names
+ * only the flag the operator toggled, so the two flags stay independent and a
+ * scrape can touch neither (ADR-0024 §2, `store.setModerationFlag`).
+ *
+ * The client module is served **from under the admin path on purpose** — every
+ * admin asset sits inside the one guarded subtree, not one file beside it. It
+ * holds no secret, but keeping it here means there is exactly one place where
+ * "public" becomes "operator", which is the property ADR-0030 §5 is spending. It
+ * comes off `siteDir` through the same `serveStatic` the public tree uses, so the
+ * content type and the traversal guard are not re-implemented here.
+ *
  * Anything else 404s, but behind auth, having already passed the boundary above.
  */
 const handleAdmin = async (
   req: IncomingMessage,
   res: ServerResponse,
   store: Store,
+  siteDir: string,
   pathname: string,
 ): Promise<void> => {
   if (req.method === "GET" && pathname === "/admin") {
@@ -282,6 +292,11 @@ const handleAdmin = async (
       "content-length": Buffer.byteLength(html),
     });
     res.end(html);
+    return;
+  }
+
+  if (req.method === "GET" && pathname === "/admin/client.js") {
+    await serveStatic(res, siteDir, pathname);
     return;
   }
 
@@ -327,7 +342,7 @@ const handle = async (
       sendUnauthorized(res);
       return;
     }
-    await handleAdmin(req, res, store, pathname);
+    await handleAdmin(req, res, store, siteDir, pathname);
     return;
   }
 

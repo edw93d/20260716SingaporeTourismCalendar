@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -94,6 +94,8 @@ beforeEach(() => {
   writeFileSync(join(siteDir, "index.html"), "<!doctype html><title>calendar</title>");
   writeFileSync(join(siteDir, "calendar.js"), "export const mountCalendar = () => {};");
   writeFileSync(join(siteDir, "secret.txt"), "must never be served");
+  mkdirSync(join(siteDir, "admin"));
+  writeFileSync(join(siteDir, "admin", "client.js"), "export const mountAdmin = () => {};");
   stop = null;
 });
 
@@ -393,6 +395,27 @@ describe("the admin surface behind Basic Auth (ADR-0030)", () => {
     expect(html).toContain("Bad listing");
     expect(html).toContain("Hidden");
     expect(html).toContain("Unreviewed");
+  });
+
+  it("serves the admin client module under the guard, as JavaScript", async () => {
+    // Every admin asset sits inside the one guarded subtree (ADR-0030 §5) — the
+    // browser module that makes the pills toggle is served from `/admin/client.js`,
+    // reached only past the boundary, exactly like the page and the write route.
+    const base = await serve(fakeStore({ readVenueEvents: notCalled }));
+    const response = await fetch(`${base}/admin/client.js`, {
+      headers: { authorization: basic(ADMIN_SECRET) },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("javascript");
+    expect(await response.text()).toContain("mountAdmin");
+  });
+
+  it("401s the admin client module without credentials — it is not an open asset", async () => {
+    // The one thing that would undo the point of moving it: it must be behind the
+    // boundary, not served open like the public calendar's `calendar.js`.
+    const base = await serve(fakeStore({ readVenueEvents: notCalled }));
+    expect((await fetch(`${base}/admin/client.js`)).status).toBe(401);
   });
 
   it("guards every path under /admin, one level up — before routing or method", async () => {

@@ -21,7 +21,7 @@
   },
   "include": [
     "site/calendar.js",
-    "site/admin-client.js",
+    "site/admin/client.js",
     "tests/calendar.test.ts",
     "tests/admin-client.test.ts"
   ]

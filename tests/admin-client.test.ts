@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { instant } from "../src/domain/instant.js";
 import type { VenueEvent } from "../src/domain/types.js";
 import { renderAdminPage } from "../src/server/admin.js";
-import { mountAdmin } from "../site/admin-client.js";
+import { mountAdmin } from "../site/admin/client.js";
 
 /**
  * **The admin client seam** (#156) — the write half of the moderator page, driven
