@@ -54,11 +54,17 @@ jobs:
       # `gh` normally infers the repository from a checkout's git remote. There
       # is no checkout here, on purpose, so it is named instead.
       GH_REPO: ${{ github.repository }}
-      # The reader's own address. Not the committed copy: the commit-back and the
-      # Pages deploy are separate steps in `daily.yml` that fail separately, and
-      # a watcher reading git would report fresh while every reader saw a frozen
-      # page. Freshness is what a reader actually reaches (CONTEXT.md).
-      CALENDAR_URL: https://edw93d.github.io/20260716SingaporeTourismCalendar/calendar.json
+      # The reader's own address — the `/calendar.json` the always-on server
+      # serves live from the store (#154, ADR-0025 §4), no longer a published
+      # Pages artifact. Freshness is what a reader actually reaches (CONTEXT.md),
+      # and now that is a request the server answers, not a committed file.
+      #
+      # ⚠️ **Host deliberately unresolved.** The deploy host is still deferred
+      # (ADR-0025), so this is an obviously-not-real placeholder — the `.invalid`
+      # TLD is reserved by RFC 2606 and can never resolve. The watcher's cron is
+      # retired above, so nothing dispatches this against the placeholder; when
+      # the host lands, this one line becomes the real address.
+      CALENDAR_URL: https://TBD-HOST.invalid/calendar.json
       # **Two days, and the reasoning is in the test, not here.** One missed run
       # is explicitly tolerated by `daily.yml` ("costs a day of freshness and
       # nothing else — the store is upserted, so the next run heals it"), so the

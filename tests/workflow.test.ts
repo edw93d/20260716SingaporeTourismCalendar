@@ -407,14 +407,16 @@ describe("the freshness watcher", () => {
     expect(threshold).toBeLessThan(afterTwoMisses);
   });
 
-  it("reads the published site over HTTPS, not the repository", () => {
-    // Freshness is what *a reader actually reaches* (CONTEXT.md). The commit-back
-    // and the Pages deploy are separate steps that fail separately, so a watcher
-    // reading the committed file would report fresh while every reader saw a
-    // frozen page. Only the published URL observes the thing end to end.
+  it("reads the served calendar over HTTPS, not the repository", () => {
+    // Freshness is what *a reader actually reaches* (CONTEXT.md). The server now
+    // answers `/calendar.json` live from the store (#154, ADR-0025 §4), so the
+    // watcher reads that request, not a committed file — a watcher reading git
+    // would report fresh while every reader saw a frozen page.
     const body = text(FRESHNESS);
-    expect(body).toMatch(/https:\/\/[a-z0-9-]+\.github\.io\//i);
-    expect(body).toContain("calendar.json");
+    expect(body).toMatch(/CALENDAR_URL:\s*https:\/\/\S+\/calendar\.json/i);
+    // The retired Pages artifact is gone (#147, ADR-0026 §4): the watcher must
+    // not fall back to reading a `github.io` URL that no longer publishes.
+    expect(body).not.toMatch(/github\.io/i);
   });
 });
 

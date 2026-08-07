@@ -72,6 +72,11 @@ const SCHEMA = `
 
   CREATE INDEX IF NOT EXISTS venue_event_end_at ON venue_event (end_at);
   CREATE INDEX IF NOT EXISTS port_call_departure_at ON port_call (departure_at);
+
+  CREATE TABLE IF NOT EXISTS pipeline_run (
+    id      boolean PRIMARY KEY DEFAULT true CHECK (id),
+    ran_at  text    NOT NULL
+  );
 `;
 
 /** The columns that carry what the source published, in serialization order. */
@@ -169,6 +174,27 @@ export type Store = {
   readPortCalls(): Promise<PortCall[]>;
   upsertVenueEvent(scraped: Scraped<VenueEvent>, seenAt: Instant): Promise<void>;
   upsertPortCall(scraped: Scraped<PortCall>, seenAt: Instant): Promise<void>;
+  /**
+   * Stamps the store with the instant this run completed — the payload's
+   * `generatedAt` (ADR-0013, #154). v1 baked it into a committed `calendar.json`;
+   * v2's pipeline publishes nothing and the server builds the payload live, so
+   * the run instant lives here instead, written once per run and read back on
+   * every request.
+   *
+   * **Advances on any completed run, including one that confirmed no source.**
+   * Freshness is a property of the publish, not of any source — reading a
+   * source's `lastSeenAt` instead would freeze the moment a scraper broke and
+   * fire the alarm on a run that published perfectly on time (CONTEXT.md §
+   * Freshness). One marker, overwritten each run — `lastRun` is the latest, not
+   * a log.
+   */
+  recordRun(ranAt: Instant): Promise<void>;
+  /**
+   * The most recent recorded run, or `null` before any run has completed. The
+   * server serves the latter as a payload with no `generatedAt`, which the
+   * freshness alarm reads as *not yet published* rather than as a stale calendar.
+   */
+  lastRun(): Promise<Instant | null>;
   /**
    * Runs `work` as one transaction — so a source either lands whole or not at
    * all (ADR-0025 §5). The `tx` handed in is the same `Store`, bound to the
@@ -275,6 +301,27 @@ const readPortCalls = async (db: Queryable): Promise<PortCall[]> => {
 };
 
 /**
+ * The single-row run-marker. `id` is a constant `true` under a `CHECK (id)` and
+ * `PRIMARY KEY`, so the table holds at most one row — the upsert can conflict on
+ * a fixed key rather than on any run detail, and there is no way to accumulate a
+ * log by accident. Every run overwrites `ran_at`.
+ */
+const recordRun = async (db: Queryable, ranAt: Instant): Promise<void> => {
+  await db.query(
+    `INSERT INTO pipeline_run (id, ran_at) VALUES (true, $1)
+     ON CONFLICT (id) DO UPDATE SET ran_at = EXCLUDED.ran_at`,
+    [ranAt],
+  );
+};
+
+/** The recorded run instant, re-validated on the way out, or `null` if none. */
+const lastRun = async (db: Queryable): Promise<Instant | null> => {
+  const { rows } = await db.query(`SELECT ran_at FROM pipeline_run WHERE id = true`);
+  const row = rows[0];
+  return row === undefined ? null : readInstant(row["ran_at"]);
+};
+
+/**
  * The store bound to one `Queryable` — the pool, or a transaction's client.
  *
  * The `transact` handed in is the pool-level one, so a `tx.transact(...)` called
@@ -288,6 +335,8 @@ const storeOver = (db: Queryable, transact: Store["transact"]): Store => ({
   readPortCalls: () => readPortCalls(db),
   upsertVenueEvent: (scraped, seenAt) => upsert(db, VENUE_EVENT, scraped, seenAt),
   upsertPortCall: (scraped, seenAt) => upsert(db, PORT_CALL, scraped, seenAt),
+  recordRun: (ranAt) => recordRun(db, ranAt),
+  lastRun: () => lastRun(db),
   transact,
   close: async () => {},
 });

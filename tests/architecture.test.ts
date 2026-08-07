@@ -86,7 +86,7 @@ describe("the source tree", () => {
     expect(identifiersOnly('const url = "/visit-events"; let event = 1;')).toMatch(/\bevent\b/);
   });
 
-  it("reads the environment in exactly one place — the entry point", () => {
+  it("reads the environment only in the entry points", () => {
     // v1 read no environment at all: everything authenticated with GITHUB_TOKEN
     // inside the workflow. ADR-0025 spends that zero-credentials property — v2
     // holds a Postgres connection string — but keeps its *shape*: the credential
@@ -94,8 +94,16 @@ describe("the source tree", () => {
     // is constructed in exactly one place below. A second `process.env` read is
     // how a default this rule removed grows back — some module deciding for its
     // callers which database they meant to reach.
+    //
+    // There are two entry points, not one: `main.ts` (the daily run) and
+    // `serve.ts` (the public read surface, #154, ADR-0025 §4). Both legitimately
+    // name the connection string; the rule guards *modules* against reaching for
+    // the environment, never the entry points that inject into them.
     const offenders = files
-      .filter(({ path, code }) => path !== "main.ts" && /process\.env/.test(code))
+      .filter(
+        ({ path, code }) =>
+          path !== "main.ts" && path !== "serve.ts" && /process\.env/.test(code),
+      )
       .map(({ path }) => path);
 
     expect(offenders).toEqual([]);

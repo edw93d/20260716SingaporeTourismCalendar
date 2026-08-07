@@ -18,7 +18,13 @@
  */
 export const DB_PATH = "data/calendar.sqlite";
 
-/** The Pages artifact root: the static shell plus the generated feeds under it. */
+/**
+ * The static site root: the committed shell (`index.html`, `calendar.js`) plus
+ * the generated feeds under it. It is what `daily.yml` uploads to Pages on a
+ * manual dispatch, and — since #154 — the directory the always-on server serves
+ * its static tree from (`src/serve.ts`, `src/server/server.ts`). The one root,
+ * two readers.
+ */
 export const SITE_DIR = "site";
 
 /**
