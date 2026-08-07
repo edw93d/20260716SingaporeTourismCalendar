@@ -138,6 +138,16 @@ const storedPortCalls = async () => {
   }
 };
 
+/** The run-marker the pipeline stamps, read back the way the server would. */
+const storedLastRun = async () => {
+  const store = await openStore(schema.connectionString);
+  try {
+    return await store.lastRun();
+  } finally {
+    await store.close();
+  }
+};
+
 /** A raw client on this test's schema, for the SQL a store method deliberately cannot express. */
 const withClient = async <T>(work: (client: Client) => Promise<T>): Promise<T> => {
   const client = new Client({ connectionString: schema.connectionString });
@@ -442,6 +452,38 @@ describe("parse outcomes", () => {
     expect(await storedVenueEvents()).toHaveLength(1);
   });
 
+});
+
+describe("the run-marker (#154, ADR-0013)", () => {
+  it("stamps the run instant so the served payload carries a live generatedAt", async () => {
+    await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
+    expect(await storedLastRun()).toBe(instant(RUN_ONE));
+  });
+
+  it("advances the marker even when every source is unreadable", async () => {
+    // Freshness is a property of the publish, not of any source: a run in which
+    // every scraper broke still ran to completion and published on time, so the
+    // marker must advance and the alarm stay quiet. A marker read off a source's
+    // `lastSeenAt` would freeze here and fire on a calendar that ran perfectly.
+    const unreadable = (key: SourceId): Source<VenueEvent> => ({
+      key,
+      fetch: async () => {
+        throw new Error("connect ETIMEDOUT");
+      },
+      parse: () => ({ ok: true, records: [], failures: [] }),
+    });
+
+    const { outcomes } = await run([unreadable("suntec"), unreadable("scc")], RUN_TWO);
+
+    expect(outcomes.every((outcome) => !outcome.ok)).toBe(true);
+    expect(await storedLastRun()).toBe(instant(RUN_TWO));
+  });
+
+  it("advances the marker to the newest run across runs", async () => {
+    await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
+    await run([venueSourceOf("suntec", [bniVision()])], RUN_THREE);
+    expect(await storedLastRun()).toBe(instant(RUN_THREE));
+  });
 });
 
 describe("retention", () => {

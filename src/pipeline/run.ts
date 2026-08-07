@@ -138,6 +138,15 @@ export const runPipeline = async ({
       breakage.push({ source: source.key, signals });
     }
 
+    // Stamp the run **unconditionally**, after every source has been read — the
+    // payload's `generatedAt` (ADR-0013, #154). Freshness is a property of the
+    // publish, not of any source: a run that completed having confirmed no source
+    // at all still published on time, and must advance the marker so the alarm
+    // stays quiet. Reading a source's `lastSeenAt` instead would freeze the moment
+    // a scraper broke and fire on a calendar that ran perfectly (CONTEXT.md §
+    // Freshness). Written last so the marker means "the run reached its end".
+    await store.recordRun(ranAt);
+
     return { ranAt, outcomes, breakage };
   } finally {
     await store.close();

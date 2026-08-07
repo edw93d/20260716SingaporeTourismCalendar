@@ -1818,6 +1818,20 @@ describe("the page chrome (#79, ADR-0014 §2 and §3)", () => {
     const notes = footer.match(/<p class="note">([\s\S]*?)<\/p>/)?.[1] ?? "";
     expect(notes.trim()).toMatch(/Days shown in Singapore time\.$/);
   });
+
+  it("carries the accuracy caveat in the methodology notes (ADR-0029 §2)", () => {
+    // One generic sentence — no source names — sitting beside the freshness,
+    // coverage and facts-only caveats already there, on §2's "disclosed, not
+    // surfaced" footing. It precedes the Singapore-time caption, so that caption
+    // stays the footer's last line (the test above).
+    const notes = footer.match(/<p class="note">([\s\S]*?)<\/p>/)?.[1] ?? "";
+    expect(notes).toContain(
+      "Collected automatically from public listings; may be inaccurate — check with the venue.",
+    );
+    expect(notes.indexOf("may be inaccurate")).toBeLessThan(
+      notes.indexOf("Days shown in Singapore time."),
+    );
+  });
 });
 
 describe("per-source freshness disclosure (#40)", () => {
