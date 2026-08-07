@@ -1,6 +1,6 @@
 import { toDate } from "../domain/instant.js";
 import type { Instant } from "../domain/instant.js";
-import type { SourceId, VenueEvent } from "../domain/types.js";
+import type { ModerationFlag, SourceId, VenueEvent } from "../domain/types.js";
 
 /**
  * The moderator spreadsheet's markup, built from the store's `VenueEvent[]`
@@ -85,10 +85,23 @@ const sourceCell = (source: SourceId, describe: SourceDescription): string => {
   return `<span title="${escapeHtml(description)}">${escapeHtml(source)}</span>`;
 };
 
-const stateCell = (reviewed: boolean): string =>
-  reviewed ? "Reviewed" : "Unreviewed";
+/**
+ * A state cell as a clickable **pill** (#156). The server renders the current
+ * state; `site/admin-client.js` attaches the toggle on load, so a click flips the
+ * flag under the auth boundary and raises an Undo toast. `data-flag` names the
+ * `VenueEvent` boolean this pill sets (`reviewed`, or `hidden` for the Shown
+ * column) and `data-value` carries that boolean's current value, so the client
+ * knows which way to flip without re-reading the label. The button's text is the
+ * same state word #155 rendered, so the read-only story survives without JS: the
+ * flags are still legible, just not yet toggleable.
+ */
+const pill = (flag: ModerationFlag, value: boolean, label: string): string =>
+  `<button type="button" class="pill" data-flag="${flag}" data-value="${value}" aria-pressed="${value}">${label}</button>`;
 
-const shownCell = (hidden: boolean): string => (hidden ? "Hidden" : "Shown");
+const reviewPill = (reviewed: boolean): string =>
+  pill("reviewed", reviewed, reviewed ? "Reviewed" : "Unreviewed");
+
+const shownPill = (hidden: boolean): string => pill("hidden", hidden, hidden ? "Hidden" : "Shown");
 
 const row = (record: VenueEvent, describe: SourceDescription): string => `
       <tr data-uid="${escapeHtml(record.uid)}">
@@ -97,8 +110,8 @@ const row = (record: VenueEvent, describe: SourceDescription): string => `
         <td class="venue">${escapeHtml(record.venue)}</td>
         <td class="start">${formatSgt(record.start)}</td>
         <td class="end">${formatSgt(record.end)}</td>
-        <td class="review-state">${stateCell(record.reviewed)}</td>
-        <td class="shown-state">${shownCell(record.hidden)}</td>
+        <td class="review-state">${reviewPill(record.reviewed)}</td>
+        <td class="shown-state">${shownPill(record.hidden)}</td>
       </tr>`;
 
 const STYLE = `
@@ -108,7 +121,16 @@ const STYLE = `
     th, td { border: 1px solid #ddd; padding: 4px 8px; text-align: left; vertical-align: top; }
     th { background: #f5f5f5; position: sticky; top: 0; }
     .source span { cursor: help; border-bottom: 1px dotted #999; }
-    caption { text-align: left; color: #666; padding-bottom: 0.5rem; }`;
+    caption { text-align: left; color: #666; padding-bottom: 0.5rem; }
+    .pill { font: inherit; cursor: pointer; border: 1px solid #bbb; border-radius: 999px;
+      padding: 1px 10px; background: #fff; color: inherit; }
+    .pill[aria-pressed="true"] { background: #111; color: #fff; border-color: #111; }
+    .pill[disabled] { opacity: 0.5; cursor: progress; }
+    .toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%);
+      background: #111; color: #fff; padding: 8px 14px; border-radius: 6px;
+      display: flex; gap: 12px; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    .toast button { font: inherit; color: #7db4ff; background: none; border: none;
+      cursor: pointer; text-decoration: underline; padding: 0; }`;
 
 /**
  * Renders the read-only moderator spreadsheet as a whole HTML document. The
@@ -148,6 +170,10 @@ export const renderAdminPage = (
     <tbody>${rows}
     </tbody>
   </table>
+  <script type="module">
+    import { mountAdmin } from "/admin-client.js";
+    mountAdmin(document.body, { fetch: (...args) => window.fetch(...args) });
+  </script>
 </body>
 </html>
 `;

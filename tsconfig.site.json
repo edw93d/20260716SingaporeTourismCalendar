@@ -19,5 +19,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["site/calendar.js", "tests/calendar.test.ts"]
+  "include": [
+    "site/calendar.js",
+    "site/admin-client.js",
+    "tests/calendar.test.ts",
+    "tests/admin-client.test.ts"
+  ]
 }

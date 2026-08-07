@@ -75,6 +75,7 @@ const fakeStore = (over: Partial<Store>): Store => ({
   lastRun: async () => null,
   upsertVenueEvent: notCalled,
   upsertPortCall: notCalled,
+  setModerationFlag: notCalled,
   recordRun: notCalled,
   transact: notCalled,
   close: async () => {},
@@ -158,6 +159,133 @@ describe("GET /calendar.json", () => {
     const base = await serve(fakeStore({ lastRun: async () => instant("2026-08-06T02:00:00Z") }));
     const response = await fetch(`${base}/calendar.json`);
     expect(response.status).toBe(200);
+  });
+
+  it("filters hidden VenueEvents out before projection, leaving the payload's shape intact", async () => {
+    // Hide-before-projection (ADR-0024 §8, #156): a hidden record is dropped on
+    // the *public* read, so it disappears from the calendar on the very next live
+    // read — reversibly, since the store keeps the row. The payload's shape does
+    // not change: it is still `venueEvents`/`portCalls`, just one shorter.
+    const base = await serve(
+      fakeStore({
+        readVenueEvents: async () => [
+          bniVision(),
+          { ...bniVision(), uid: "uid-hidden", name: "Cleaned away", hidden: true },
+        ],
+        readPortCalls: async () => [odyssey()],
+        lastRun: async () => instant("2026-08-06T02:00:00Z"),
+      }),
+    );
+
+    const payload = (await (await fetch(`${base}/calendar.json`)).json()) as SitePayload;
+
+    expect(payload.venueEvents).toMatchObject([{ summary: "BNI Vision" }]);
+    expect(JSON.stringify(payload)).not.toContain("Cleaned away");
+    // The port call is untouched — hiding is a VenueEvent-only property (ADR-0024 §2).
+    expect(payload.portCalls).toHaveLength(1);
+  });
+});
+
+describe("POST /admin/flag — the toggle write route (#156, ADR-0024)", () => {
+  /** A store that records every flag write, so the route's exact call is asserted. */
+  type Toggle = { uid: string; flag: "hidden" | "reviewed"; value: boolean };
+  const recordingStore = (matched: boolean) => {
+    const calls: Toggle[] = [];
+    const store = fakeStore({
+      setModerationFlag: async (uid, flag, value) => {
+        calls.push({ uid, flag, value });
+        return matched;
+      },
+    });
+    return { store, calls };
+  };
+
+  const post = (base: string, body: unknown, auth = basic(ADMIN_SECRET)): Promise<Response> =>
+    fetch(`${base}/admin/flag`, {
+      method: "POST",
+      headers: { authorization: auth, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  it("401s without credentials — the write path is behind the one boundary", async () => {
+    // The guard sits one level up (ADR-0030 §5), so it covers this write route
+    // before the store is ever reached — the recorder throws if it is.
+    const { store } = recordingStore(true);
+    const base = await serve(store);
+    const response = await fetch(`${base}/admin/flag`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ uid: "u", flag: "hidden", value: true }),
+    });
+    expect(response.status).toBe(401);
+  });
+
+  it("flips hidden and echoes the write back", async () => {
+    const { store, calls } = recordingStore(true);
+    const base = await serve(store);
+
+    const response = await post(base, { uid: "uid-ve-1", flag: "hidden", value: true });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ uid: "uid-ve-1", flag: "hidden", value: true });
+    expect(calls).toEqual([{ uid: "uid-ve-1", flag: "hidden", value: true }]);
+  });
+
+  it("flips reviewed independently — the store is asked for exactly that flag", async () => {
+    // Independence (ADR-0024 §2): the route names only the flag it was told to,
+    // so marking reviewed cannot touch hidden and vice versa.
+    const { store, calls } = recordingStore(true);
+    const base = await serve(store);
+
+    await post(base, { uid: "uid-ve-1", flag: "reviewed", value: true });
+
+    expect(calls).toEqual([{ uid: "uid-ve-1", flag: "reviewed", value: true }]);
+  });
+
+  it("reverts on the opposite value — the write is genuinely reversible", async () => {
+    // Undo is the same route with the flipped value (ADR-0024 §7). Two calls, the
+    // second the exact inverse of the first, and the store keeps the row between.
+    const { store, calls } = recordingStore(true);
+    const base = await serve(store);
+
+    await post(base, { uid: "u", flag: "hidden", value: true });
+    await post(base, { uid: "u", flag: "hidden", value: false });
+
+    expect(calls).toEqual([
+      { uid: "u", flag: "hidden", value: true },
+      { uid: "u", flag: "hidden", value: false },
+    ]);
+  });
+
+  it("404s an unknown uid rather than reporting a phantom success", async () => {
+    const { store } = recordingStore(false);
+    const base = await serve(store);
+    const response = await post(base, { uid: "nope", flag: "hidden", value: true });
+    expect(response.status).toBe(404);
+  });
+
+  it("400s a body naming a column that is not a moderation flag", async () => {
+    // The store is never reached — an unknown flag is rejected at the route, so no
+    // request can ask the SQL to write an arbitrary column.
+    const base = await serve(fakeStore({ setModerationFlag: notCalled }));
+    const response = await post(base, { uid: "u", flag: "sequence", value: true });
+    expect(response.status).toBe(400);
+  });
+
+  it("400s a non-boolean value and a missing uid", async () => {
+    const base = await serve(fakeStore({ setModerationFlag: notCalled }));
+    expect((await post(base, { uid: "u", flag: "hidden", value: "yes" })).status).toBe(400);
+    expect((await post(base, { flag: "hidden", value: true })).status).toBe(400);
+  });
+
+  it("400s a malformed JSON body", async () => {
+    const base = await serve(fakeStore({ setModerationFlag: notCalled }));
+    const response = await fetch(`${base}/admin/flag`, {
+      method: "POST",
+      headers: { authorization: basic(ADMIN_SECRET), "content-type": "application/json" },
+      body: "{ not json",
+    });
+    expect(response.status).toBe(400);
   });
 });
 

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import { instant, type Instant } from "../domain/instant.js";
-import type { PortCall, Scraped, Terminal, VenueEvent } from "../domain/types.js";
+import type { ModerationFlag, PortCall, Scraped, Terminal, VenueEvent } from "../domain/types.js";
 
 /**
  * The pipeline's memory — a hosted Postgres reached over an injected connection
@@ -201,6 +201,22 @@ export type Store = {
   upsertVenueEvent(scraped: Scraped<VenueEvent>, seenAt: Instant): Promise<void>;
   upsertPortCall(scraped: Scraped<PortCall>, seenAt: Instant): Promise<void>;
   /**
+   * Sets one moderation flag on the `VenueEvent` with this `uid` to `value`
+   * (ADR-0024, ADR-0030; #156). This is the **only** write that touches a
+   * moderation column — the upsert names none of them — so a person's judgement
+   * and a scrape's content can never overwrite one another.
+   *
+   * The two flags are **independent**: this sets exactly the one named and leaves
+   * the other untouched, so hiding never implies reviewed (ADR-0024 §2). It is
+   * genuinely reversible — the same call with the opposite `value` restores the
+   * prior state, minting and retiring nothing (ADR-0024 §7).
+   *
+   * Returns whether a row matched: `false` is an unknown `uid`, which the toggle
+   * route answers as a 404 rather than a silent success. `PortCall` carries no
+   * flags, so there is deliberately no port-call counterpart (ADR-0024 §2).
+   */
+  setModerationFlag(uid: string, flag: ModerationFlag, value: boolean): Promise<boolean>;
+  /**
    * Stamps the store with the instant this run completed — the payload's
    * `generatedAt` (ADR-0013, #154). v1 baked it into a committed `calendar.json`;
    * v2's pipeline publishes nothing and the server builds the payload live, so
@@ -329,6 +345,40 @@ const readPortCalls = async (db: Queryable): Promise<PortCall[]> => {
 };
 
 /**
+ * The flag name mapped to its column, an **allowlist**: the only two strings that
+ * ever reach the SQL below, so the column is never interpolated from anything a
+ * request supplied. `ModerationFlag` already bounds the type; this bounds the
+ * value at runtime too, because the string arrives from an HTTP body the type
+ * system never saw. An unknown flag throws rather than building a statement.
+ */
+const MODERATION_COLUMN: Record<ModerationFlag, string> = {
+  hidden: "hidden",
+  reviewed: "reviewed",
+};
+
+/**
+ * Flips one moderation flag on one `VenueEvent`, by `uid`. A single-column
+ * `UPDATE` — it names only the one flag, so the other stays exactly as it was
+ * (independence, ADR-0024 §2). `RETURNING uid` lets the caller tell a real toggle
+ * from an unknown `uid` (no row → `false` → the route's 404) without a second
+ * round trip.
+ */
+const setModerationFlag = async (
+  db: Queryable,
+  uid: string,
+  flag: ModerationFlag,
+  value: boolean,
+): Promise<boolean> => {
+  const column = MODERATION_COLUMN[flag];
+  if (column === undefined) throw new Error(`Not a moderation flag: ${JSON.stringify(flag)}.`);
+  const { rows } = await db.query(
+    `UPDATE venue_event SET ${column} = $1 WHERE uid = $2 RETURNING uid`,
+    [value, uid],
+  );
+  return rows.length > 0;
+};
+
+/**
  * The single-row run-marker. `id` is a constant `true` under a `CHECK (id)` and
  * `PRIMARY KEY`, so the table holds at most one row — the upsert can conflict on
  * a fixed key rather than on any run detail, and there is no way to accumulate a
@@ -363,6 +413,7 @@ const storeOver = (db: Queryable, transact: Store["transact"]): Store => ({
   readPortCalls: () => readPortCalls(db),
   upsertVenueEvent: (scraped, seenAt) => upsert(db, VENUE_EVENT, scraped, seenAt),
   upsertPortCall: (scraped, seenAt) => upsert(db, PORT_CALL, scraped, seenAt),
+  setModerationFlag: (uid, flag, value) => setModerationFlag(db, uid, flag, value),
   recordRun: (ranAt) => recordRun(db, ranAt),
   lastRun: () => lastRun(db),
   transact,
