@@ -25,6 +25,8 @@ const venueEvent = (overrides: Partial<VenueEvent> = {}): VenueEvent => ({
   end: instant("2026-07-17T10:00:00Z"),
   venue: "Suntec Convention Centre",
   hall: "Level 4, Hall 404",
+  hidden: false,
+  reviewed: false,
   firstSeenAt: instant("2026-07-01T02:00:00Z"),
   lastSeenAt: instant("2026-07-01T02:00:00Z"),
   ...overrides,

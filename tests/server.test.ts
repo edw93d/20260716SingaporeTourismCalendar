@@ -33,6 +33,8 @@ const bniVision = (): VenueEvent => ({
   end: instant("2026-07-17T10:00:00Z"),
   venue: "Suntec Convention Centre",
   hall: "Level 4, Hall 404",
+  hidden: false,
+  reviewed: false,
   firstSeenAt: instant("2026-07-01T02:00:00Z"),
   lastSeenAt: instant("2026-07-01T02:00:00Z"),
 });
@@ -54,6 +56,13 @@ const odyssey = (): PortCall => ({
 const notCalled = (): never => {
   throw new Error("the server must not reach this store method");
 };
+
+/** The injected admin secret — a long random token, as ADR-0030 §3 requires. */
+const ADMIN_SECRET = "T0k3n-long-random-do-not-guess-9f2a1c";
+
+/** A Basic Auth header. The username is fixed and ignored (ADR-0030 §3). */
+const basic = (password: string, user = "admin"): string =>
+  `Basic ${Buffer.from(`${user}:${password}`).toString("base64")}`;
 
 /**
  * A store the server reads and nothing more. It calls exactly three methods —
@@ -94,7 +103,7 @@ afterEach(async () => {
 
 /** Starts the server on an ephemeral port and returns its base URL. */
 const serve = async (store: Store): Promise<string> => {
-  const server = createCalendarServer({ store, siteDir });
+  const server = createCalendarServer({ store, siteDir, adminPassword: ADMIN_SECRET });
   await new Promise<void>((ready) => server.listen(0, "127.0.0.1", ready));
   stop = () => new Promise<void>((closed) => server.close(() => closed()));
   const { port } = server.address() as AddressInfo;
@@ -202,5 +211,79 @@ describe("safety", () => {
     const base = await serve(fakeStore({}));
     const response = await fetch(`${base}/calendar.json`, { method: "POST" });
     expect(response.status).toBe(405);
+  });
+});
+
+describe("the admin surface behind Basic Auth (ADR-0030)", () => {
+  it("401s a request with no credentials, and asks for Basic Auth", async () => {
+    // The boundary: a stranger who loads the admin page is refused before any
+    // row is read. The `WWW-Authenticate` header is what makes the browser prompt.
+    const base = await serve(fakeStore({ readVenueEvents: notCalled }));
+    const response = await fetch(`${base}/admin`);
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("www-authenticate")).toMatch(/^Basic/);
+  });
+
+  it("401s a wrong secret", async () => {
+    const base = await serve(fakeStore({ readVenueEvents: notCalled }));
+    const response = await fetch(`${base}/admin`, {
+      headers: { authorization: basic("wrong-secret") },
+    });
+    expect(response.status).toBe(401);
+  });
+
+  it("lets the right secret through, and ignores the username", async () => {
+    // Only the password is the secret; the username is fixed and ignored — so a
+    // different username with the right password still reaches the surface.
+    const base = await serve(fakeStore({ readVenueEvents: async () => [bniVision()] }));
+    const response = await fetch(`${base}/admin`, {
+      headers: { authorization: basic(ADMIN_SECRET, "anyone") },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(await response.text()).toContain("BNI Vision");
+  });
+
+  it("renders every VenueEvent, including hidden and unreviewed rows", async () => {
+    // The admin read shows what the public projection filters — the difference
+    // between public and operator is the auth guard, not the query (ADR-0030 §5).
+    const base = await serve(
+      fakeStore({
+        readVenueEvents: async () => [
+          bniVision(),
+          { ...bniVision(), uid: "uid-hidden", name: "Bad listing", hidden: true, reviewed: false },
+        ],
+      }),
+    );
+    const response = await fetch(`${base}/admin`, {
+      headers: { authorization: basic(ADMIN_SECRET) },
+    });
+    const html = await response.text();
+
+    expect(html).toContain("Bad listing");
+    expect(html).toContain("Hidden");
+    expect(html).toContain("Unreviewed");
+  });
+
+  it("guards every path under /admin, one level up — before routing or method", async () => {
+    // The boundary wraps the whole admin subtree so every future write route is
+    // covered by the same middleware, not a second line to keep in sync. A path
+    // that does not exist yet still 401s without the secret, rather than 404ing.
+    const base = await serve(fakeStore({ readVenueEvents: notCalled }));
+
+    expect((await fetch(`${base}/admin/anything`)).status).toBe(401);
+    expect(
+      (await fetch(`${base}/admin/write`, { method: "POST" })).status,
+    ).toBe(401);
+  });
+
+  it("leaves the public calendar read open even though /admin is guarded", async () => {
+    // One boundary moves from public to operator; the calendar read is not behind it.
+    const base = await serve(fakeStore({ lastRun: async () => instant("2026-08-06T02:00:00Z") }));
+
+    expect((await fetch(`${base}/calendar.json`)).status).toBe(200);
+    expect((await fetch(`${base}/`)).status).toBe(200);
   });
 });

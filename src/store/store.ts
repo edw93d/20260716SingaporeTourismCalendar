@@ -50,10 +50,22 @@ const SCHEMA = `
     end_at        text    NOT NULL,
     venue         text    NOT NULL,
     hall          text,
+    hidden        boolean NOT NULL DEFAULT false,
+    reviewed      boolean NOT NULL DEFAULT false,
     first_seen_at text    NOT NULL,
     last_seen_at  text    NOT NULL,
     PRIMARY KEY (source, source_key)
   );
+
+  -- The two moderation flags (ADR-0024, ADR-0030; #155 reads them, #156 writes
+  -- them). Added out of line as well as in the CREATE above so a store migrated
+  -- from v1 -- whose table predates these columns -- gains them on the next open;
+  -- IF NOT EXISTS makes that a no-op on a table that already has them. They
+  -- default to their not-set value and port_call gets neither. The upsert never
+  -- names them (its SET clause is spec.content only), so a scrape can neither
+  -- set nor clear a person's judgement.
+  ALTER TABLE venue_event ADD COLUMN IF NOT EXISTS hidden   boolean NOT NULL DEFAULT false;
+  ALTER TABLE venue_event ADD COLUMN IF NOT EXISTS reviewed boolean NOT NULL DEFAULT false;
 
   CREATE TABLE IF NOT EXISTS port_call (
     source        text    NOT NULL,
@@ -112,7 +124,8 @@ export const PORT_CALL: TableSpec<PortCall> = {
 /** Every content field is a string or an absent value, which is what lets one upsert serve both types. */
 type StoredValue = string | null;
 
-type Row = Record<string, StoredValue | number>;
+/** A read row. `boolean` for the moderation flag columns, alongside text and the integer `sequence`. */
+type Row = Record<string, StoredValue | number | boolean>;
 
 /** Both a `Pool` and a transaction-bound `PoolClient` answer this — the store is written once against it. */
 type Queryable = {
@@ -149,6 +162,19 @@ const optionalText = (value: unknown): string | null =>
 const readNumber = (value: unknown): number => {
   if (typeof value !== "number" || !Number.isInteger(value)) {
     throw new Error(`Expected a stored integer, found ${JSON.stringify(value)}.`);
+  }
+  return value;
+};
+
+/**
+ * A stored boolean read as a parse, not a cast — the `NOT NULL DEFAULT false`
+ * flag columns. `pg` maps a Postgres `boolean` to a JS boolean, so anything else
+ * is a column that arrived malformed (a bad migration, a hand-edit), which must
+ * not reach the admin table as a truthy `"f"` string.
+ */
+const readBoolean = (value: unknown): boolean => {
+  if (typeof value !== "boolean") {
+    throw new Error(`Expected a stored boolean, found ${JSON.stringify(value)}.`);
   }
   return value;
 };
@@ -285,6 +311,8 @@ const readVenueEvents = async (db: Queryable): Promise<VenueEvent[]> => {
     end: readInstant(row["end_at"]),
     venue: readText(row["venue"]),
     hall: optionalText(row["hall"]),
+    hidden: readBoolean(row["hidden"]),
+    reviewed: readBoolean(row["reviewed"]),
   }));
 };
 

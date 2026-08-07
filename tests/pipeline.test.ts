@@ -247,18 +247,15 @@ describe("per-source transactions", () => {
 
 describe("the upsert writes only the fields Scraped<T> carries", () => {
   it("never clobbers a person-set column a scrape does not own", async () => {
-    // ⚠️ The one storage-shaped trap on the ticket (ADR-0025 §5). #4 adds a
-    // person-set `hidden` flag; a scrape that overwrote it would silently un-do
-    // every moderation judgement on the next run. `hidden` does not exist yet, so
-    // this simulates it: add the column, hide a record, then re-scrape it with
-    // changed content. The upsert's SET clause names only content, sequence and
-    // last_seen_at — so `hidden` must survive untouched while the content moves.
-    // A `SELECT *`-style write, or one that widened the column list, fails here.
+    // ⚠️ The one storage-shaped trap on the ticket (ADR-0025 §5). The person-set
+    // `hidden` flag (#155) is a real column now; a scrape that overwrote it would
+    // silently un-do every moderation judgement on the next run. So: scrape a
+    // record, hide it by hand, then re-scrape it with changed content. The
+    // upsert's SET clause names only content, sequence and last_seen_at — so
+    // `hidden` must survive untouched while the content moves. A `SELECT *`-style
+    // write, or one that widened the column list, fails here.
     await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
 
-    await withClient((client) =>
-      client.query(`ALTER TABLE venue_event ADD COLUMN hidden boolean NOT NULL DEFAULT false`),
-    );
     await withClient((client) => client.query(`UPDATE venue_event SET hidden = true`));
 
     await run([venueSourceOf("suntec", [bniVision({ name: "BNI Vision 2026" })])], RUN_TWO);
@@ -272,6 +269,26 @@ describe("the upsert writes only the fields Scraped<T> carries", () => {
     expect(hidden).toBe(true);
     expect(after?.name).toBe("BNI Vision 2026");
     expect(after?.sequence).toBe(1);
+  });
+
+  it("reads both flags back as independent booleans (#155)", async () => {
+    // The read side #155 adds: the admin table is built from `readVenueEvents`,
+    // so a stored flag must surface as a real boolean, not a `"t"`/`"f"` string,
+    // and the two must be independent — a hidden record is not thereby reviewed.
+    // A fresh scrape arrives unmoderated (both false); set them apart by hand.
+    await run([venueSourceOf("suntec", [bniVision()])], RUN_ONE);
+
+    const [fresh] = await storedVenueEvents();
+    expect(fresh?.hidden).toBe(false);
+    expect(fresh?.reviewed).toBe(false);
+
+    await withClient((client) =>
+      client.query(`UPDATE venue_event SET hidden = true, reviewed = false`),
+    );
+
+    const [moderated] = await storedVenueEvents();
+    expect(moderated?.hidden).toBe(true);
+    expect(moderated?.reviewed).toBe(false);
   });
 });
 
@@ -776,6 +793,10 @@ describe("migration from v1", () => {
         end: "2026-07-17T10:00:00Z",
         venue: "Suntec Convention Centre",
         hall: "Level 4, Hall 404",
+        // A migrated record arrives unmoderated: the flags default to not-set,
+        // and the migration's column-copy names neither (src/store/migrate.ts).
+        hidden: false,
+        reviewed: false,
         firstSeenAt: "2026-01-02T02:00:00Z",
         lastSeenAt: "2026-07-01T02:00:00Z",
       },
