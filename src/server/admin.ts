@@ -8,12 +8,17 @@ import type { ModerationFlag, SourceId, VenueEvent } from "../domain/types.js";
  * record, every record, including the hidden and the unreviewed: the admin read
  * shows everything the public projection filters, because the boundary between
  * public and operator is the auth guard in front of this page (ADR-0030 §5), not
- * what the query returns. The state pills, the funnel filters and the hand-entry
- * form are later tickets (#156/#157/#158); this proves the boundary and the table.
+ * what the query returns. The state pills toggle (#156) and the whole table
+ * filters, sorts and bulk-moderates (#157) once `site/admin/client.js` attaches;
+ * the hand-entry form is a later ticket (#158).
  *
- * It is a **pure function of its inputs** so the column set, the SGT surfacing and
- * the escaping are pinned without a socket (`tests/admin.test.ts`); the request
- * handler passes the store's rows and a lookup for the ADR-0020 descriptions.
+ * The rendering stays a **pure function of its inputs**, and carries the client's
+ * behaviour as **data on the markup** rather than as logic here: each date cell's
+ * `data-facet`/`data-sort` and each header's `data-key`/`data-funnel` are what let
+ * a generic grid client filter and sort without the server shipping any script.
+ * The column set, the SGT surfacing and the escaping are pinned without a socket
+ * (`tests/admin.test.ts`); the request handler passes the store's rows and a
+ * lookup for the ADR-0020 descriptions.
  */
 
 /** Resolves a source's admin-facing description (ADR-0020) — absent for `manual`. */
@@ -38,6 +43,19 @@ const sgtTime = new Intl.DateTimeFormat("en-GB", {
   hour: "2-digit",
   minute: "2-digit",
   hour12: false,
+});
+
+/**
+ * The SGT month a record falls in, as `Jul 2026` — the value the Start/End funnel
+ * filters group by (#157). Excel-style date funnels group by month rather than by
+ * the per-minute cell value, so "one venue in one month across all sources" is one
+ * checkbox, not thirty. Fixed to the Singapore zone like the other two, so a
+ * record's month is the month the moderator reads it in, not UTC's.
+ */
+const sgtMonth = new Intl.DateTimeFormat("en-GB", {
+  timeZone: SINGAPORE,
+  month: "short",
+  year: "numeric",
 });
 
 /**
@@ -103,13 +121,52 @@ const reviewPill = (reviewed: boolean): string =>
 
 const shownPill = (hidden: boolean): string => pill("hidden", hidden, hidden ? "Hidden" : "Shown");
 
+/**
+ * A date cell, carrying the two keys the client's grid reads off the DOM (#157)
+ * alongside the human-readable SGT text: `data-facet` is the **month** the funnel
+ * filter groups by, and `data-sort` is the instant as **epoch milliseconds** so a
+ * click-label sort orders chronologically rather than by the alphabetised
+ * display string. Epoch ms is a display-neutral key — it never surfaces the stored
+ * UTC wall-clock the SGT text deliberately hides.
+ */
+const dateCell = (value: Instant, className: string): string => {
+  const at = toDate(value);
+  return `<td class="${className}" data-facet="${sgtMonth.format(at)}" data-sort="${at.getTime()}">${formatSgt(value)}</td>`;
+};
+
+/**
+ * The columns, in order — the label the header shows, the stable `key` the client
+ * addresses a column by (for sort and for reading each row's cell), and whether
+ * the column carries a **funnel filter** (#157). Every column is sortable by its
+ * label; only some are worth funnelling. `Event` is deliberately not funnelled —
+ * it is free text with ~one distinct value per row, so a funnel of it would list
+ * the whole table and filter nothing useful. The client injects the funnel control
+ * into a `[data-funnel]` header on load, so a header renders as plain, legible text
+ * without JS rather than as a dead control.
+ */
+const HEADERS: ReadonlyArray<{ label: string; key: string; funnel: boolean }> = [
+  { label: "Source", key: "source", funnel: true },
+  { label: "Event", key: "name", funnel: false },
+  { label: "Venue", key: "venue", funnel: true },
+  { label: "Start (SGT)", key: "start", funnel: true },
+  { label: "End (SGT)", key: "end", funnel: true },
+  { label: "Review state", key: "reviewed", funnel: true },
+  { label: "Shown on calendar", key: "hidden", funnel: true },
+];
+
+const headerCells = (): string =>
+  HEADERS.map(
+    ({ label, key, funnel }) =>
+      `<th data-key="${key}"${funnel ? " data-funnel" : ""}>${escapeHtml(label)}</th>`,
+  ).join("\n        ");
+
 const row = (record: VenueEvent, describe: SourceDescription): string => `
       <tr data-uid="${escapeHtml(record.uid)}">
         <td class="source">${sourceCell(record.source, describe)}</td>
         <td class="name">${escapeHtml(record.name)}</td>
         <td class="venue">${escapeHtml(record.venue)}</td>
-        <td class="start">${formatSgt(record.start)}</td>
-        <td class="end">${formatSgt(record.end)}</td>
+        ${dateCell(record.start, "start")}
+        ${dateCell(record.end, "end")}
         <td class="review-state">${reviewPill(record.reviewed)}</td>
         <td class="shown-state">${shownPill(record.hidden)}</td>
       </tr>`;
@@ -126,11 +183,41 @@ const STYLE = `
       padding: 1px 10px; background: #fff; color: inherit; }
     .pill[aria-pressed="true"] { background: #111; color: #fff; border-color: #111; }
     .pill[disabled] { opacity: 0.5; cursor: progress; }
-    .toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%);
-      background: #111; color: #fff; padding: 8px 14px; border-radius: 6px;
+    .toast { position: fixed; left: 50%; bottom: 4rem; transform: translateX(-50%);
+      background: #111; color: #fff; padding: 8px 14px; border-radius: 6px; z-index: 20;
       display: flex; gap: 12px; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
     .toast button { font: inherit; color: #7db4ff; background: none; border: none;
-      cursor: pointer; text-decoration: underline; padding: 0; }`;
+      cursor: pointer; text-decoration: underline; padding: 0; }
+
+    /* The column header is a sort control (#157): the whole cell is clickable, and
+       an injected funnel button opens the filter menu without triggering a sort. */
+    th { cursor: pointer; user-select: none; }
+    th[aria-sort="ascending"]::after { content: " ▲"; color: #888; }
+    th[aria-sort="descending"]::after { content: " ▼"; color: #888; }
+    .funnel { font: inherit; cursor: pointer; border: none; background: none; color: #888;
+      padding: 0 2px; margin-left: 4px; }
+    .funnel[aria-expanded="true"], th.filtered .funnel { color: #111; font-weight: 700; }
+    th.filtered { background: #eef4ff; }
+    .menu { position: absolute; top: 100%; left: 0; z-index: 30; min-width: 12rem;
+      max-height: 16rem; overflow-y: auto; background: #fff; border: 1px solid #bbb;
+      border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); padding: 6px; font-weight: 400; }
+    .menu label { display: flex; gap: 8px; align-items: center; padding: 3px 4px; cursor: pointer;
+      white-space: nowrap; }
+    .menu .menu-actions { display: flex; gap: 12px; padding: 4px; border-bottom: 1px solid #eee;
+      margin-bottom: 4px; }
+    .menu .menu-actions button { font: inherit; background: none; border: none; color: #06c;
+      cursor: pointer; text-decoration: underline; padding: 0; }
+
+    /* The filter-then-bulk bar (#157): fixed, always visible, acting on exactly the
+       rows the funnel filters leave showing. */
+    .bulkbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+      display: flex; gap: 12px; align-items: center; background: #111; color: #fff;
+      padding: 8px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,0.3); }
+    .bulkbar .count { font-weight: 700; }
+    .bulkbar button { font: inherit; cursor: pointer; border: 1px solid #666; border-radius: 4px;
+      background: #222; color: #fff; padding: 3px 12px; }
+    .bulkbar button:hover { background: #333; }
+    table { margin-bottom: 3.5rem; } /* keep the last rows clear of the fixed bulk bar */`;
 
 /**
  * Renders the read-only moderator spreadsheet as a whole HTML document. The
@@ -158,13 +245,7 @@ export const renderAdminPage = (
     <caption>${count} record${count === 1 ? "" : "s"} — every listing, including hidden and unreviewed. Times shown in Singapore time (SGT); storage is UTC.</caption>
     <thead>
       <tr>
-        <th>Source</th>
-        <th>Event</th>
-        <th>Venue</th>
-        <th>Start (SGT)</th>
-        <th>End (SGT)</th>
-        <th>Review state</th>
-        <th>Shown on calendar</th>
+        ${headerCells()}
       </tr>
     </thead>
     <tbody>${rows}

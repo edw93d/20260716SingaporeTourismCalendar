@@ -126,6 +126,30 @@ describe("the admin read shows everything, including what the public cannot see"
   });
 });
 
+describe("the grid attributes the client filters and sorts by (#157)", () => {
+  it("marks the funnel-able headers and leaves the free-text Event column unfunnelled", () => {
+    const html = renderAdminPage([suntecEvent()], noDescriptions);
+    // Every funnel-able column carries data-funnel; Event (free text) does not.
+    for (const key of ["source", "venue", "start", "end", "reviewed", "hidden"]) {
+      expect(html, `expected a funnel on ${key}`).toContain(`data-key="${key}" data-funnel`);
+    }
+    expect(html).toContain('data-key="name"');
+    expect(html).not.toContain('data-key="name" data-funnel');
+  });
+
+  it("gives a date cell a month facet and an epoch-ms sort key, never the UTC clock", () => {
+    // 04:00Z on 17 Jul → month 'Jul 2026' for the funnel, and a numeric sort key so
+    // a click-label sort orders chronologically rather than by the display string.
+    const html = renderAdminPage([suntecEvent()], noDescriptions);
+    expect(html).toContain('data-facet="Jul 2026"');
+    // The sort key is epoch milliseconds — a display-neutral chronological key that
+    // does not leak the stored UTC wall-clock the SGT text deliberately hides.
+    const startMs = String(new Date("2026-07-17T04:00:00Z").getTime());
+    expect(html).toContain(`data-sort="${startMs}"`);
+    expect(html).not.toContain("04:00");
+  });
+});
+
 describe("safety", () => {
   it("HTML-escapes record text so a listing name cannot inject markup", () => {
     const html = renderAdminPage(

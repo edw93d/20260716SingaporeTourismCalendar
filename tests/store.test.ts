@@ -184,3 +184,110 @@ describe("the moderation-flag write (#156, ADR-0024)", () => {
     });
   });
 });
+
+/**
+ * The **bulk moderation-flag write** (#157, ADR-0024) — the same one flag on many
+ * records at once, so a moderator can hide or mark a whole filtered selection in a
+ * single action (filter-then-bulk). Exercised against real SQL for the same reason
+ * the single write is: it must touch *only* the one named flag on *only* the named
+ * rows, leave every other flag and every unlisted row exactly as they were
+ * (independence, ADR-0024 §2), be reversible byte-for-byte (ADR-0024 §7), and
+ * report how many of the named uids actually matched — so the route and the toast
+ * count what really changed rather than what was asked for.
+ */
+describe("the bulk moderation-flag write (#157, ADR-0024)", () => {
+  const scrapedVenueEvent = (over: Partial<Scraped<VenueEvent>> = {}): Scraped<VenueEvent> => ({
+    source: "suntec",
+    sourceKey: "bni-vision1472026",
+    name: "BNI Vision",
+    start: instant("2026-07-17T04:00:00Z"),
+    end: instant("2026-07-17T10:00:00Z"),
+    venue: "Suntec Convention Centre",
+    hall: "Level 4, Hall 404",
+    ...over,
+  });
+
+  /** Seeds `count` distinct VenueEvents and returns their minted uids, in read order. */
+  const seedMany = async (store: Store, count: number): Promise<string[]> => {
+    for (let i = 0; i < count; i++) {
+      await store.upsertVenueEvent(
+        scrapedVenueEvent({ sourceKey: `event-${i}`, name: `Event ${i}` }),
+        instant("2026-07-01T02:00:00Z"),
+      );
+    }
+    return (await store.readVenueEvents()).map((record) => record.uid);
+  };
+
+  const byUid = async (store: Store): Promise<Map<string, VenueEvent>> =>
+    new Map((await store.readVenueEvents()).map((record) => [record.uid, record]));
+
+  it("sets the flag on exactly the named uids, leaving unlisted rows untouched", async () => {
+    await withStore(async (store) => {
+      const [a, b, c] = await seedMany(store, 3);
+
+      const matched = await store.setModerationFlags([a!, c!], "hidden", true);
+
+      expect(matched).toBe(2);
+      const rows = await byUid(store);
+      expect(rows.get(a!)?.hidden).toBe(true);
+      expect(rows.get(c!)?.hidden).toBe(true);
+      // The row that was not named keeps its default — the write named it nowhere.
+      expect(rows.get(b!)?.hidden).toBe(false);
+    });
+  });
+
+  it("names only the one flag, so a bulk hide never marks anything reviewed", async () => {
+    // Independence (ADR-0024 §2) holds in bulk exactly as it does for one row.
+    await withStore(async (store) => {
+      const uids = await seedMany(store, 3);
+
+      await store.setModerationFlags(uids, "hidden", true);
+
+      const rows = await byUid(store);
+      for (const uid of uids) {
+        expect(rows.get(uid)?.hidden).toBe(true);
+        expect(rows.get(uid)?.reviewed).toBe(false);
+      }
+    });
+  });
+
+  it("is reversible — the opposite value restores the whole set", async () => {
+    await withStore(async (store) => {
+      const uids = await seedMany(store, 3);
+      await store.setModerationFlags(uids, "hidden", true);
+
+      const reverted = await store.setModerationFlags(uids, "hidden", false);
+
+      expect(reverted).toBe(3);
+      const rows = await byUid(store);
+      for (const uid of uids) expect(rows.get(uid)?.hidden).toBe(false);
+    });
+  });
+
+  it("counts only the uids that matched, ignoring unknown ones", async () => {
+    // A selection can name a uid the store never had; the count is what really
+    // changed, so the toast and the route report the truth, not the request size.
+    await withStore(async (store) => {
+      const [a] = await seedMany(store, 1);
+
+      const matched = await store.setModerationFlags(
+        [a!, "ghost-1@sg-tourism-calendar", "ghost-2@sg-tourism-calendar"],
+        "hidden",
+        true,
+      );
+
+      expect(matched).toBe(1);
+    });
+  });
+
+  it("an empty selection writes nothing and matches nothing", async () => {
+    await withStore(async (store) => {
+      const uids = await seedMany(store, 2);
+
+      expect(await store.setModerationFlags([], "hidden", true)).toBe(0);
+
+      const rows = await byUid(store);
+      for (const uid of uids) expect(rows.get(uid)?.hidden).toBe(false);
+    });
+  });
+});
