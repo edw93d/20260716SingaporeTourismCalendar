@@ -201,6 +201,16 @@ export type Store = {
   upsertVenueEvent(scraped: Scraped<VenueEvent>, seenAt: Instant): Promise<void>;
   upsertPortCall(scraped: Scraped<PortCall>, seenAt: Instant): Promise<void>;
   /**
+   * Inserts a hand-entered `VenueEvent` — the manual write path (ADR-0024 §9,
+   * #158). The **second** write into the store, outside the `Source` contract:
+   * the caller supplies `source: "manual"` and a minted `sourceKey`, and the row
+   * arrives `reviewed: true` (a person typed it) and `hidden: false` (shown). It
+   * only ever inserts — `manual` is never fetched, so nothing re-observes it and
+   * its `lastSeenAt` never advances, which is why `manual` is exempt from Source
+   * health (ADR-0007). Returns the inserted record so the route can echo it.
+   */
+  addManualVenueEvent(scraped: Scraped<VenueEvent>, typedAt: Instant): Promise<VenueEvent>;
+  /**
    * Sets one moderation flag on the `VenueEvent` with this `uid` to `value`
    * (ADR-0024, ADR-0030; #156). This is the **only** write that touches a
    * moderation column — the upsert names none of them — so a person's judgement
@@ -335,18 +345,70 @@ const trackedOf = (row: Row) => ({
   lastSeenAt: readInstant(row["last_seen_at"]),
 });
 
+/**
+ * A `venue_event` row read back as a `VenueEvent`, every column re-validated as a
+ * parse rather than a cast — one place, so the whole-table read and the manual
+ * write's `RETURNING` echo cannot map a row differently.
+ */
+const venueEventOf = (row: Row): VenueEvent => ({
+  ...trackedOf(row),
+  name: readText(row["name"]),
+  start: readInstant(row["start_at"]),
+  end: readInstant(row["end_at"]),
+  venue: readText(row["venue"]),
+  hall: optionalText(row["hall"]),
+  hidden: readBoolean(row["hidden"]),
+  reviewed: readBoolean(row["reviewed"]),
+});
+
 const readVenueEvents = async (db: Queryable): Promise<VenueEvent[]> => {
   const { rows } = await db.query(`SELECT * FROM venue_event ORDER BY start_at, uid`);
-  return rows.map((row) => ({
-    ...trackedOf(row),
-    name: readText(row["name"]),
-    start: readInstant(row["start_at"]),
-    end: readInstant(row["end_at"]),
-    venue: readText(row["venue"]),
-    hall: optionalText(row["hall"]),
-    hidden: readBoolean(row["hidden"]),
-    reviewed: readBoolean(row["reviewed"]),
-  }));
+  return rows.map(venueEventOf);
+};
+
+/**
+ * Inserts a hand-entered `VenueEvent` — the manual write path (ADR-0024 §9,
+ * #158). It is the **second** write into the store and the only exception to
+ * *every record comes from an adapter*: `manual` is never fetched, never in the
+ * source registry, and implements neither `fetch` nor `parse` (ADR-0027). The
+ * caller (the admin route) supplies `source: "manual"` and a freshly-minted
+ * `sourceKey`, so `(source, sourceKey)` stays the universal identity.
+ *
+ * ⚠️ **This is the one write that *sets* the moderation flags**, where the scrape's
+ * upsert names neither. A manual row arrives `reviewed: true` — a person typed it,
+ * so it is looked-at by definition (CONTEXT.md § Reviewed) — and `hidden: false`,
+ * shown. Both are literals in the SQL, not columns copied from the input, so the
+ * write path cannot be tricked into un-hiding or un-reviewing anything: it only
+ * ever inserts, never conflicts (the key is unique-by-minting), and touches no
+ * existing row.
+ *
+ * `firstSeenAt` and `lastSeenAt` are both the typed instant and never advance —
+ * there is no re-scrape to advance them, which is exactly why `manual` is exempt
+ * from Source health (a frozen `lastSeenAt` would otherwise read as a source going
+ * quiet, ADR-0007). Returns the inserted record, `uid` and all, so the route can
+ * echo what it created.
+ */
+const addManualVenueEvent = async (
+  db: Queryable,
+  scraped: Scraped<VenueEvent>,
+  typedAt: Instant,
+): Promise<VenueEvent> => {
+  const columns = VENUE_EVENT.content.map(([column]) => column);
+  const values = contentOf(VENUE_EVENT, scraped);
+  const contentPlaceholders = columns.map((_, i) => `$${i + 4}`);
+  const seenPlaceholder = `$${columns.length + 4}`;
+
+  const { rows } = await db.query(
+    `INSERT INTO venue_event
+       (source, source_key, uid, sequence, ${columns.join(", ")}, hidden, reviewed, first_seen_at, last_seen_at)
+     VALUES ($1, $2, $3, 0, ${contentPlaceholders.join(", ")}, false, true, ${seenPlaceholder}, ${seenPlaceholder})
+     RETURNING *`,
+    [scraped.source, scraped.sourceKey, mintUid(), ...values, typedAt],
+  );
+
+  const row = rows[0];
+  if (row === undefined) throw new Error("the manual insert returned no row");
+  return venueEventOf(row);
 };
 
 const readPortCalls = async (db: Queryable): Promise<PortCall[]> => {
@@ -458,6 +520,7 @@ const storeOver = (db: Queryable, transact: Store["transact"]): Store => ({
   readPortCalls: () => readPortCalls(db),
   upsertVenueEvent: (scraped, seenAt) => upsert(db, VENUE_EVENT, scraped, seenAt),
   upsertPortCall: (scraped, seenAt) => upsert(db, PORT_CALL, scraped, seenAt),
+  addManualVenueEvent: (scraped, typedAt) => addManualVenueEvent(db, scraped, typedAt),
   setModerationFlag: (uid, flag, value) => setModerationFlag(db, uid, flag, value),
   setModerationFlags: (uids, flag, value) => setModerationFlags(db, uids, flag, value),
   recordRun: (ranAt) => recordRun(db, ranAt),

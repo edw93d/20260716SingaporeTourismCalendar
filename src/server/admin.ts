@@ -217,7 +217,28 @@ const STYLE = `
     .bulkbar button { font: inherit; cursor: pointer; border: 1px solid #666; border-radius: 4px;
       background: #222; color: #fff; padding: 3px 12px; }
     .bulkbar button:hover { background: #333; }
-    table { margin-bottom: 3.5rem; } /* keep the last rows clear of the fixed bulk bar */`;
+    table { margin-bottom: 3.5rem; } /* keep the last rows clear of the fixed bulk bar */
+
+    /* Hand-entry (#158): a prominent ＋ button, and a centred modal over a backdrop.
+       The modal is display:flex when open, so its [hidden] state needs an explicit
+       display:none — an author display rule otherwise beats the UA [hidden] rule. */
+    .add-event { position: fixed; top: 1.5rem; right: 1.5rem; z-index: 15; font: inherit;
+      cursor: pointer; border: 1px solid #0a6; border-radius: 6px; background: #0a6; color: #fff;
+      padding: 6px 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+    .add-event:hover { background: #097; }
+    .entry-modal { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center;
+      justify-content: center; background: rgba(0,0,0,0.4); }
+    .entry-modal[hidden] { display: none; }
+    .entry-form { background: #fff; border-radius: 8px; padding: 20px; width: min(28rem, 92vw);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 12px; }
+    .entry-field { display: flex; flex-direction: column; gap: 3px; }
+    .entry-field span { font-weight: 600; }
+    .entry-field input { font: inherit; padding: 5px 7px; border: 1px solid #bbb; border-radius: 4px; }
+    .entry-error { margin: 0; color: #c00; font-weight: 600; }
+    .entry-actions { display: flex; justify-content: flex-end; gap: 10px; }
+    .entry-actions button { font: inherit; cursor: pointer; border-radius: 4px; padding: 5px 14px; }
+    .entry-cancel { border: 1px solid #bbb; background: #fff; color: #111; }
+    .entry-submit { border: 1px solid #0a6; background: #0a6; color: #fff; }`;
 
 /**
  * Renders the read-only moderator spreadsheet as a whole HTML document. The
