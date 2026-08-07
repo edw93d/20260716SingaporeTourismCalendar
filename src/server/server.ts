@@ -1,10 +1,13 @@
+import { timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import type { Instant } from "../domain/instant.js";
 import type { PortCall, VenueEvent } from "../domain/types.js";
 import { buildSitePayload, type SitePayload } from "../site/payload.js";
+import { manifests } from "../sources/registry.js";
 import type { Store } from "../store/store.js";
+import { renderAdminPage } from "./admin.js";
 
 /**
  * The public read surface (#154). One always-on server does two jobs: it serves
@@ -15,11 +18,14 @@ import type { Store } from "../store/store.js";
  * `calendar.json`: the page reads the same projection (`buildSitePayload`) the
  * feeds do, so it cannot drift from what the store holds.
  *
- * **This is the read surface only.** The route is open — no auth — because the
- * calendar is public; the admin write routes (ADR-0030) are a later ticket and
- * live nowhere here. The store is injected, not opened, so the whole thing is
- * exercisable over a real socket against an ephemeral store without the entry
- * point's environment read (`tests/server.test.ts`).
+ * **The public calendar read is open** — no auth — because the calendar is
+ * public (ADR-0026 §2). Everything under `/admin` is the operator surface and
+ * sits behind one HTTP Basic Auth boundary against a single shared secret
+ * (ADR-0030, #155): for now that surface is the read-only moderator spreadsheet,
+ * with the write routes arriving under the same guard on later tickets. The store
+ * and the admin secret are both injected, not opened/read here, so the whole
+ * thing is exercisable over a real socket against an ephemeral store without the
+ * entry point's environment read (`tests/server.test.ts`).
  */
 
 export type CalendarServerDeps = {
@@ -31,6 +37,14 @@ export type CalendarServerDeps = {
    * repo's `site/`, a test at a fixture directory.
    */
   siteDir: string;
+  /**
+   * The one shared secret guarding the admin surface (ADR-0030). A long random
+   * token compared per request as HTTP Basic Auth — **injected, never defaulted**
+   * (ADR-0010's rule, whose property ADR-0030 §3 spends): the entry point reads it
+   * from the environment and hands it here, so this module never touches
+   * `process.env` and a test can drive the boundary with a known secret.
+   */
+  adminPassword: string;
 };
 
 /** The content types the static tree actually holds. Unlisted extensions 404. */
@@ -140,20 +154,106 @@ const serveStatic = async (
   res.end(body);
 };
 
+/**
+ * Everything under `/admin` is the operator surface (ADR-0030 §5) — the page,
+ * the admin read, and every future write route. The boundary is this one test,
+ * one level up, so a single Basic Auth guard covers the whole subtree rather than
+ * each route guarding itself. The public calendar (`/`, the static tree,
+ * `/calendar.json`) is not under it and stays open (ADR-0026 §2).
+ */
+const isAdminPath = (pathname: string): boolean =>
+  pathname === "/admin" || pathname.startsWith("/admin/");
+
+/**
+ * The password from a Basic Auth header, or `null` if the header is absent or
+ * malformed. **The username is parsed off and discarded** — only the password is
+ * the secret (ADR-0030 §3), so any username with the right password passes.
+ */
+const passwordFromHeader = (header: string | undefined): string | null => {
+  if (header === undefined) return null;
+  const match = /^Basic (.+)$/.exec(header);
+  if (match === null) return null;
+  const decoded = Buffer.from(match[1]!, "base64").toString("utf8");
+  const separator = decoded.indexOf(":");
+  if (separator === -1) return null;
+  return decoded.slice(separator + 1);
+};
+
+/**
+ * A length-guarded constant-time comparison. `timingSafeEqual` throws on a length
+ * mismatch, so the lengths are checked first — and the check itself leaks only the
+ * length, never the content, which a long random token does not depend on hiding.
+ * Brute force is out of scope only because the secret is a long random token
+ * (ADR-0030 §3); this keeps the comparison itself from being the leak.
+ */
+const secretMatches = (supplied: string, expected: string): boolean => {
+  const a = Buffer.from(supplied, "utf8");
+  const b = Buffer.from(expected, "utf8");
+  return a.length === b.length && timingSafeEqual(a, b);
+};
+
+/** Answers a request that failed the boundary — 401, and the browser's prompt. */
+const sendUnauthorized = (res: ServerResponse): void => {
+  res.writeHead(401, {
+    "www-authenticate": 'Basic realm="admin", charset="UTF-8"',
+    "content-type": "text/plain; charset=utf-8",
+  });
+  res.end("unauthorized");
+};
+
+/**
+ * The admin surface, reached only past the boundary. For #155 it is one route —
+ * `GET /admin`, the read-only spreadsheet built live from the store, every
+ * `VenueEvent` including the hidden and the unreviewed (ADR-0030 §5). Write
+ * routes arrive on later tickets under this same guard; anything not yet built
+ * 404s — but behind auth, having already passed the boundary above.
+ */
+const handleAdmin = async (
+  req: IncomingMessage,
+  res: ServerResponse,
+  store: Store,
+  pathname: string,
+): Promise<void> => {
+  if (req.method === "GET" && pathname === "/admin") {
+    const venueEvents = await store.readVenueEvents();
+    const html = renderAdminPage(venueEvents, (source) => manifests[source]?.description);
+    res.writeHead(200, {
+      "content-type": "text/html; charset=utf-8",
+      "content-length": Buffer.byteLength(html),
+    });
+    res.end(html);
+    return;
+  }
+
+  sendText(res, 404, "not found");
+};
+
 const handle = async (
   req: IncomingMessage,
   res: ServerResponse,
-  { store, siteDir }: CalendarServerDeps,
+  { store, siteDir, adminPassword }: CalendarServerDeps,
 ): Promise<void> => {
-  // GET only: the read surface reads. Writes (ADR-0030) live behind auth on a
-  // later ticket, and rejecting other methods here keeps this file honestly
-  // read-only rather than silently ignoring a body it was never meant to accept.
+  const { pathname } = new URL(req.url ?? "/", "http://localhost");
+
+  // The one boundary (ADR-0030 §5), checked before routing or method so it wraps
+  // the whole admin subtree — including routes that do not exist yet.
+  if (isAdminPath(pathname)) {
+    const supplied = passwordFromHeader(req.headers.authorization);
+    if (supplied === null || !secretMatches(supplied, adminPassword)) {
+      sendUnauthorized(res);
+      return;
+    }
+    await handleAdmin(req, res, store, pathname);
+    return;
+  }
+
+  // GET only: the public read surface reads. Rejecting other methods here keeps
+  // this file honestly read-only rather than silently ignoring a body it was
+  // never meant to accept.
   if (req.method !== "GET") {
     sendText(res, 405, "method not allowed");
     return;
   }
-
-  const { pathname } = new URL(req.url ?? "/", "http://localhost");
 
   if (pathname === "/calendar.json") {
     sendJson(res, 200, await livePayload(store));

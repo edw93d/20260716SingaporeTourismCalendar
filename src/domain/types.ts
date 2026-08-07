@@ -69,6 +69,20 @@ export type VenueEvent = TrackedRecord & {
   venue: string;
   /** e.g. `Level 4, Hall 404`. */
   hall: string | null;
+  /**
+   * The two moderation flags — **person-set only, never observed** (ADR-0024,
+   * ADR-0030, #155/#156). Two independent booleans: `hidden` removes the record
+   * from the public calendar (filtered *before* projection, #156) and `reviewed`
+   * records that a person has looked at it. Hiding does not imply reviewed, and
+   * neither records *by whom* or *when* — the single-operator footing (ADR-0030).
+   *
+   * They live on `VenueEvent` and **not** on `PortCall`, and they are absent from
+   * `Scraped<T>` below, so a scrape can neither set them nor clobber them (the
+   * upsert's SET clause names only content — `src/store/store.ts`). `#155` reads
+   * and renders them; `#156` makes them writable and load-bearing.
+   */
+  hidden: boolean;
+  reviewed: boolean;
 };
 
 /**
@@ -123,12 +137,17 @@ export type CalendarEntry = {
  * computes `sourceKey`. It cannot know `uid` (durable state looked up by
  * `(source, sourceKey)` — today's HTML has no access to that memory),
  * `sequence` (a comparison against stored state it has never seen), or either
- * seen-timestamp (facts about our observation history, not about the page).
+ * seen-timestamp (facts about our observation history, not about the page). Nor
+ * the two moderation flags (`hidden`/`reviewed`): those are person-set, not
+ * observed, and a scrape that could return them could clobber them (ADR-0024).
  *
  * **The adapter observes; the core remembers.** If `parse` returned a full
- * `VenueEvent` it would have to fabricate those four — including minting a
- * `uid` on *every scrape*, precisely the recompute that duplicates a
- * rescheduled conference instead of moving it. The type makes that bug
- * unwritable rather than merely discouraged.
+ * `VenueEvent` it would have to fabricate those — including minting a `uid` on
+ * *every scrape*, precisely the recompute that duplicates a rescheduled
+ * conference instead of moving it, and re-asserting a `hidden` a person cleared.
+ * The type makes those bugs unwritable rather than merely discouraged.
  */
-export type Scraped<T> = Omit<T, "uid" | "sequence" | "firstSeenAt" | "lastSeenAt">;
+export type Scraped<T> = Omit<
+  T,
+  "uid" | "sequence" | "firstSeenAt" | "lastSeenAt" | "hidden" | "reviewed"
+>;

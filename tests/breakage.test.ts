@@ -131,6 +131,8 @@ describe("cohortDelta", () => {
       end: instant("2026-08-01T10:00:00Z"),
       venue: "Suntec",
       hall: null,
+      hidden: false,
+      reviewed: false,
       firstSeenAt: instant("2026-07-09T00:00:00Z"),
       lastSeenAt: instant("2026-07-09T00:00:00Z"),
     };
